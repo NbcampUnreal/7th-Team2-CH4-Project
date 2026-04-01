@@ -1,24 +1,61 @@
+# =========================
+# Unreal Engine
+# =========================
 Binaries/
-Build/
 DerivedDataCache/
 Intermediate/
 Saved/
 
-*.sln
-*.suo
-*.xcodeproj
-*.xcworkspace
+# Build 결과물 (필요 시만 제외)
+Build/*
+
+# =========================
+# IDE - Visual Studio
+# =========================
+.vs/
 *.VC.db
 *.VC.VC.opendb
+*.suo
+*.opensdf
+*.sdf
+*.ipch
 
+# =========================
+# IDE - Rider / JetBrains
+# =========================
+.idea/
+*.sln.iml
+
+# Rider는 .sln 기반이라 .sln 유지해야 함
+
+# =========================
+# VSCode
+# =========================
+.vscode/
+
+# =========================
+# Mac / 기타
+# =========================
+.DS_Store
+
+# =========================
+# Logs / Temp
+# =========================
 *.log
 *.tmp
 
-.DS_Store
+# =========================
+# Xcode (Mac 빌드 시)
+# =========================
+*.xcodeproj
+*.xcworkspace
 
-.vscode/
-.idea/
-
-# Visual Studio cache
-.vs/
-*.ipch
+# =========================
+# Unreal 자동 생성 파일
+# =========================
+*.opensdf
+*.sdf
+*.pidb
+*.svd
+*.suo
+*.sln
