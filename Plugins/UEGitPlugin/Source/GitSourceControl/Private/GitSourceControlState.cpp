@@ -98,8 +98,6 @@ FSlateIcon FGitSourceControlState::GetIcon() const
 	default:
 		return FSlateIcon();
 	}
-
-	return FSlateIcon();
 }
 
 #else
