@@ -13,11 +13,14 @@ class CH4_PROJECT_API UGridSubSystem : public UWorldSubsystem
 	
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Coordinate")
 	FIntPoint WorldToGridPosition(const FVector& WorldLocation) const;	// 월드 3D 좌표 -> 논리 2D 그리드 좌표
 	UFUNCTION(BlueprintCallable, Category = "Grid|Coordinate")
 	FVector GridToWorldPosition(const FIntPoint& GridLocation) const;	// 논리 2D 그리드 좌표 -> 월드 3D 좌표
+	
+	
 	
 	// UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	// bool CanBuildAt(const FIntPoint& GridLocation) const;	// 좌표에 건물을 건설할 수 있는지 검사
