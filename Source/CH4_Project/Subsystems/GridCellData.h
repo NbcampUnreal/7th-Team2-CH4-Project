@@ -23,6 +23,9 @@ struct FGridCellData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Flags")
 	uint8 bHasTrap : 1;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Coordinate")
+	float TerrarianZ;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Construction")
 	TObjectPtr<AActor> OccupyingBuilding;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Construction")
@@ -32,6 +35,7 @@ struct FGridCellData
 		: bIsBuildable(true)
 		, bIsDestroyed(false)
 		, bHasTrap(false)
+		, TerrarianZ(0.0f)
 		, OccupyingBuilding(nullptr)
 		, VisibilityState(ECellVisibilityState::Hidden)
 	{}
