@@ -20,7 +20,9 @@ void UGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	
 	FCollisionQueryParams QueryParams;	
-	QueryParams.bTraceComplex = false;
+	QueryParams.bTraceComplex = true;
+	
+	ECollisionChannel LandscapeChannel = ECC_GameTraceChannel1;
 	
 	for (int32 Y = 0; Y < GridDimensions.Y; Y++)
 	{
@@ -37,7 +39,7 @@ void UGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 					HitResult
 					, TraceStart
 					, TraceEnd
-					, ECC_Visibility
+					, LandscapeChannel
 					, QueryParams
 			);
 			
@@ -46,14 +48,19 @@ void UGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 			if (bHit)
 			{
 				GridData[Index].TerrarianZ = HitResult.ImpactPoint.Z;
+				
+				DrawDebugPoint(&InWorld, HitResult.ImpactPoint, 10.0f, FColor::Green, true);
 			}
 			else
 			{
 				GridData[Index].TerrarianZ = 0.0f;
 				GridData[Index].bIsBuildable = false;
+				
+				DrawDebugLine(&InWorld, TraceStart, TraceEnd, FColor::Red, true);
 			}
 		}
 	}
+	UE_LOG(LogTemp, Warning, TEXT("Z축 캐싱 완료"));
 }
 
 FIntPoint UGridSubSystem::WorldToGridPosition(const FVector& WorldLocation) const

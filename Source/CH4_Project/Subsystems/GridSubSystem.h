@@ -35,7 +35,7 @@ private:
 	float CellSize = 100.0f;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
-	FIntPoint GridDimensions = FIntPoint(100, 100);
+	FIntPoint GridDimensions = FIntPoint(200, 200);
 	
 	TArray<FGridCellData> GridData;	
 	
