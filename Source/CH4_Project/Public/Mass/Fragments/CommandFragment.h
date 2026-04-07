@@ -14,7 +14,7 @@
  * 
  */
 UENUM()
-enum class ECommandType:uint8
+enum class ETWCommandType:uint8
 {
 	None,
 	MoveToLocation,
@@ -22,32 +22,32 @@ enum class ECommandType:uint8
 
 
 USTRUCT()
-struct FCommandTypeFragment : public FMassFragment
+struct FTWCommandTypeFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	FCommandTypeFragment() = default;
+	FTWCommandTypeFragment() = default;
 
-	FCommandTypeFragment(const ECommandType InType)
+	FTWCommandTypeFragment(const ETWCommandType InType)
 		: Type(InType)
 	{
 	}
 
-	ECommandType GetType() const { return Type; }
-	void SetType(const ECommandType InType) { Type = InType; }
+	ETWCommandType GetType() const { return Type; }
+	void SetType(const ETWCommandType InType) { Type = InType; }
 
 protected:
 	UPROPERTY(Transient)
-	ECommandType Type = ECommandType::None;
+	ETWCommandType Type = ETWCommandType::None;
 };
 
 USTRUCT()
-struct FCommandDataFragment : public FMassSharedFragment
+struct FTWCommandDataFragment : public FMassSharedFragment
 {
 	GENERATED_BODY()
-	FCommandDataFragment() = default;
+	FTWCommandDataFragment() = default;
 
-	FCommandDataFragment(const FVector& InLocation, const FMassEntityHandle& InTarget)
+	FTWCommandDataFragment(const FVector& InLocation, const FMassEntityHandle& InTarget)
 		: Location(InLocation),
 		  Target(InTarget)
 	{

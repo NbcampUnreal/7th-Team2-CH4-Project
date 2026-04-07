@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
 #include "TESTPlayerController.generated.h"
 
@@ -21,4 +22,5 @@ public:
 	
 	UFUNCTION(Server, BlueprintCallable, Reliable)
 	void ServerMoveCommand(FVector Location);
+
 };
