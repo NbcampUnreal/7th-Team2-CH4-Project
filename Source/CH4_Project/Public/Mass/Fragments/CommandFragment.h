@@ -14,10 +14,14 @@
  * 
  */
 UENUM()
-enum class ETWCommandType:uint8
+enum class ETWState:uint8
 {
 	None,
 	MoveToLocation,
+	MoveToUnit,
+	AttackToLocation,
+	AttackToUnit,
+	Hold
 };
 
 
@@ -28,17 +32,17 @@ struct FTWCommandTypeFragment : public FMassFragment
 
 	FTWCommandTypeFragment() = default;
 
-	FTWCommandTypeFragment(const ETWCommandType InType)
+	FTWCommandTypeFragment(const ETWState InType)
 		: Type(InType)
 	{
 	}
 
-	ETWCommandType GetType() const { return Type; }
-	void SetType(const ETWCommandType InType) { Type = InType; }
+	ETWState GetType() const { return Type; }
+	void SetType(const ETWState InType) { Type = InType; }
 
 protected:
 	UPROPERTY(Transient)
-	ETWCommandType Type = ETWCommandType::None;
+	ETWState Type = ETWState::None;
 };
 
 USTRUCT()

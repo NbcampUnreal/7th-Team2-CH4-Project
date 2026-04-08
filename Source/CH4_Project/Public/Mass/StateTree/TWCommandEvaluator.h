@@ -14,7 +14,7 @@ struct FTWCommandEvaluatorInstanceData
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, Category = "Output")
-	ETWCommandType CurrentCommand = ETWCommandType::None;
+	ETWState CurrentCommand = ETWState::None;
 };
 
 /**

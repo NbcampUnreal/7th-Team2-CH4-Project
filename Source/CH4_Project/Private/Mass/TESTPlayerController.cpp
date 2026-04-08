@@ -39,7 +39,6 @@ void ATESTPlayerController::ServerMoveCommand_Implementation(FVector LastClickLo
 {
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem) return;
-	UE_LOG(LogMass, Warning, TEXT("MulticastMoveCommand_Implementation"));
 	FVector NavLocation = FVector::ZeroVector;
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 
@@ -87,7 +86,7 @@ void ATESTPlayerController::ServerMoveCommand_Implementation(FVector LastClickLo
 				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<
 					FTWCommandTypeFragment>(Entity))
 				{
-					TypeFragment->SetType(ETWCommandType::MoveToLocation);
+					TypeFragment->SetType(ETWState::MoveToLocation);
 				}
 			}
 
