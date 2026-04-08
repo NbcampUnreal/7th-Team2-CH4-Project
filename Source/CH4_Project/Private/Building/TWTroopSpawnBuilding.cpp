@@ -137,6 +137,16 @@ int8 ATWTroopSpawnBuilding::SpawnUnitNow()
     return 1;
 }
 
+void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(const int8 bInPaused)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    bQueuePausedByUpkeep = bInPaused;
+}
+
 void ATWTroopSpawnBuilding::StartSpawnQueueTimer()
 {
     if (!HasAuthority())
@@ -176,6 +186,11 @@ void ATWTroopSpawnBuilding::HandleSpawnQueue()
         ClearAllBuildingTimers();
         return;
     }
+    
+    if (bQueuePausedByUpkeep == 1)
+    {
+        return;
+    }
 
     const int8 bSpawnSuccess = SpawnUnitNow();
     if (bSpawnSuccess == 0)
@@ -206,6 +221,7 @@ void ATWTroopSpawnBuilding::ClearAllBuildingTimers()
     }
 
     GetWorldTimerManager().ClearTimer(SpawnQueueTimerHandle);
+    bQueuePausedByUpkeep = 0;
 }
 
 void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -213,4 +229,5 @@ void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ATWTroopSpawnBuilding, CurrentQueueCount);
+    DOREPLIFETIME(ATWTroopSpawnBuilding, bQueuePausedByUpkeep);
 }

@@ -57,4 +57,19 @@ public:
 #pragma region 인구 수
 	void AddPopulationCap(const int32 InAmount);
 #pragma endregion
+	
+#pragma region 병력 유지비
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep")
+	FBuildingResourceCost UpkeepCost;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep", meta=(ClampMin="0.1"))
+	float UpkeepInterval = 60.0f;
+
+	FTimerHandle TroopUpkeepTimerHandle;
+
+	FBuildingResourceCost GetTotalTroopUpkeepCost() const;
+	void RefreshTroopUpkeepTimer();
+	void HandleTroopUpkeep();
+	int8 TrySpendTroopUpkeep();
+#pragma endregion
 };

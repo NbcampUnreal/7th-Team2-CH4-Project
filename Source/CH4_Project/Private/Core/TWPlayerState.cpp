@@ -1,7 +1,9 @@
 ﻿#include "Core/TWPlayerState.h"
-
 #include "Data/TWBuildingTypes.h"
 #include "Net/UnrealNetwork.h"
+#include "Building/TWTroopSpawnBuilding.h"
+#include "EngineUtils.h"
+#include "TimerManager.h"
 
 ATWPlayerState::ATWPlayerState()
 {
@@ -106,7 +108,8 @@ void ATWPlayerState::AddTroopCount(const int32 InAmount)
 	}
 
 	CurrentTroopCount += InAmount;
-
+	RefreshTroopUpkeepTimer();
+	
 	UE_LOG(
 		LogTemp,
 		Log,
@@ -131,7 +134,8 @@ void ATWPlayerState::RemoveTroopCount(const int32 InAmount)
 
 	CurrentTroopCount -= InAmount;
 	CurrentTroopCount = FMath::Max(0, CurrentTroopCount);
-
+	RefreshTroopUpkeepTimer();
+	
 	UE_LOG(
 		LogTemp,
 		Log,
@@ -195,6 +199,119 @@ void ATWPlayerState::AddPopulationCap(const int32 InAmount)
 		PlayerSlot,
 		MaxTroopCount
 	);
+}
+
+FBuildingResourceCost ATWPlayerState::GetTotalTroopUpkeepCost() const
+{
+	FBuildingResourceCost TotalCost;
+
+	TotalCost.Wood = UpkeepCost.Wood * CurrentTroopCount;
+	TotalCost.Ore = UpkeepCost.Ore * CurrentTroopCount;
+
+	return TotalCost;
+}
+
+void ATWPlayerState::RefreshTroopUpkeepTimer()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (CurrentTroopCount <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(TroopUpkeepTimerHandle);
+
+		for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
+		{
+			ATWTroopSpawnBuilding* TroopBuilding = *It;
+			if (!TroopBuilding)
+			{
+				continue;
+			}
+
+			if (TroopBuilding->GetOwnerPlayerState() != this)
+			{
+				continue;
+			}
+
+			TroopBuilding->SetQueuePausedByUpkeep(0);
+		}
+
+		return;
+	}
+
+	if (GetWorldTimerManager().IsTimerActive(TroopUpkeepTimerHandle))
+	{
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		TroopUpkeepTimerHandle,
+		this,
+		&ATWPlayerState::HandleTroopUpkeep,
+		UpkeepInterval,
+		true
+	);
+}
+
+void ATWPlayerState::HandleTroopUpkeep()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const FBuildingResourceCost TotalCost = GetTotalTroopUpkeepCost();
+	const int8 bPaidUpkeep = TrySpendTroopUpkeep();
+
+	for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWTroopSpawnBuilding* TroopBuilding = *It;
+		if (!TroopBuilding)
+		{
+			continue;
+		}
+
+		if (TroopBuilding->GetOwnerPlayerState() != this)
+		{
+			continue;
+		}
+
+		TroopBuilding->SetQueuePausedByUpkeep(bPaidUpkeep == 1 ? 0 : 1);
+	}
+
+	if (bPaidUpkeep == 1)
+	{
+		UE_LOG(LogTemp, Log, TEXT("PlayerSlot: %d | 유지비 지불 성공"), PlayerSlot);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PlayerSlot: %d | 유지비 부족 - 다음 체크까지 대기열 정지"), PlayerSlot);
+	}
+}
+
+int8 ATWPlayerState::TrySpendTroopUpkeep()
+{
+	if (!HasAuthority())
+	{
+		return 0;
+	}
+
+	if (CurrentTroopCount <= 0)
+	{
+		return 1;
+	}
+
+	const FBuildingResourceCost TotalCost = GetTotalTroopUpkeepCost();
+
+	if (CanAffordCost(TotalCost.Wood, TotalCost.Ore) == 0)
+	{
+		return 0;
+	}
+
+	SpendCost(TotalCost.Wood, TotalCost.Ore);
+	return 1;
 }
 
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
