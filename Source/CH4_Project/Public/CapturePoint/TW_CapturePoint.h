@@ -1,0 +1,76 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "TW_CapturePoint.generated.h"
+
+class UBoxComponent;
+class UTW_TeamComponent;
+class UTW_VisionComponent;
+
+UCLASS()
+class CH4_PROJECT_API ATW_CapturePoint : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	ATW_CapturePoint();
+
+protected:
+	virtual void BeginPlay() override;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	UBoxComponent* CaptureArea;
+
+	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	UTW_TeamComponent* MyTeamComp;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	UTW_VisionComponent* MyVisionComp;
+
+	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	UStaticMeshComponent* MeshComp;
+	
+	UPROPERTY(EditAnywhere, Category = "Capture")
+	float MaxGauge = 100.0f;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Capture")
+	float CurrentGauge = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Capture")
+	float CaptureSpeed = 10.0f; // 점령게이지 초당 상승량
+
+	UPROPERTY(EditAnywhere, Category = "Capture")
+	float DecaySpeed = 30.0f;    // 점령 게이지 감소량
+	
+	UPROPERTY(EditAnywhere, Category = "Capture")
+	float VisionRad = 2000.0f;
+
+private:
+	FTimerHandle CaptureTimerHandle;
+	const float CheckInterval = 0.1f;
+	
+	void StartCaptureTimer();
+	
+	void StopCaptureTimer();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	void CheckCaptureStatus();
+	
+private:
+	
+	int32 CapturingTeamID = 0;
+
+	// 영역 내 액터 관리
+	TSet<AActor*> OverlappingActors;
+
+	// 델리게이트 함수
+	UFUNCTION()
+	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+};
