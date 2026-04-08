@@ -24,14 +24,14 @@ public:
 	void RequestEnqueueTroop();
 	int8 SpawnUnitNow();
 	
-	void SetQueuePausedByUpkeep(const int8 bInPaused);
+	void SetQueuePausedByUpkeep(const uint8 bInPaused);
 	
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Queue")
 	int32 CurrentQueueCount = 0;
 	
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Upkeep")
-	int32 bQueuePausedByUpkeep = 0;
+	uint8 QueuePausedByUpkeep = 0;
 
 	FTimerHandle SpawnQueueTimerHandle;
 

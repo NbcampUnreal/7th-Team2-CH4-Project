@@ -46,6 +46,12 @@ void ATWTroopSpawnBuilding::RequestEnqueueTroop()
     {
         return;
     }
+    
+    if (QueuePausedByUpkeep == 1)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("유지비 부족으로 건물 pause 상태 - 병력 대기열 추가 불가"));
+        return;
+    }
 
     if (!TroopData->SpawnActorClass)
     {
@@ -137,14 +143,14 @@ int8 ATWTroopSpawnBuilding::SpawnUnitNow()
     return 1;
 }
 
-void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(const int8 bInPaused)
+void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(const uint8 bInPaused)
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    bQueuePausedByUpkeep = bInPaused;
+    QueuePausedByUpkeep = bInPaused;
 }
 
 void ATWTroopSpawnBuilding::StartSpawnQueueTimer()
@@ -187,7 +193,7 @@ void ATWTroopSpawnBuilding::HandleSpawnQueue()
         return;
     }
     
-    if (bQueuePausedByUpkeep == 1)
+    if (QueuePausedByUpkeep == 1)
     {
         return;
     }
@@ -221,7 +227,6 @@ void ATWTroopSpawnBuilding::ClearAllBuildingTimers()
     }
 
     GetWorldTimerManager().ClearTimer(SpawnQueueTimerHandle);
-    bQueuePausedByUpkeep = 0;
 }
 
 void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -229,5 +234,5 @@ void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ATWTroopSpawnBuilding, CurrentQueueCount);
-    DOREPLIFETIME(ATWTroopSpawnBuilding, bQueuePausedByUpkeep);
+    DOREPLIFETIME(ATWTroopSpawnBuilding, QueuePausedByUpkeep);
 }
