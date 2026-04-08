@@ -7,8 +7,8 @@
 #include "TW_CapturePoint.generated.h"
 
 class UBoxComponent;
-class UTW_TeamComponent;
-class UTW_VisionComponent;
+class UTWTeamComponent;
+class UTWVisionComponent;
 
 UCLASS()
 class CH4_PROJECT_API ATW_CapturePoint : public AActor
@@ -25,10 +25,10 @@ protected:
 	UBoxComponent* CaptureArea;
 
 	UPROPERTY(VisibleAnywhere, Category = "Capture")
-	UTW_TeamComponent* MyTeamComp;
+	UTWTeamComponent* MyTeamComp;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Capture")
-	UTW_VisionComponent* MyVisionComp;
+	UTWVisionComponent* MyVisionComp;
 
 	UPROPERTY(VisibleAnywhere, Category = "Capture")
 	UStaticMeshComponent* MeshComp;

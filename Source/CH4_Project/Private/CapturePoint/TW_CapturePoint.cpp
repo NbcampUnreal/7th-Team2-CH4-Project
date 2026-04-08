@@ -1,10 +1,10 @@
 #include "CapturePoint/TW_CapturePoint.h"
 
-#include "Component/TW_TeamComponent.h"
+#include "Component/TWTeamComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "TimerManager.h"
-#include "FOW/TW_VisionComponent.h"
+#include "FOW/TWVisionComponent.h"
 #include "Net/UnrealNetwork.h"
 
 ATW_CapturePoint::ATW_CapturePoint()
@@ -19,9 +19,9 @@ ATW_CapturePoint::ATW_CapturePoint()
     MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
     MeshComp->SetupAttachment(RootComponent);
     
-    MyTeamComp = CreateDefaultSubobject<UTW_TeamComponent>(TEXT("TeamComponent"));
+    MyTeamComp = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
     
-    MyVisionComp = CreateDefaultSubobject<UTW_VisionComponent>(TEXT("VisionComponent"));
+    MyVisionComp = CreateDefaultSubobject<UTWVisionComponent>(TEXT("VisionComponent"));
     if (MyVisionComp)
     {
         MyVisionComp->VisionRadius = VisionRad;
@@ -43,7 +43,7 @@ void ATW_CapturePoint::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActo
 {
     if (!HasAuthority()) return;
 
-    if (OtherActor && OtherActor->FindComponentByClass<UTW_TeamComponent>())
+    if (OtherActor && OtherActor->FindComponentByClass<UTWTeamComponent>())
     {
         OverlappingActors.Add(OtherActor);
         StartCaptureTimer();
@@ -88,7 +88,7 @@ void ATW_CapturePoint::CheckCaptureStatus()
     TSet<int32> PresentTeams;
     for (AActor* Actor : CurrentlyInArea)
     {
-        if (UTW_TeamComponent* TeamComp = Actor->FindComponentByClass<UTW_TeamComponent>())
+        if (UTWTeamComponent* TeamComp = Actor->FindComponentByClass<UTWTeamComponent>())
         {
             if (TeamComp->TeamID > 0) 
             {
