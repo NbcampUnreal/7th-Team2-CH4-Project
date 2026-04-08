@@ -41,8 +41,6 @@ struct FBuildingGridSize
 
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Grid", meta=(ClampMin="1"))
-	int32 Width = 1;
+	FIntPoint BuildingSize = FIntPoint(1, 1);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Grid", meta=(ClampMin="1"))
-	int32 Height = 1;
 };
