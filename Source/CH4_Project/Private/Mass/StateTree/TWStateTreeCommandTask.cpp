@@ -24,7 +24,7 @@ EStateTreeRunStatus FTWStateTreeCommandTask::EnterState(FStateTreeExecutionConte
 	InstanceData.TargetLocation.EndOfPathPosition = CommandData.GetLocation();
 	
 	FTWCommandTypeFragment& CommandType = Context.GetExternalData(EntityCommandTypeHandle);
-	CommandType.SetType(ETWCommandType::None);
+	CommandType.SetType(ETWState::None);
 	
 	UE_LOG(LogMass, Warning, TEXT("%lf, %lf, %lf"), CommandData.GetLocation().X,CommandData.GetLocation().Y,CommandData.GetLocation().Z)
 	return EStateTreeRunStatus::Running;

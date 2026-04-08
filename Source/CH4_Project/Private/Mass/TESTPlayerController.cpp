@@ -87,7 +87,7 @@ void ATESTPlayerController::ServerMoveCommand_Implementation(FVector LastClickLo
 				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<
 					FTWCommandTypeFragment>(Entity))
 				{
-					TypeFragment->SetType(ETWCommandType::MoveToLocation);
+					TypeFragment->SetType(ETWState::MoveToLocation);
 				}
 			}
 

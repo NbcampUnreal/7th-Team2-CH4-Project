@@ -13,14 +13,14 @@
 #include "MassStateTreeFragments.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
-#include "Mass/Fragments/CommandFragment.h"
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/TWUnitSubsystem.h"
 
 ATWPlayerController::ATWPlayerController()
+	:CurrentCommandType(ETWCommand::None)
 {
 	PrimaryActorTick.bCanEverTick = true;
-	bReplicates = true;
+	SelectedEntities.Empty();
 }
 
 void ATWPlayerController::BeginPlay()
@@ -53,14 +53,15 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 void ATWPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	check(IsValid(SelectAction));
+	check(IsValid(LeftMouseAction));
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Started, this, &ThisClass::OnStartSelectAction);
-		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Completed, this, &ThisClass::OnEndSelectAction);
+		EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
+		EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
+		EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
 		EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 		EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 		EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
@@ -68,13 +69,41 @@ void ATWPlayerController::SetupInputComponent()
 }
 
 
-void ATWPlayerController::OnStartSelectAction(const FInputActionValue& InputActionValue)
+void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
+	FHitResult HitResult;
+	FVector ClickLocation;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	{
+		ClickLocation = HitResult.Location;
+	}else
+	{
+		return;
+	}
+	
+	if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
+	{
+		switch (CurrentCommandType) {
+		case ETWCommand::Move:
+			ServerHandleMoveCommand(ClickLocation);
+			break;
+		case ETWCommand::Attack:
+			ServerHandleAttackCommand(ClickLocation);
+			break;
+		default:
+			check(false);
+			break;
+		}
+		ChangeCurrentCommandType(ETWCommand::None);
+		return;
+	}
+	ClickStartLocation = ClickLocation;
 }
 
-void ATWPlayerController::OnEndSelectAction(const FInputActionValue& InputActionValue)
+void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	
+	ChangeCurrentCommandType(ETWCommand::None);
+	//TODO 다중선택 처리 필요
 	FHitResult HitResult;
 	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
@@ -84,8 +113,15 @@ void ATWPlayerController::OnEndSelectAction(const FInputActionValue& InputAction
 	
 }
 
-inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
+void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActionValue)
 {
+	//Cancle Command
+	if (CurrentCommandType != ETWCommand::None)
+	{
+		ChangeCurrentCommandType(ETWCommand::None);
+		return;
+	}
+	//Move Command Execute
 	FHitResult HitResult;
 	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
@@ -94,12 +130,19 @@ inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& In
 	}
 }
 
+inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
+{
+	ChangeCurrentCommandType(ETWCommand::Move);
+}
+
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
+	ChangeCurrentCommandType(ETWCommand::Attack);
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
 {
+	ServerHandleHoldCommand();
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
@@ -166,7 +209,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 					if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<
 						FTWCommandTypeFragment>(Entity))
 					{
-						TypeFragment->SetType(ETWCommandType::MoveToLocation);
+						TypeFragment->SetType(ETWState::MoveToLocation);
 					}
 				}
 
@@ -191,6 +234,25 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 		}));
 	}
 }
+void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector& CommandLocation)
+{
+	// if (건물)
+	// {
+	// 	
+	// }else if (유닛)
+	// {
+	// 	
+	// }else
+	// {
+	// 	지형
+	// }
+}
+
+void ATWPlayerController::ServerHandleHoldCommand_Implementation()
+{
+	//TODO Hold
+}
+
 
 void ATWPlayerController::ServerHandleSelect_Implementation(const FVector& CommandLocation)
 {
@@ -253,6 +315,12 @@ void ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 			MyPawn->AddMovementInput(MoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
 		}
 	}
+}
+
+void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
+{
+	//TODO 마우스 커서 변경 등 처리
+	CurrentCommandType = CommandType;
 }
 
 
