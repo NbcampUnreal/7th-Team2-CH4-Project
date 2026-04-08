@@ -10,6 +10,8 @@
 struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
+class ATWPopulationBuilding;
+class ATWBlockingBuilding;
 /**
  * 
  */
@@ -57,6 +59,40 @@ protected:
 private:
 	void HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
+	
+#pragma region 병력 스폰 대기열
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	UInputAction* IA_TestSpawnTroop;
+
+	UFUNCTION()
+	void HandleTestSpawnTroop(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTestSpawnTroop();
+#pragma endregion
+
+#pragma region 인구 수 대기열	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	UInputAction* IA_TestIncreasePopulation;
+	
+	UFUNCTION()
+	void HandleTestIncreasePopulation(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTestIncreasePopulation();
+#pragma endregion
+	
+#pragma region 방벽 데미지
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	UInputAction* IA_TestDamageBlockingBuilding;
+
+	UFUNCTION()
+	void HandleTestDamageBlockingBuilding(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTestDamageBlockingBuilding();
+#pragma endregion
+
 	
 private:
 	TArray<FMassEntityHandle> SelectedEntities;

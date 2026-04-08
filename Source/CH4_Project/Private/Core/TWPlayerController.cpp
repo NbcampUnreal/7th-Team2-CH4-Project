@@ -1,9 +1,12 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Core/TWPlayerController.h"
+#include "Core/TWPlayerState.h"
+#include "Building/TWTroopSpawnBuilding.h"
+#include "Building/TWPopulationBuilding.h"
+#include "Building/TWBlockingBuilding.h"
 #include "EnhancedInputComponent.h"
+#include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
+#include "EngineUtils.h"
 #include "InputMappingContext.h"
 #include "EnhancedPlayerInput.h"
 #include "MassCommandBuffer.h"
@@ -26,6 +29,17 @@ ATWPlayerController::ATWPlayerController()
 void ATWPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
 	check(IsValid(DefaultMappingContext));
 	
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -57,13 +71,47 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+	
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+	if (!EnhancedInputComponent)
 	{
-		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Started, this, &ThisClass::OnStartSelectAction);
-		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Completed, this, &ThisClass::OnEndSelectAction);
-		EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
-		EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
-		EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
+		return;
+	}
+	
+	EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Started, this, &ThisClass::OnStartSelectAction);
+	EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Completed, this, &ThisClass::OnEndSelectAction);
+	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
+	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
+	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
+	
+	if (IA_TestSpawnTroop)
+	{
+		EnhancedInputComponent->BindAction(
+			IA_TestSpawnTroop,
+			ETriggerEvent::Started,
+			this,
+			&ATWPlayerController::HandleTestSpawnTroop
+		);
+	}
+
+	if (IA_TestIncreasePopulation)
+	{
+		EnhancedInputComponent->BindAction(
+			IA_TestIncreasePopulation,
+			ETriggerEvent::Started,
+			this,
+			&ATWPlayerController::HandleTestIncreasePopulation
+		);
+	}
+
+	if (IA_TestDamageBlockingBuilding)
+	{
+		EnhancedInputComponent->BindAction(
+			IA_TestDamageBlockingBuilding,
+			ETriggerEvent::Started,
+			this,
+			&ATWPlayerController::HandleTestDamageBlockingBuilding
+		);
 	}
 }
 
@@ -254,6 +302,106 @@ void ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 		}
 	}
 }
+
+void ATWPlayerController::HandleTestSpawnTroop(const FInputActionValue& Value)
+{
+	ServerTestSpawnTroop();
+}
+
+void ATWPlayerController::ServerTestSpawnTroop_Implementation()
+{
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+
+	for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWTroopSpawnBuilding* TroopBuilding = *It;
+		if (!TroopBuilding)
+		{
+			continue;
+		}
+
+		if (TroopBuilding->OwnerPlayerSlot != MyPlayerSlot)
+		{
+			continue;
+		}
+
+		TroopBuilding->RequestEnqueueTroop();
+		return;
+	}
+}
+
+void ATWPlayerController::HandleTestIncreasePopulation(const FInputActionValue& Value)
+{
+	ServerTestIncreasePopulation();
+}
+
+void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
+{
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+
+	for (TActorIterator<ATWPopulationBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWPopulationBuilding* PopulationBuilding = *It;
+		if (!PopulationBuilding)
+		{
+			continue;
+		}
+
+		if (PopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
+		{
+			continue;
+		}
+
+		PopulationBuilding->RequestEnqueuePopulation();
+		return;
+	}
+}
+
+void ATWPlayerController::HandleTestDamageBlockingBuilding(const FInputActionValue& Value)
+{
+	ServerTestDamageBlockingBuilding();
+}
+
+void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
+{
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+
+	for (TActorIterator<ATWBlockingBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWBlockingBuilding* BlockingBuilding = *It;
+		if (!BlockingBuilding)
+		{
+			continue;
+		}
+
+		if (BlockingBuilding->OwnerPlayerSlot == MyPlayerSlot)
+		{
+			continue;
+		}
+
+		BlockingBuilding->ApplyDamageToBuilding(10);
+		return;
+	}
+}
+
 
 
 #pragma endregion
