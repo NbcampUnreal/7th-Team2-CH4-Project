@@ -1,4 +1,4 @@
-﻿#include "Player/TWPlayerController.h"
+﻿#include "GamePlay/Test/TWTestPlayerController.h"
 
 #include "Components/InputComponent.h"
 #include "Engine/DataTable.h"
@@ -13,14 +13,14 @@
 #include "UI/Data/TWUIDataTypes.h"
 #include "UI/Widgets/TWHUDRootWidget.h"
 
-ATWPlayerController::ATWPlayerController()
+ATWTestPlayerController::ATWTestPlayerController()
 {
 	bShowMouseCursor = true;
 	bReplicates = false;
 	DefaultMouseCursor = EMouseCursor::Default;
 }
 
-void ATWPlayerController::BeginPlay()
+void ATWTestPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -43,7 +43,7 @@ void ATWPlayerController::BeginPlay()
 	ClearSelection();
 }
 
-void ATWPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ATWTestPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (HUDRootWidget)
 	{
@@ -63,7 +63,7 @@ void ATWPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void ATWPlayerController::SetupInputComponent()
+void ATWTestPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
@@ -88,7 +88,7 @@ void ATWPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Zero, IE_Pressed, this, &ThisClass::Input_CommandSlot0);
 }
 
-void ATWPlayerController::CreateAndShowHUD()
+void ATWTestPlayerController::CreateAndShowHUD()
 {
 	if (!IsLocalController() || HUDRootWidget)
 	{
@@ -111,7 +111,7 @@ void ATWPlayerController::CreateAndShowHUD()
 	HUDRootWidget->AddToViewport();
 }
 
-void ATWPlayerController::CreateCoordinator()
+void ATWTestPlayerController::CreateCoordinator()
 {
 	if (!HUDCoordinator)
 	{
@@ -119,7 +119,7 @@ void ATWPlayerController::CreateCoordinator()
 	}
 }
 
-void ATWPlayerController::BindCoordinator()
+void ATWTestPlayerController::BindCoordinator()
 {
 	if (!HUDCoordinator || !HUDRootWidget || !SelectionProvider || !ResourceProvider)
 	{
@@ -139,7 +139,7 @@ void ATWPlayerController::BindCoordinator()
 	HUDRootWidget->GetOnHUDCommandClickedDelegate().AddUObject(this, &ThisClass::HandleCommandButtonClicked);
 }
 
-void ATWPlayerController::CreateProviders()
+void ATWTestPlayerController::CreateProviders()
 {
 	ShutdownProviders();
 
@@ -158,7 +158,7 @@ void ATWPlayerController::CreateProviders()
 	}
 }
 
-void ATWPlayerController::ShutdownProviders()
+void ATWTestPlayerController::ShutdownProviders()
 {
 	if (SelectionProvider)
 	{
@@ -173,7 +173,7 @@ void ATWPlayerController::ShutdownProviders()
 	}
 }
 
-void ATWPlayerController::HandleLeftClick()
+void ATWTestPlayerController::HandleLeftClick()
 {
 	FHitResult HitResult;
 	if (!GetHitResultUnderCursor(ECC_Visibility, true, HitResult))
@@ -212,7 +212,7 @@ void ATWPlayerController::HandleLeftClick()
 	ClearSelection();
 }
 
-void ATWPlayerController::HandleRightClick()
+void ATWTestPlayerController::HandleRightClick()
 {
 	FHitResult HitResult;
 	if (!GetHitResultUnderCursor(ECC_Visibility, true, HitResult))
@@ -223,23 +223,23 @@ void ATWPlayerController::HandleRightClick()
 	TryIssuePendingMove(HitResult.Location);
 }
 
-void ATWPlayerController::Input_CommandSlot1() { HandleCommandSlotPressed(1); }
-void ATWPlayerController::Input_CommandSlot2() { HandleCommandSlotPressed(2); }
-void ATWPlayerController::Input_CommandSlot3() { HandleCommandSlotPressed(3); }
-void ATWPlayerController::Input_CommandSlot4() { HandleCommandSlotPressed(4); }
-void ATWPlayerController::Input_CommandSlot5() { HandleCommandSlotPressed(5); }
-void ATWPlayerController::Input_CommandSlot6() { HandleCommandSlotPressed(6); }
-void ATWPlayerController::Input_CommandSlot7() { HandleCommandSlotPressed(7); }
-void ATWPlayerController::Input_CommandSlot8() { HandleCommandSlotPressed(8); }
-void ATWPlayerController::Input_CommandSlot9() { HandleCommandSlotPressed(9); }
-void ATWPlayerController::Input_CommandSlot0() { HandleCommandSlotPressed(0); }
+void ATWTestPlayerController::Input_CommandSlot1() { HandleCommandSlotPressed(1); }
+void ATWTestPlayerController::Input_CommandSlot2() { HandleCommandSlotPressed(2); }
+void ATWTestPlayerController::Input_CommandSlot3() { HandleCommandSlotPressed(3); }
+void ATWTestPlayerController::Input_CommandSlot4() { HandleCommandSlotPressed(4); }
+void ATWTestPlayerController::Input_CommandSlot5() { HandleCommandSlotPressed(5); }
+void ATWTestPlayerController::Input_CommandSlot6() { HandleCommandSlotPressed(6); }
+void ATWTestPlayerController::Input_CommandSlot7() { HandleCommandSlotPressed(7); }
+void ATWTestPlayerController::Input_CommandSlot8() { HandleCommandSlotPressed(8); }
+void ATWTestPlayerController::Input_CommandSlot9() { HandleCommandSlotPressed(9); }
+void ATWTestPlayerController::Input_CommandSlot0() { HandleCommandSlotPressed(0); }
 
-void ATWPlayerController::HandleCommandSlotPressed(int32 InHumanReadableHotkey)
+void ATWTestPlayerController::HandleCommandSlotPressed(int32 InHumanReadableHotkey)
 {
 	TryHandleCommandBySlot(InHumanReadableHotkey);
 }
 
-bool ATWPlayerController::TryHandleCommandBySlot(int32 InHumanReadableHotkey)
+bool ATWTestPlayerController::TryHandleCommandBySlot(int32 InHumanReadableHotkey)
 {
 	if (!HUDCoordinator)
 	{
@@ -288,17 +288,17 @@ bool ATWPlayerController::TryHandleCommandBySlot(int32 InHumanReadableHotkey)
 	return false;
 }
 
-bool ATWPlayerController::TryHandleCommandById(FName InCommandId)
+bool ATWTestPlayerController::TryHandleCommandById(FName InCommandId)
 {
 	return ExecuteGameplayCommandById(InCommandId);
 }
 
-void ATWPlayerController::HandleCommandButtonClicked(FName InCommandId)
+void ATWTestPlayerController::HandleCommandButtonClicked(FName InCommandId)
 {
 	TryHandleCommandById(InCommandId);
 }
 
-void ATWPlayerController::SetSelectedActor(AActor* InActor)
+void ATWTestPlayerController::SetSelectedActor(AActor* InActor)
 {
 	UE_LOG(LogTemp, Warning, TEXT("[Selection] SetSelectedActor called: %s"),
 		InActor ? *InActor->GetName() : TEXT("None"));
@@ -349,7 +349,7 @@ void ATWPlayerController::SetSelectedActor(AActor* InActor)
 	PushInfoNotification(FString::Printf(TEXT("Selected: %s"), *SelectionVM.DisplayName));
 }
 
-void ATWPlayerController::ClearSelection()
+void ATWTestPlayerController::ClearSelection()
 {
 	CurrentSelectedActor = nullptr;
 	bPendingMoveCommand = false;
@@ -360,7 +360,7 @@ void ATWPlayerController::ClearSelection()
 	}
 }
 
-bool ATWPlayerController::TryBuildSelectionFromActor(
+bool ATWTestPlayerController::TryBuildSelectionFromActor(
 	AActor* InActor,
 	FSelectionViewModel& OutSelectionVM,
 	TArray<FName>& OutCommandIds) const
@@ -406,7 +406,7 @@ bool ATWPlayerController::TryBuildSelectionFromActor(
 	return false;
 }
 
-bool ATWPlayerController::TryIssuePendingMove(const FVector& InTargetLocation)
+bool ATWTestPlayerController::TryIssuePendingMove(const FVector& InTargetLocation)
 {
 	ATWTestUnitActor* Unit = GetSelectedTestUnit();
 	if (!Unit)
@@ -428,7 +428,7 @@ bool ATWPlayerController::TryIssuePendingMove(const FVector& InTargetLocation)
 	return true;
 }
 
-bool ATWPlayerController::ExecuteGameplayCommandById(FName InCommandId)
+bool ATWTestPlayerController::ExecuteGameplayCommandById(FName InCommandId)
 {
 	if (InCommandId.IsNone())
 	{
@@ -556,17 +556,17 @@ bool ATWPlayerController::ExecuteGameplayCommandById(FName InCommandId)
 	return false;
 }
 
-ATWTestUnitActor* ATWPlayerController::GetSelectedTestUnit() const
+ATWTestUnitActor* ATWTestPlayerController::GetSelectedTestUnit() const
 {
 	return Cast<ATWTestUnitActor>(CurrentSelectedActor);
 }
 
-ATWTestBuildingActor* ATWPlayerController::GetSelectedTestBuilding() const
+ATWTestBuildingActor* ATWTestPlayerController::GetSelectedTestBuilding() const
 {
 	return Cast<ATWTestBuildingActor>(CurrentSelectedActor);
 }
 
-void ATWPlayerController::PushInfoNotification(const FString& InMessage) const
+void ATWTestPlayerController::PushInfoNotification(const FString& InMessage) const
 {
 	if (HUDCoordinator)
 	{

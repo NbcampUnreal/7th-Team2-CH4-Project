@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/Data/TWUIDataTypes.h"
-#include "TWPlayerController.generated.h"
+#include "TWTestPlayerController.generated.h"
 
 class UDataTable;
 class UTWHUDRootWidget;
@@ -14,12 +14,12 @@ class ATWTestUnitActor;
 class ATWTestBuildingActor;
 
 UCLASS()
-class CH4_PROJECT_API ATWPlayerController : public APlayerController
+class CH4_PROJECT_API ATWTestPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
 public:
-	ATWPlayerController();
+	ATWTestPlayerController();
 
 protected:
 	virtual void BeginPlay() override;
