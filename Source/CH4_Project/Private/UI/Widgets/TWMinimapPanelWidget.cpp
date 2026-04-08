@@ -12,11 +12,6 @@ void UTWMinimapPanelWidget::SetMinimapData(const FMinimapPanelViewModel& InData)
 		TextTitle->SetText(FText::FromString(InData.Title));
 	}
 
-	if (TextPlaceholder)
-	{
-		TextPlaceholder->SetText(FText::FromString(InData.PlaceholderText));
-	}
-
 	if (DisabledOverlay)
 	{
 		DisabledOverlay->SetVisibility(InData.bInteractive ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);

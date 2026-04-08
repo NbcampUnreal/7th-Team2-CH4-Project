@@ -1,12 +1,12 @@
 #include "UI/Widgets/TWSelectionPanelWidget.h"
 
 #include "Components/Image.h"
-#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/TileView.h"
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
-#include "UI/Widgets/TWSelectionSummaryItemWidget.h"
+#include "UI/Data/TWSelectionSummaryItemObject.h"
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
 {
@@ -31,7 +31,7 @@ void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData
 			StateSwitcher->SetActiveWidget(EmptyStateBox);
 		}
 
-		RebuildMultiSummaryChildren(TArray<FSelectionSummaryItemViewModel>());
+		RebuildMultiSummaryTiles({});
 		return;
 	}
 
@@ -96,7 +96,7 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 		}
 	}
 
-	RebuildMultiSummaryChildren(TArray<FSelectionSummaryItemViewModel>());
+	RebuildMultiSummaryTiles({});
 }
 
 void UTWSelectionPanelWidget::RefreshMultiState(const FSelectionViewModel& InData)
@@ -112,35 +112,27 @@ void UTWSelectionPanelWidget::RefreshMultiState(const FSelectionViewModel& InDat
 		ImagePortrait->SetVisibility(ESlateVisibility::Hidden);
 	}
 
-	RebuildMultiSummaryChildren(InData.SummaryItems);
+	RebuildMultiSummaryTiles(InData.SummaryItems);
 }
 
-void UTWSelectionPanelWidget::RebuildMultiSummaryChildren(const TArray<FSelectionSummaryItemViewModel>& InItems)
+void UTWSelectionPanelWidget::RebuildMultiSummaryTiles(const TArray<FSelectionSummaryItemViewModel>& InItems)
 {
-	if (!SummaryContainer)
+	if (!SummaryTileView)
 	{
 		return;
 	}
 
-	SummaryContainer->ClearChildren();
-
-	if (!SummaryItemWidgetClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[SelectionPanel] SummaryItemWidgetClass is not set."));
-		return;
-	}
+	SummaryTileView->ClearListItems();
 
 	for (const FSelectionSummaryItemViewModel& Item : InItems)
 	{
-		UTWSelectionSummaryItemWidget* SummaryItemWidget =
-			CreateWidget<UTWSelectionSummaryItemWidget>(this, SummaryItemWidgetClass);
-
-		if (!SummaryItemWidget)
+		UTWSelectionSummaryItemObject* ItemObject = NewObject<UTWSelectionSummaryItemObject>(this);
+		if (!ItemObject)
 		{
 			continue;
 		}
 
-		SummaryItemWidget->SetSummaryData(Item);
-		SummaryContainer->AddChild(SummaryItemWidget);
+		ItemObject->SummaryData = Item;
+		SummaryTileView->AddItem(ItemObject);
 	}
 }
