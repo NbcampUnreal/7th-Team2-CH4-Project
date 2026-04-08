@@ -1,58 +1,64 @@
-﻿#pragma once
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
 
 #include "CoreMinimal.h"
+#include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
 #include "TWPlayerController.generated.h"
 
-class UInputAction;
 struct FInputActionValue;
+class UInputAction;
 class UInputMappingContext;
-class ATWPopulationBuilding;
-class ATWBlockingBuilding;
-
+/**
+ * 
+ */
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
 {
 	GENERATED_BODY()
-
 public:
-	virtual void BeginPlay() override;
-	virtual void SetupInputComponent() override;
-
+	ATWPlayerController();
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputMappingContext> IMC_Default = nullptr;
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+#pragma region Input
+protected:
+	virtual void SetupInputComponent() override;
 	
-#pragma region 병력 스폰 대기열
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestSpawnTroop;
-
-	UFUNCTION()
-	void HandleTestSpawnTroop(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestSpawnTroop();
-#pragma endregion
-
-#pragma region 인구 수 대기열	
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestIncreasePopulation;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> MoveCommandAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> AttackCommandAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> HoldCommandAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	float ScreenEdgeMargin = 10.0f; 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	float ScrollSpeed = 1500.0f; 
 	UFUNCTION()
-	void HandleTestIncreasePopulation(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestIncreasePopulation();
+	void OnStartSelectAction(const FInputActionValue& InputActionValue);
+	void OnEndSelectAction(const FInputActionValue& InputActionValue);
+	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
+	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
+	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
+	
+	UFUNCTION(Server,Reliable)
+	void ServerHandleMoveCommand(const FVector& CommandLocation);
+	UFUNCTION(Server,Reliable)
+	void ServerHandleSelect(const FVector& CommandLocation);
+	
+	
+private:
+	void HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
 	
-#pragma region 방벽 데미지
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestDamageBlockingBuilding;
-
-	UFUNCTION()
-	void HandleTestDamageBlockingBuilding(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestDamageBlockingBuilding();
-#pragma endregion
+private:
+	TArray<FMassEntityHandle> SelectedEntities;
+	
 };

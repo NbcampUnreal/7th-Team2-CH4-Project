@@ -1,180 +1,259 @@
-﻿#include "Core/TWPlayerController.h"
-#include "Core/TWPlayerState.h"
-#include "Building/TWTroopSpawnBuilding.h"
-#include "Building/TWPopulationBuilding.h"
-#include "Building/TWBlockingBuilding.h"
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
+
+#include "Framework/TWPlayerController.h"
 #include "EnhancedInputComponent.h"
-#include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
-#include "EngineUtils.h"
+#include "InputMappingContext.h"
+#include "EnhancedPlayerInput.h"
+#include "MassCommandBuffer.h"
+#include "MassEntitySubsystem.h"
+#include "MassExecutionContext.h"
+#include "MassSignalSubsystem.h"
+#include "MassStateTreeFragments.h"
+#include "NavigationSystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Mass/Fragments/CommandFragment.h"
+#include "Net/UnrealNetwork.h"
+#include "Subsystems/TWUnitSubsystem.h"
+
+ATWPlayerController::ATWPlayerController()
+{
+	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+}
 
 void ATWPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (!IsLocalController())
+	check(IsValid(DefaultMappingContext));
+	
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		return;
+		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
-
-	ULocalPlayer* LocalPlayer = GetLocalPlayer();
-	if (!LocalPlayer)
-	{
-		return;
-	}
-
-	UEnhancedInputLocalPlayerSubsystem* Subsystem =
-		LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
-	if (!Subsystem)
-	{
-		return;
-	}
-
-	if (!IMC_Default)
-	{
-		return;
-	}
-
-	Subsystem->AddMappingContext(IMC_Default, 0);
+	FInputModeGameAndUI InputMode = FInputModeGameAndUI();
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
+	
+	
+	
 }
+
+void ATWPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	HandleScreenEdgeScrolling(DeltaSeconds);
+}
+
+
+#pragma region Input
 
 void ATWPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-
-	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
-	if (!EnhancedInput)
+	check(IsValid(SelectAction));
+	check(IsValid(MoveCommandAction));
+	check(IsValid(AttackCommandAction));
+	check(IsValid(HoldCommandAction));
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		return;
+		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Started, this, &ThisClass::OnStartSelectAction);
+		EnhancedInputComponent->BindAction(SelectAction, ETriggerEvent::Completed, this, &ThisClass::OnEndSelectAction);
+		EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
+		EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
+		EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
 	}
+}
 
-	if (IA_TestSpawnTroop)
+
+void ATWPlayerController::OnStartSelectAction(const FInputActionValue& InputActionValue)
+{
+}
+
+void ATWPlayerController::OnEndSelectAction(const FInputActionValue& InputActionValue)
+{
+	
+	FHitResult HitResult;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
-		EnhancedInput->BindAction(
-			IA_TestSpawnTroop,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestSpawnTroop
-		);
+		FVector ClickLocation = HitResult.Location;
+		ServerHandleSelect(ClickLocation);
 	}
 	
-	if (IA_TestIncreasePopulation)
+}
+
+inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
+{
+	FHitResult HitResult;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
-		EnhancedInput->BindAction(
-			IA_TestIncreasePopulation,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestIncreasePopulation
-		);
+		FVector ClickLocation = HitResult.Location;
+		ServerHandleMoveCommand(ClickLocation);
+	}
+}
+
+void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
+{
+}
+
+void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
+{
+}
+
+void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	if (SelectedEntities.IsEmpty())
+	{
+		return;
+	}
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (false == IsValid(UnitSubsystem))
+	{
+		return;
+	}
+
+	FMassEntityHandle EntityHandle;
+	//TODO 건물이 대상인 경우 처리해야함
+	if (UnitSubsystem->FindNearestEntity(CommandLocation, EntityHandle)) //타겟이 유닛인 이동명령
+	{
+		//TODO 유닛이 대상인 경우 처리해야함
+	}
+	else //타겟이 지형인 이동명령
+	{
+		UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+		if (!EntitySubsystem) return;
+		UE_LOG(LogMass, Warning, TEXT("MulticastMoveCommand_Implementation"));
+		UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+
+		FNavLocation ProjectedLocation;
+		FVector NavCommandLocation = FVector::ZeroVector;
+		if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation,
+		                                               FVector(500.f, 500.f, 500.f)))
+		{
+			NavCommandLocation = ProjectedLocation.Location;
+		}
+		else
+		{
+			return;
+		}
+
+		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+		FMassCommandBuffer CommandBuffer;
+		TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
+		CommandBuffer.PushCommand<FMassDeferredSetCommand>(
+			[ThisWeakPtr, NavCommandLocation](FMassEntityManager& InOutEntityManager)
+			{
+				if (false == ThisWeakPtr.IsValid())
+				{
+					return;
+				}
+				FMassEntityQuery EntityQuery;
+				EntityQuery.Initialize(InOutEntityManager.AsShared());
+				EntityQuery.AddRequirement<FTWCommandTypeFragment>(EMassFragmentAccess::ReadWrite);
+				EntityQuery.AddRequirement<FMassStateTreeInstanceFragment>(EMassFragmentAccess::ReadOnly);
+				EntityQuery.AddSharedRequirement<FTWCommandDataFragment>(EMassFragmentAccess::ReadWrite);
+
+				FMassExecutionContext Context = InOutEntityManager.CreateExecutionContext(0.f);
+
+				for (const FMassEntityHandle& Entity : ThisWeakPtr->SelectedEntities)
+				{
+					if (!InOutEntityManager.IsEntityActive(Entity)) continue;
+
+					if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<
+						FTWCommandTypeFragment>(Entity))
+					{
+						TypeFragment->SetType(ETWCommandType::MoveToLocation);
+					}
+				}
+
+				if (ThisWeakPtr->SelectedEntities.IsValidIndex(0) && InOutEntityManager.IsEntityActive(ThisWeakPtr->SelectedEntities[0]))
+				{
+					if (FTWCommandDataFragment* SharedData = InOutEntityManager.GetSharedFragmentDataPtr<
+						FTWCommandDataFragment>(ThisWeakPtr->SelectedEntities[0]))
+					{
+						SharedData->SetLocation(NavCommandLocation);
+					}
+				}
+
+				if (UMassSignalSubsystem* SignalSubsystem = InOutEntityManager.GetWorld()->GetSubsystem<
+					UMassSignalSubsystem>())
+				{
+					SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate, ThisWeakPtr->SelectedEntities);
+				}
+			});
+
+		EntityManager.AppendCommands(TSharedPtr<FMassCommandBuffer>(&CommandBuffer, [](FMassCommandBuffer*)
+		{
+		}));
+	}
+}
+
+void ATWPlayerController::ServerHandleSelect_Implementation(const FVector& CommandLocation)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (false == IsValid(UnitSubsystem))
+	{
+		return;
+	}
+
+	FMassEntityHandle EntityHandle;
+	//TODO 건물이 대상인 경우 처리해야함
+	if (UnitSubsystem->FindNearestEntity(CommandLocation, EntityHandle))
+	{
+		SelectedEntities.Empty();
+		SelectedEntities.Add(EntityHandle);
 	}
 	
-	if (IA_TestDamageBlockingBuilding)
-	{
-		EnhancedInput->BindAction(
-			IA_TestDamageBlockingBuilding,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestDamageBlockingBuilding
-		);
-	}
 }
 
-void ATWPlayerController::HandleTestSpawnTroop(const FInputActionValue& Value)
+void ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 {
-	ServerTestSpawnTroop();
-}
-
-void ATWPlayerController::ServerTestSpawnTroop_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
+	if (false == IsLocalController())
 	{
 		return;
 	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-
-	for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
-	{
-		ATWTroopSpawnBuilding* TroopBuilding = *It;
-		if (!TroopBuilding)
-		{
-			continue;
-		}
-
-		if (TroopBuilding->OwnerPlayerSlot != MyPlayerSlot)
-		{
-			continue;
-		}
-
-		TroopBuilding->RequestEnqueueTroop();
-		return;
-	}
-}
-
-void ATWPlayerController::HandleTestIncreasePopulation(const FInputActionValue& Value)
-{
-	ServerTestIncreasePopulation();
-}
-
-void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
+	FVector2D MousePosition;
+	if (false == GetMousePosition(MousePosition.X, MousePosition.Y))
 	{
 		return;
 	}
+	int32 ViewportSizeX, ViewportSizeY;
+	GetViewportSize(ViewportSizeX, ViewportSizeY);
 
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+	FVector MoveDirection = FVector::ZeroVector;
 
-	for (TActorIterator<ATWPopulationBuilding> It(GetWorld()); It; ++It)
+
+	if (MousePosition.X < ScreenEdgeMargin)
 	{
-		ATWPopulationBuilding* PopulationBuilding = *It;
-		if (!PopulationBuilding)
-		{
-			continue;
-		}
+		MoveDirection.Y = -1;
+	}
+	else if (MousePosition.X > ViewportSizeX - ScreenEdgeMargin)
+	{
+		MoveDirection.Y = 1;
+	}
+	if (MousePosition.Y < ScreenEdgeMargin)
+	{
+		MoveDirection.X = 1;
+	}
+	else if (MousePosition.Y > ViewportSizeY - ScreenEdgeMargin)
+	{
+		MoveDirection.X = -1;
+	}
 
-		if (PopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
+	if (false == MoveDirection.IsNearlyZero())
+	{
+		APawn* MyPawn = GetPawn();
+		if (MyPawn)
 		{
-			continue;
+			MyPawn->AddMovementInput(MoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
 		}
-
-		PopulationBuilding->RequestEnqueuePopulation();
-		return;
 	}
 }
 
-void ATWPlayerController::HandleTestDamageBlockingBuilding(const FInputActionValue& Value)
-{
-	ServerTestDamageBlockingBuilding();
-}
 
-void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		return;
-	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-
-	for (TActorIterator<ATWBlockingBuilding> It(GetWorld()); It; ++It)
-	{
-		ATWBlockingBuilding* BlockingBuilding = *It;
-		if (!BlockingBuilding)
-		{
-			continue;
-		}
-
-		if (BlockingBuilding->OwnerPlayerSlot == MyPlayerSlot)
-		{
-			continue;
-		}
-
-		BlockingBuilding->ApplyDamageToBuilding(10);
-		return;
-	}
-}
+#pragma endregion
