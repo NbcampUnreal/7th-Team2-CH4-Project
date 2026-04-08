@@ -1,18 +1,18 @@
-#include "FOW/TW_FogManager.h"
+#include "FOW/TWFogManager.h"
 
-#include "Component/TW_TeamComponent.h"
+#include "Component/TWTeamComponent.h"
 #include "FOW/Test_MyPlayerState.h"
-#include "FOW/TW_VisionComponent.h"
+#include "FOW/TWVisionComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
 
-ATW_FogManager::ATW_FogManager()
+ATWFogManager::ATWFogManager()
 {
     PrimaryActorTick.bCanEverTick = true;
 }
 
-void ATW_FogManager::BeginPlay()
+void ATWFogManager::BeginPlay()
 {
     Super::BeginPlay();
     UWorld* World = GetWorld();
@@ -59,7 +59,7 @@ void ATW_FogManager::BeginPlay()
     }
 }
 
-void ATW_FogManager::Tick(float DeltaTime)
+void ATWFogManager::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     AccumulatedTime += DeltaTime;
@@ -70,17 +70,17 @@ void ATW_FogManager::Tick(float DeltaTime)
     }
 }
 
-void ATW_FogManager::RegisterVision(UTW_VisionComponent* Comp) { if (Comp) RegisteredVisionComponents.AddUnique(Comp); }
-void ATW_FogManager::UnregisterVision(UTW_VisionComponent* Comp) { RegisteredVisionComponents.Remove(Comp); }
+void ATWFogManager::RegisterVision(UTWVisionComponent* Comp) { if (Comp) RegisteredVisionComponents.AddUnique(Comp); }
+void ATWFogManager::UnregisterVision(UTWVisionComponent* Comp) { RegisteredVisionComponents.Remove(Comp); }
 
-FVector2D ATW_FogManager::WorldToUV(FVector WorldPos)
+FVector2D ATWFogManager::WorldToUV(FVector WorldPos)
 {
     float U = ((WorldPos.X - MapOrigin.X) / MapSize.X) + 0.5f;
     float V = ((WorldPos.Y - MapOrigin.Y) / MapSize.Y) + 0.5f;
     return FVector2D(U, V);
 }
 
-void ATW_FogManager::UpdateFog()
+void ATWFogManager::UpdateFog()
 {
     if (!CurrentFogRT || !ExploredFogRT || !DrawMID || !CombineMID) return;
     
@@ -98,14 +98,14 @@ void ATW_FogManager::UpdateFog()
     
     for (int32 i = RegisteredVisionComponents.Num() - 1; i >= 0; --i)
     {
-        UTW_VisionComponent* VC = RegisteredVisionComponents[i].Get();
+        UTWVisionComponent* VC = RegisteredVisionComponents[i].Get();
         if (!IsValid(VC) || !IsValid(VC->GetOwner()))
         {
             RegisteredVisionComponents.RemoveAt(i);
             continue;
         }
         
-        UTW_TeamComponent* TeamComp = VC->GetOwner()->FindComponentByClass<UTW_TeamComponent>();
+        UTWTeamComponent* TeamComp = VC->GetOwner()->FindComponentByClass<UTWTeamComponent>();
         if (TeamComp && TeamComp->TeamID == MyLocalTeamID)
         {
             FVector2D UV = WorldToUV(VC->GetVisionLocation());

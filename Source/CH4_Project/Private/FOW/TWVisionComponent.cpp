@@ -1,20 +1,20 @@
-#include "FOW/TW_VisionComponent.h"
-#include "FOW/TW_FogManager.h"
+#include "FOW/TWVisionComponent.h"
+#include "FOW/TWFogManager.h"
 #include "Kismet/GameplayStatics.h"
 
-UTW_VisionComponent::UTW_VisionComponent()
+UTWVisionComponent::UTWVisionComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
     SetIsReplicatedByDefault(true);
 }
 
-void UTW_VisionComponent::BeginPlay()
+void UTWVisionComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    ATW_FogManager* FogManager = Cast<ATW_FogManager>(
+    ATWFogManager* FogManager = Cast<ATWFogManager>(
         UGameplayStatics::GetActorOfClass(GetWorld(), 
-            ATW_FogManager::StaticClass())
+            ATWFogManager::StaticClass())
             );
     
     if (FogManager)
@@ -23,13 +23,13 @@ void UTW_VisionComponent::BeginPlay()
     }
 }
 
-void UTW_VisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UTWVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     Super::EndPlay(EndPlayReason);
 
-    ATW_FogManager* FogManager = Cast<ATW_FogManager>(
+    ATWFogManager* FogManager = Cast<ATWFogManager>(
         UGameplayStatics::GetActorOfClass(GetWorld(), 
-            ATW_FogManager::StaticClass())
+            ATWFogManager::StaticClass())
             );
     
     if (FogManager)
@@ -38,7 +38,7 @@ void UTW_VisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     }
 }
 
-FVector UTW_VisionComponent::GetVisionLocation() const
+FVector UTWVisionComponent::GetVisionLocation() const
 {
     return GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
 }

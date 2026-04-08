@@ -7,8 +7,8 @@
 #include "InputActionValue.h"
 #include "TW_TestCharacter.generated.h"
 
-class UTW_VisionComponent;
-class UTW_TeamComponent;
+class UTWVisionComponent;
+class UTWTeamComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
@@ -47,8 +47,8 @@ protected:
 	UCameraComponent* TopDownCamera;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Gameplay")
-	UTW_TeamComponent* TeamComp;
+	UTWTeamComponent* TeamComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Gameplay")
-	UTW_VisionComponent* VisionComp;
+	UTWVisionComponent* VisionComp;
 };

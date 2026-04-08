@@ -4,9 +4,9 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "Component/TW_TeamComponent.h"
+#include "Component/TWTeamComponent.h"
 #include "FOW/Test_MyPlayerState.h"
-#include "FOW/TW_VisionComponent.h"
+#include "FOW/TWVisionComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ATW_TestCharacter::ATW_TestCharacter()
@@ -23,13 +23,13 @@ ATW_TestCharacter::ATW_TestCharacter()
     TopDownCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
     TopDownCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
     
-    TeamComp = CreateDefaultSubobject<UTW_TeamComponent>(TEXT("TeamComponent"));
+    TeamComp = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
     if (TeamComp)
     {
         TeamComp->SetTeamID(0);
     }
     
-    VisionComp = CreateDefaultSubobject<UTW_VisionComponent>(TEXT("VisionComponent"));
+    VisionComp = CreateDefaultSubobject<UTWVisionComponent>(TEXT("VisionComponent"));
     if (VisionComp)
     {
         VisionComp->VisionRadius = 800.0f;

@@ -2,16 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "TW_TeamComponent.generated.h"
+#include "TWTeamComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTeamChanged, int32, NewTeamID);
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class CH4_PROJECT_API UTW_TeamComponent : public UActorComponent
+class CH4_PROJECT_API UTWTeamComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:    
-	UTW_TeamComponent();
+	UTWTeamComponent();
 	
 	virtual void BeginPlay() override;
 
