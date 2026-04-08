@@ -8,13 +8,37 @@ public class CH4_Project : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			"AIModule",
+			"NavigationSystem",
+			"StateTreeModule",
+			"GameplayStateTreeModule",
+			"Niagara",
+			"UMG",
+			"Slate",
+			"MassEntity",
+			"MassCommon",
+			"MassMovement",
+			"MassActors",
+			"MassSpawner",
+			"MassAIBehavior",
+			"MassNavigation",
+			"MassSignals",
+			"GameplayTags",
+			"MassReplication",
+			"MassEQS",
+			"NetCore",
+			
+			
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
+
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 
