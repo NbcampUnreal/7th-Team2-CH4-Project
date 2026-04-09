@@ -6,11 +6,10 @@
 #include "TWSelectionPanelWidget.generated.h"
 
 class UImage;
-class UPanelWidget;
 class UTextBlock;
+class UTileView;
 class UWidget;
 class UWidgetSwitcher;
-class UTWSelectionSummaryItemWidget;
 
 UCLASS()
 class CH4_PROJECT_API UTWSelectionPanelWidget : public UUserWidget
@@ -24,17 +23,11 @@ public:
 protected:
 	void RefreshSingleState(const FSelectionViewModel& InData);
 	void RefreshMultiState(const FSelectionViewModel& InData);
-	void RebuildMultiSummaryChildren(const TArray<FSelectionSummaryItemViewModel>& InItems);
+	void RebuildMultiSummaryTiles(const TArray<FSelectionSummaryItemViewModel>& InItems);
 
 protected:
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextName = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextType = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextHP = nullptr;
+	TObjectPtr<UWidgetSwitcher> StateSwitcher = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> EmptyStateBox = nullptr;
@@ -43,21 +36,23 @@ protected:
 	TObjectPtr<UWidget> ContentBox = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UWidgetSwitcher> StateSwitcher = nullptr;
-
-	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> MultiStateBox = nullptr;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> ImagePortrait = nullptr;
 
 	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextName = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextType = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextHP = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TextCountLabel = nullptr;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UPanelWidget> SummaryContainer = nullptr;
-
-	// 5단계 멀티 요약용 위젯 클래스
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RTS UI")
-	TSubclassOf<UTWSelectionSummaryItemWidget> SummaryItemWidgetClass;
+	TObjectPtr<UTileView> SummaryTileView = nullptr;
 };

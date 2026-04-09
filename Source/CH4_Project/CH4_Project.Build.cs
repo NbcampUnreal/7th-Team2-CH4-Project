@@ -29,12 +29,12 @@ public class CH4_Project : ModuleRules
 			"GameplayTags",
 			"MassReplication",
 			"MassEQS",
-			"NetCore",
+			"NetCore", "CommonUI",
 			
 			
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[] { "CommonUI" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

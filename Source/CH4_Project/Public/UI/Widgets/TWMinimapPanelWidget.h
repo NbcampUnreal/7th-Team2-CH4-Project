@@ -29,8 +29,5 @@ protected:
 	TObjectPtr<UTextBlock> TextTitle;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextPlaceholder;
-
-	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> DisabledOverlay;
 };

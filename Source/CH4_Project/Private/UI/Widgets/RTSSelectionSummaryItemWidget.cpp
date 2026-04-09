@@ -3,6 +3,36 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
+#include "UI/Data/TWSelectionSummaryItemObject.h"
+
+void UTWSelectionSummaryItemWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
+{
+	IUserObjectListEntry::NativeOnListItemObjectSet(ListItemObject);
+
+	const UTWSelectionSummaryItemObject* ItemObject = Cast<UTWSelectionSummaryItemObject>(ListItemObject);
+	if (!ItemObject)
+	{
+		if (TextName)
+		{
+			TextName->SetText(FText::GetEmpty());
+		}
+
+		if (TextCount)
+		{
+			TextCount->SetText(FText::GetEmpty());
+		}
+
+		if (IconImage)
+		{
+			IconImage->SetBrushFromTexture(nullptr, true);
+			IconImage->SetVisibility(ESlateVisibility::Hidden);
+		}
+
+		return;
+	}
+
+	SetSummaryData(ItemObject->SummaryData);
+}
 
 void UTWSelectionSummaryItemWidget::SetSummaryData(const FSelectionSummaryItemViewModel& InData)
 {
