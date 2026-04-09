@@ -8,6 +8,7 @@
 #include "MassReplicationSubsystem.h"
 #include "MassEntityConfigAsset.h"
 #include "MassSpawner.h"
+#include "Core/TWPlayerState.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
@@ -126,7 +127,7 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 	return true;
 }
 
-void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig)
+void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig, APlayerController* PlayerController)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
@@ -140,17 +141,24 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 
 	const FMassEntityTemplate& EntityTemplate = UnitEntityConfig->GetOrCreateEntityTemplate(*GetWorld());
 
+	TWeakObjectPtr<APlayerController> WeakPlayerController = PlayerController;
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
-		[Location, EntityTemplate](FMassEntityManager& InOutEntityManager)
+		[Location, EntityTemplate, WeakPlayerController](FMassEntityManager& InOutEntityManager)
 		{
 			UWorld* World = InOutEntityManager.GetWorld();
 			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
 			UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
-			if (!MassSubsystem)
+			if (nullptr == MassSubsystem)
 			{
 				return;
 			}
-
+			if (false == WeakPlayerController.IsValid())
+			{
+				return;
+			}
+			ATWPlayerState* PlayerState =	WeakPlayerController->GetPlayerState<ATWPlayerState>();
+			//TODO 유닛 PlayerState에 추가
+			
 			TArray<FMassEntityHandle> SpawnedEntities;
 			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
 
