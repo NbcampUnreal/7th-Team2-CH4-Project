@@ -348,6 +348,56 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 {
 	//TODO Hold
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	if (SelectedEntities.IsEmpty())
+	{
+		return;
+	}
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (false == IsValid(UnitSubsystem))
+	{
+		return;
+	}
+	
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem) return;
+	UE_LOG(LogMass, Warning, TEXT("MulticastHoldCommand_Implementation"));
+	
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+	FMassCommandBuffer CommandBuffer;
+	TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
+	
+	CommandBuffer.PushCommand<FMassDeferredSetCommand>(
+	[ThisWeakPtr](FMassEntityManager& InOutEntityManager)
+	{
+		if (false == ThisWeakPtr.IsValid())
+		{
+			return;
+		}
+		FMassEntityQuery EntityQuery;
+		EntityQuery.Initialize(InOutEntityManager.AsShared());
+		EntityQuery.AddRequirement<FTWCommandTypeFragment>(EMassFragmentAccess::ReadWrite);
+		EntityQuery.AddRequirement<FMassStateTreeInstanceFragment>(EMassFragmentAccess::ReadOnly);
+		FMassExecutionContext Context = InOutEntityManager.CreateExecutionContext(0.f);
+
+		for (const FMassEntityHandle& Entity : ThisWeakPtr->SelectedEntities)
+		{
+			if (!InOutEntityManager.IsEntityActive(Entity)) continue;
+
+			if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<
+				FTWCommandTypeFragment>(Entity))
+			{
+				TypeFragment->SetType(ETWState::Hold);
+			}
+		}
+
+		if (UMassSignalSubsystem* SignalSubsystem = InOutEntityManager.GetWorld()->GetSubsystem<
+			UMassSignalSubsystem>())
+		{
+			SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate, ThisWeakPtr->SelectedEntities);
+		}
+	});
 }
 
 
