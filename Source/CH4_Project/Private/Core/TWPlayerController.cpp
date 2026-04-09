@@ -15,8 +15,10 @@
 #include "MassSignalSubsystem.h"
 #include "MassStateTreeFragments.h"
 #include "NavigationSystem.h"
+#include "Building/GhostBuilding.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/TWGridSubSystem.h"
 #include "Subsystems/TWUnitSubsystem.h"
 
 ATWPlayerController::ATWPlayerController()
@@ -24,6 +26,7 @@ ATWPlayerController::ATWPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	SelectedEntities.Empty();
+	bIsBuildMode = false;
 }
 
 void ATWPlayerController::BeginPlay()
@@ -59,6 +62,26 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	HandleScreenEdgeScrolling(DeltaSeconds);
+	
+	if (bIsBuildMode && CurrentGhost)
+	{
+		FHitResult Hit;
+		
+		GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), true, Hit);
+		
+		if (Hit.bBlockingHit)
+		{
+			auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+			
+			CurrentAnchor = GridSub->WorldToGridPosition(Hit.Location);
+			
+			bool bCanBuild = GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize);
+			CurrentGhost->UpdateBuildingVisual(bCanBuild);
+			
+			FVector CenterPos = GridSub->GetBuildingCenterPosition(CurrentAnchor, CurrentGhost->BuildingSize);
+			CurrentGhost->SetActorLocation(CenterPos);
+		}
+	}
 }
 
 
@@ -71,7 +94,7 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-	
+	check(IsValid(BuildCommandAction));
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
 	{
@@ -84,6 +107,7 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
+	EnhancedInputComponent->BindAction(BuildCommandAction, ETriggerEvent::Started, this, &ThisClass::OnBuildCommandAction);
 	if (IA_TestSpawnTroop)
 	{
 		EnhancedInputComponent->BindAction(
@@ -118,33 +142,35 @@ void ATWPlayerController::SetupInputComponent()
 
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	FHitResult HitResult;
-	FVector ClickLocation;
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-	{
-		ClickLocation = HitResult.Location;
-	}else
-	{
-		return;
-	}
-	
-	if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
-	{
-		switch (CurrentCommandType) {
-		case ETWCommand::Move:
-			ServerHandleMoveCommand(ClickLocation);
-			break;
-		case ETWCommand::Attack:
-			ServerHandleAttackCommand(ClickLocation);
-			break;
-		default:
-			check(false);
-			break;
-		}
-		ChangeCurrentCommandType(ETWCommand::None);
-		return;
-	}
-	ClickStartLocation = ClickLocation;
+	// FHitResult HitResult;
+	// FVector ClickLocation;
+	// if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	// {
+	// 	ClickLocation = HitResult.Location;
+	// }else
+	// {
+	// 	return;
+	// }
+	//
+	// if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
+	// {
+	// 	switch (CurrentCommandType) {
+	// 	case ETWCommand::Move:
+	// 		ServerHandleMoveCommand(ClickLocation);
+	// 		break;
+	// 	case ETWCommand::Attack:
+	// 		ServerHandleAttackCommand(ClickLocation);
+	// 		break;
+	// 	default:
+	// 		check(false);
+	// 		break;
+	// 	}
+	// 	ChangeCurrentCommandType(ETWCommand::None);
+	// 	return;
+	// }
+	// ClickStartLocation = ClickLocation;
+	//
+	RequestBuild();
 }
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
@@ -190,6 +216,11 @@ void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputAc
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
 {
 	ServerHandleHoldCommand();
+}
+
+void ATWPlayerController::OnBuildCommandAction(const FInputActionValue& InputActionValue)
+{
+	ToggleBuildMode();
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
@@ -470,5 +501,70 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
 	CurrentCommandType = CommandType;
 }
 
+
+#pragma endregion
+
+#pragma region 건설
+
+void ATWPlayerController::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<AActor> ClassToSpawn)
+{
+	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+	
+	if (GridSub && GridSub->CanBuildArea(Anchor, BuildSize))
+	{
+		FVector SpawnPos = GridSub->GetBuildingCenterPosition(Anchor, BuildSize);
+		AActor* NewBuilding = GetWorld()->SpawnActor<AActor>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
+	
+		GridSub->OccupyArea(Anchor, BuildSize, NewBuilding);
+	}
+}
+
+void ATWPlayerController::ToggleBuildMode()
+{
+	if (bIsBuildMode)
+	{
+		EndBuildMode();
+	}
+	else
+	{
+		if (!BuildClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("BuildingClass가 설정안됨"));
+			return;
+		}
+		
+		bIsBuildMode = true;
+		
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		
+		CurrentGhost = GetWorld()->SpawnActor<AGhostBuilding>(BuildClass,FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		
+		if (CurrentGhost)
+		{
+			CurrentGhost->BuildingSize = FIntPoint(3,3);
+		}
+	}
+}
+
+void ATWPlayerController::RequestBuild()
+{
+	if (bIsBuildMode && CurrentGhost)
+	{
+		Server_SpawnBuilding(CurrentAnchor,CurrentGhost->BuildingSize, SelectedBuildingClass);
+		EndBuildMode();
+	}
+}
+
+void ATWPlayerController::EndBuildMode()
+{
+	bIsBuildMode = false;
+	
+	if (CurrentGhost != nullptr)
+	{
+		CurrentGhost->Destroy();
+		CurrentGhost = nullptr;
+	}
+}
 
 #pragma endregion

@@ -13,6 +13,7 @@ class UInputAction;
 class UInputMappingContext;
 class ATWPopulationBuilding;
 class ATWBlockingBuilding;
+class AGhostBuilding;
 /**
  * 
  */
@@ -54,6 +55,9 @@ protected:
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> BuildCommandAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScreenEdgeMargin = 10.0f; 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScrollSpeed = 1500.0f; 
@@ -64,6 +68,7 @@ protected:
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
 	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
+	void OnBuildCommandAction(const FInputActionValue& InputActionValue);
 	
 	UFUNCTION(Server,Reliable)
 	void ServerHandleMoveCommand(const FVector& CommandLocation);
@@ -73,7 +78,7 @@ protected:
 	void ServerHandleHoldCommand();
 	UFUNCTION(Server,Reliable)
 	void ServerHandleSelect(const FVector& CommandLocation);
-	
+
 	
 private:
 	void HandleScreenEdgeScrolling(float DeltaSeconds);
@@ -112,6 +117,34 @@ private:
 	void ServerTestDamageBlockingBuilding();
 #pragma endregion
 
+#pragma region 건설
+	
+protected:
+	UFUNCTION(Server,Reliable, Category = "Build")
+	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<AActor> ClassToSpawn);
+	
+public:
+	
+	UFUNCTION(BlueprintCallable, Category = "Build")
+	void ToggleBuildMode();
+	UFUNCTION(BlueprintCallable, Category = "Build")
+	void RequestBuild();
+
+	void EndBuildMode();
+	
+private:
+	uint8 bIsBuildMode : 1;
+	FIntPoint CurrentAnchor;
+	
+	UPROPERTY()
+	TObjectPtr<AGhostBuilding> CurrentGhost;
+	
+	UPROPERTY(EditAnywhere, Category = "Build|Classes")
+	TSubclassOf<AGhostBuilding> BuildClass;
+	UPROPERTY(EditAnywhere, Category = "Build|Classes")
+	TSubclassOf<AActor> SelectedBuildingClass;
+	
+#pragma endregion
 	
 private:
 	void ChangeCurrentCommandType(ETWCommand CommandType);

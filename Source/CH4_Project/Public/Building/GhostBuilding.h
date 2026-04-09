@@ -15,8 +15,11 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
-	void SetBuildingMesh(UStaticMesh* Mesh, FIntPoint BuildingSize);
+	void SetBuildingMesh(UStaticMesh* Mesh, FIntPoint NewBuildingSize);
 	void UpdateBuildingVisual(bool bCanBuild);
+	
+	UPROPERTY(EditAnywhere, Category = "Grid")
+	FIntPoint BuildingSize;
 	
 private:
 	UPROPERTY(VisibleAnywhere)
