@@ -9,6 +9,7 @@
 #include "MassEntityConfigAsset.h"
 #include "MassSpawner.h"
 #include "Core/TWPlayerState.h"
+#include "Mass/Fragments/TWOwnerFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
@@ -127,7 +128,8 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 	return true;
 }
 
-void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig, APlayerController* PlayerController)
+void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig,
+                                 ATWPlayerController* PlayerController)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
@@ -141,7 +143,7 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 
 	const FMassEntityTemplate& EntityTemplate = UnitEntityConfig->GetOrCreateEntityTemplate(*GetWorld());
 
-	TWeakObjectPtr<APlayerController> WeakPlayerController = PlayerController;
+	TWeakObjectPtr<ATWPlayerController> WeakPlayerController = PlayerController;
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
 		[Location, EntityTemplate, WeakPlayerController](FMassEntityManager& InOutEntityManager)
 		{
@@ -156,30 +158,33 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 			{
 				return;
 			}
-			ATWPlayerState* PlayerState =	WeakPlayerController->GetPlayerState<ATWPlayerState>();
-			//TODO 유닛 PlayerState에 추가
+			ATWPlayerState* PlayerState = WeakPlayerController->GetPlayerState<ATWPlayerState>();
+			if (false == IsValid(PlayerState))
+			{
+				return;
+			}
+
 			
 			TArray<FMassEntityHandle> SpawnedEntities;
 			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
 
 			if (SpawnedEntities.Num() > 0)
 			{
-				FMassEntityHandle SpawnedUnit =
-					SpawnedEntities[0];
-
-				if (FTransformFragment* TransformFragment =
-					InOutEntityManager.GetFragmentDataPtr<
-						FTransformFragment>(SpawnedUnit))
+				FMassEntityHandle SpawnedUnit =	SpawnedEntities[0];
+				
+				//TODO 유닛 PlayerState에 추가
+				//int Idx = PlayerState->AddUnit(SpawnedUnit);
+				if (FTWOwnerFragment* TransformFragment =InOutEntityManager.GetFragmentDataPtr<FTWOwnerFragment>(SpawnedUnit))
 				{
-					TransformFragment->GetMutableTransform().
-					                   SetLocation(Location);
-					TransformFragment->GetMutableTransform().
-					                   SetScale3D(FVector(1.0f));
+					TransformFragment->SetOwner(WeakPlayerController.Get());
 				}
-
-				if (FTWStatusFragment* StatusFragment =
-					InOutEntityManager.GetFragmentDataPtr<
-						FTWStatusFragment>(SpawnedUnit))
+				
+				if (FTransformFragment* TransformFragment =	InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+				{
+					TransformFragment->GetMutableTransform().SetLocation(Location);
+				}
+				//TODO Stat HardCoded
+				if (FTWStatusFragment* StatusFragment =	InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 				{
 					StatusFragment->SetDamage(100);
 					StatusFragment->SetHealth(100);
