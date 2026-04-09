@@ -1,11 +1,12 @@
 #include "FOW/TWFogManager.h"
 
 #include "Component/TWTeamComponent.h"
-#include "FOW/Test_MyPlayerState.h"
+#include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
+#include "TextureResource.h" // RenderTarget 읽기를 위해 필요
 
 ATWFogManager::ATWFogManager()
 {
@@ -70,8 +71,18 @@ void ATWFogManager::Tick(float DeltaTime)
     }
 }
 
-void ATWFogManager::RegisterVision(UTWVisionComponent* Comp) { if (Comp) RegisteredVisionComponents.AddUnique(Comp); }
-void ATWFogManager::UnregisterVision(UTWVisionComponent* Comp) { RegisteredVisionComponents.Remove(Comp); }
+void ATWFogManager::RegisterVision(UTWVisionComponent* Comp)
+{
+    if (Comp)
+    {
+        RegisteredVisionComponents.AddUnique(Comp);
+    }
+}
+
+void ATWFogManager::UnregisterVision(UTWVisionComponent* Comp)
+{
+    RegisteredVisionComponents.Remove(Comp);
+}
 
 FVector2D ATWFogManager::WorldToUV(FVector WorldPos)
 {
@@ -84,15 +95,14 @@ void ATWFogManager::UpdateFog()
 {
     if (!CurrentFogRT || !ExploredFogRT || !DrawMID || !CombineMID) return;
     
-    APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
-    if (!PlayerController) return;
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (!PC) return;
     
-    // 테스트용 플레이어 스테이트 넣어서 확인 > 플레이어 스테이트 추가해서 변경해줘야함
-    ATest_MyPlayerState* PlayerState = PlayerController->GetPlayerState<ATest_MyPlayerState>();
-    if (!PlayerState) return;
+    ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
+    if (!PS) return;
     
-    int32 MyLocalTeamID = PlayerState->TeamID;
-    if (MyLocalTeamID <= 0) return;
+    int32 MyLocalTeamSlot = PS->PlayerSlot;
+    if (MyLocalTeamSlot < 0) return;
     
     UKismetRenderingLibrary::ClearRenderTarget2D(GetWorld(), CurrentFogRT, FLinearColor::Black);
     
@@ -106,7 +116,7 @@ void ATWFogManager::UpdateFog()
         }
         
         UTWTeamComponent* TeamComp = VC->GetOwner()->FindComponentByClass<UTWTeamComponent>();
-        if (TeamComp && TeamComp->TeamID == MyLocalTeamID)
+        if (TeamComp && TeamComp->TeamID == MyLocalTeamSlot)
         {
             FVector2D UV = WorldToUV(VC->GetVisionLocation());
             DrawMID->SetVectorParameterValue(TEXT("VisionPos"), FLinearColor(UV.X, UV.Y, 0, 0));
@@ -119,4 +129,71 @@ void ATWFogManager::UpdateFog()
     CombineMID->SetTextureParameterValue(TEXT("CurrentTex"), CurrentFogRT);
     CombineMID->SetTextureParameterValue(TEXT("PrevTex"), ExploredFogRT);
     UKismetRenderingLibrary::DrawMaterialToRenderTarget(GetWorld(), ExploredFogRT, CombineMID);
+    
+    UpdateEnemyVisibility();
+}
+
+
+void ATWFogManager::UpdateEnemyVisibility()
+{
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (!PC || !PC->IsLocalController()) return;
+
+    ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
+    if (!PS || !CurrentFogRT) return;
+    
+    FTextureResource* TextureResource = CurrentFogRT->GetResource();
+    if (!TextureResource)
+    {
+        CurrentFogRT->UpdateResource();
+        return; 
+    }
+
+    FTextureRenderTargetResource* RenderTargetResource = static_cast<FTextureRenderTargetResource*>(TextureResource);
+    TArray<FColor> RawPixels;
+    if (!RenderTargetResource->ReadPixels(RawPixels))
+    {
+        return;
+    }
+    
+    TArray<AActor*> TaggedUnits;
+    UGameplayStatics::GetAllActorsWithTag(GetWorld(), TEXT("Unit"), TaggedUnits);
+
+    int32 LocalPlayerTeamID = PS->PlayerSlot;
+    int32 RTSizeX = CurrentFogRT->SizeX;
+    int32 RTSizeY = CurrentFogRT->SizeY;
+
+    for (AActor* UnitActor : TaggedUnits)
+    {
+        if (!IsValid(UnitActor)) continue;
+
+        UTWTeamComponent* TeamComp = UnitActor->FindComponentByClass<UTWTeamComponent>();
+        if (TeamComp && TeamComp->TeamID == LocalPlayerTeamID)
+        {
+            if (UnitActor->IsHidden()) UnitActor->SetActorHiddenInGame(false);
+            continue;
+        }
+        
+        FVector2D UnitUV = WorldToUV(UnitActor->GetActorLocation());
+        if (UnitUV.X < 0.f || UnitUV.X > 1.f || UnitUV.Y < 0.f || UnitUV.Y > 1.f)
+        {
+            UnitActor->SetActorHiddenInGame(true);
+            continue;
+        }
+
+        int32 PixelX = FMath::Clamp(static_cast<int32>(UnitUV.X * RTSizeX), 0, RTSizeX - 1);
+        int32 PixelY = FMath::Clamp(static_cast<int32>(UnitUV.Y * RTSizeY), 0, RTSizeY - 1);
+        int32 PixelIndex = (PixelY * RTSizeX) + PixelX;
+
+        if (RawPixels.IsValidIndex(PixelIndex))
+        {
+            uint8 Brightness = RawPixels[PixelIndex].R;
+            bool bIsVisibleNow = Brightness > 25;
+            
+            if (UnitActor->IsHidden() == bIsVisibleNow)
+            {
+                UnitActor->SetActorHiddenInGame(!bIsVisibleNow);
+            }
+        }
+    }
 }

@@ -5,7 +5,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Component/TWTeamComponent.h"
-#include "FOW/Test_MyPlayerState.h"
+#include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -34,18 +34,18 @@ ATW_TestCharacter::ATW_TestCharacter()
     {
         VisionComp->VisionRadius = 800.0f;
     }
+    
+    // FogManager 에서 식별용으로 사용
+    Tags.Add(TEXT("Unit"));
 }
 
 void ATW_TestCharacter::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
     
-    if (ATest_MyPlayerState* PS = NewController->GetPlayerState<ATest_MyPlayerState>())
+    if (ATWPlayerState* PS = NewController->GetPlayerState<ATWPlayerState>())
     {
-        if (TeamComp)
-        {
-            TeamComp->SetTeamID(PS->TeamID);
-        }
+        UpdatePlayerSlot(PS->PlayerSlot);
     }
 }
 
@@ -53,17 +53,17 @@ void ATW_TestCharacter::OnRep_PlayerState()
 {
     Super::OnRep_PlayerState();
     
-    SyncTeamFromPlayerState();
+    if (ATWPlayerState* PS = GetPlayerState<ATWPlayerState>())
+    {
+        UpdatePlayerSlot(PS->PlayerSlot);
+    }
 }
 
-void ATW_TestCharacter::SyncTeamFromPlayerState()
+void ATW_TestCharacter::UpdatePlayerSlot(int32 newPlayerSlot)
 {
-    if (ATest_MyPlayerState* TWPS = GetPlayerState<ATest_MyPlayerState>())
+    if (TeamComp) 
     {
-        if (TWPS->TeamID > 0 && TeamComp) 
-        {
-            TeamComp->SetTeamID(TWPS->TeamID);
-        }
+        TeamComp->SetTeamID(newPlayerSlot);
     }
 }
 
@@ -82,7 +82,6 @@ void ATW_TestCharacter::BeginPlay()
 
 void ATW_TestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-    // 2. Enhanced Input Component로 캐스팅 후 바인딩
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
     {
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATW_TestCharacter::Move);

@@ -13,11 +13,8 @@ class CH4_PROJECT_API ATWFogManager : public AActor
 
 public:
     ATWFogManager();
-
-protected:
+    
     virtual void BeginPlay() override;
-
-public:
     virtual void Tick(float DeltaTime) override;
 
 public:
@@ -66,8 +63,14 @@ private:
 public:
     void RegisterVision(UTWVisionComponent* Comp);
     void UnregisterVision(UTWVisionComponent* Comp);
-
+    
 private:
     void UpdateFog();
+    
     FVector2D WorldToUV(FVector WorldPos);
+    
+#pragma region EnemyVisibility
+private:
+    void UpdateEnemyVisibility();
+#pragma endregion
 };

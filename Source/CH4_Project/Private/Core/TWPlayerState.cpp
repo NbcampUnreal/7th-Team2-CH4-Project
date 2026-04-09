@@ -1,5 +1,6 @@
 ﻿#include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
@@ -25,9 +26,27 @@ void ATWPlayerState::BeginPlay()
 	
 }
 
-void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
+
+void ATWPlayerState::SetPlayerSlot(const int32 NewSlot)
 {
-	PlayerSlot = InPlayerSlot;
+	if (HasAuthority())
+	{
+		PlayerSlot = NewSlot;
+		OnRep_PlayerSlot();
+	}
+}
+
+void ATWPlayerState::OnRep_PlayerSlot()
+{
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn) {
+		return;
+	}
+	
+	if (ITWPlayerSlotInterface* Interface = Cast<ITWPlayerSlotInterface>(MyPawn))
+	{
+		Interface->UpdatePlayerSlot(PlayerSlot);
+	}
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
@@ -189,7 +208,7 @@ void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 	checkf(Units.Num()<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
-a	Units[CurrentTroopCount] = Unit;
+	Units[CurrentTroopCount] = Unit;
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
 	if (FTWOwnerFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWOwnerFragment>(Unit))
 	{
