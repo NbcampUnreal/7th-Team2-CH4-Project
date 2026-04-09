@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MassEntityConfigAsset.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
 #include "Mass/Fragments/TWCommandFragment.h"
@@ -158,4 +159,6 @@ private:
 	UFUNCTION(Server, Reliable)
 	void TESTSPAWNCODE();
 protected:
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<UMassEntityConfigAsset> TestMassEntityConfigAsset;
 };

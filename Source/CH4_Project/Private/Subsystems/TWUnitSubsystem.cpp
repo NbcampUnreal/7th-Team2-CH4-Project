@@ -8,6 +8,7 @@
 #include "MassReplicationSubsystem.h"
 #include "MassEntityConfigAsset.h"
 #include "MassSpawner.h"
+#include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
 
@@ -139,6 +140,10 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
     {
 	    return;
     }
+	if (nullptr == UnitEntityConfig)
+	{
+		return;
+	}
 	
 	FMassArchetypeHandle ArchetypeHandle = UnitEntityConfig->GetConfig().GetOrCreateEntityTemplate(*GetWorld()).GetArchetype();
 	FMassEntityHandle SpawnedUnit = EntityManager->CreateEntity(ArchetypeHandle);
@@ -150,12 +155,12 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 	{
 		TransformFragment->GetMutableTransform().SetLocation(Location);
 	}
-	//TODO HardCoded
-	// if (FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
-	// {
-	// 	StatusFragment->SetDamage(100);
-	// 	StatusFragment->SetHealth(100);
-	// 	StatusFragment->SetRange(100);
-	// }
+	// TODO HardCoded
+	 if (FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+	 {
+	 	StatusFragment->SetDamage(100);
+	 	StatusFragment->SetHealth(100);
+	 	StatusFragment->SetRange(100);
+	 }
 }
 #endif
