@@ -11,6 +11,7 @@
  * 
  */
 
+class UMassEntityConfigAsset;
 struct FMassEntityHandle;
 
 UCLASS()
@@ -21,8 +22,13 @@ public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	virtual void PostInitialize() override;
 	
+#ifdef WITH_SERVER_CODE
 	bool FindNearestEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle, float MaxDistance = 50.0f);
 	bool GetAllEntities(const FVector& StartLocation, const FVector& EndLocation, TArray<FMassEntityHandle>& OutEntityHandles);
+	void SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig);
+#endif
+	
+	
 
 private:
 	FMassEntityQuery FindNearestEntityQuery;

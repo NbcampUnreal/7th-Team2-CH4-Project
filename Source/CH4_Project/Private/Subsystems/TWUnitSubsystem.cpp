@@ -6,6 +6,8 @@
 #include "MassEntitySubsystem.h"
 #include "MassNavigationSubsystem.h"
 #include "MassReplicationSubsystem.h"
+#include "MassEntityConfigAsset.h"
+#include "MassSpawner.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
 
@@ -29,6 +31,8 @@ void UTWUnitSubsystem::PostInitialize()
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
 }
+
+#ifdef WITH_SERVER_CODE
 
 //TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
 //현재는 단순히 월드에 존재하는 모든 엔티티를 조회함.
@@ -120,3 +124,38 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 	return true;
 	
 }
+
+void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	UWorld* World = GetWorld();
+	if (false == IsValid(World))
+	{
+		return;
+	}
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+    if (nullptr == EntityManager)
+    {
+	    return;
+    }
+	
+	FMassArchetypeHandle ArchetypeHandle = UnitEntityConfig->GetConfig().GetOrCreateEntityTemplate(*GetWorld()).GetArchetype();
+	FMassEntityHandle SpawnedUnit = EntityManager->CreateEntity(ArchetypeHandle);
+
+	// TArray<FMassEntityHandle> SpawnedEntities;
+	// EntityManager->BatchCreateEntities(TemplateData.GetArchetype(), 1, SpawnedEntities);
+
+	if (FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+	{
+		TransformFragment->GetMutableTransform().SetLocation(Location);
+	}
+	//TODO HardCoded
+	// if (FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+	// {
+	// 	StatusFragment->SetDamage(100);
+	// 	StatusFragment->SetHealth(100);
+	// 	StatusFragment->SetRange(100);
+	// }
+}
+#endif

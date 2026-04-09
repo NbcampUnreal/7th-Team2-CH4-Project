@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
-#include "Mass/Fragments/CommandFragment.h"
+#include "Mass/Fragments/TWCommandFragment.h"
 #include "TWPlayerController.generated.h"
 
 struct FInputActionValue;
@@ -154,4 +154,8 @@ private:
 	TArray<FMassEntityHandle> SelectedEntities;
 	FVector ClickStartLocation;
 	
+	
+	UFUNCTION(Server, Reliable)
+	void TESTSPAWNCODE();
+protected:
 };

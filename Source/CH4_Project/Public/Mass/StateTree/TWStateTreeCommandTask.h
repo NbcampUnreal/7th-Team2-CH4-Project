@@ -9,7 +9,7 @@
 #include "MassStateTreeTypes.h"
 #include "MassNavigationTypes.h"
 #include "MassNavigationFragments.h"
-#include "Mass/Fragments/CommandFragment.h"
+#include "Mass/Fragments/TWCommandFragment.h"
 
 #include "TWStateTreeCommandTask.generated.h"
 

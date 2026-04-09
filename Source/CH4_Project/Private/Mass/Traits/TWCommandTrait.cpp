@@ -4,7 +4,7 @@
 #include "Mass/Traits/TWCommandTrait.h"
 
 #include "MassEntityTemplateRegistry.h"
-#include "Mass/Fragments/CommandFragment.h"
+#include "Mass/Fragments/TWCommandFragment.h"
 #include "Mass/Fragments/TWTransformOffsetParams.h"
 
 

@@ -8,7 +8,7 @@
 #include "MassEntityTraitBase.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "StructUtils/SharedStruct.h"
-#include "CommandFragment.generated.h"
+#include "TWCommandFragment.generated.h"
 
 /**
  * 

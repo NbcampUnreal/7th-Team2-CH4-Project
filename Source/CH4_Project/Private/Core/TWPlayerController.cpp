@@ -52,8 +52,8 @@ void ATWPlayerController::BeginPlay()
 	}
 
 	FInputModeGameAndUI InputMode;
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways); // 클릭(캡처) 중에는 마우스를 가둠
-	InputMode.SetHideCursorDuringCapture(false); // 드래그 중에도 커서가 보이게 설정
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways); 
+	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 	SetShowMouseCursor(true);
 	
@@ -226,6 +226,7 @@ inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& In
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
 	ChangeCurrentCommandType(ETWCommand::Attack);
+	TESTSPAWNCODE();
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
@@ -552,6 +553,11 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
 {
 	//TODO 마우스 커서 변경 등 처리
 	CurrentCommandType = CommandType;
+}
+
+void ATWPlayerController::TESTSPAWNCODE_Implementation()
+{
+	// GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({0,0,0}, TestMassEntityConfigAsset.LoadSynchronous());
 }
 
 

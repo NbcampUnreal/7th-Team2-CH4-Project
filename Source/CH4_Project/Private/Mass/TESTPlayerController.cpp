@@ -17,7 +17,7 @@
 #include "MassStateTreeSubsystem.h"
 #include "MassStateTreeFragments.h"
 #include "NavigationSystem.h"
-#include "Mass/Fragments/CommandFragment.h"
+#include "Mass/Fragments/TWCommandFragment.h"
 
 void ATESTPlayerController::BeginPlay()
 {
