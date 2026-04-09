@@ -28,9 +28,12 @@ struct FTWOwnerFragment : public FMassFragment
 
 	ATWPlayerController* GetOwner() const { return Owner.Get(); }
 	void SetOwner(ATWPlayerController* InOwner) { Owner = InOwner; }
-
+	int32 GetIdx()const { return Idx; }
+	void SetIdx(int32 InIdx) { Idx = InIdx; }
 protected:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ATWPlayerController> Owner;
+	UPROPERTY(Transient)
+	int32 Idx;
 };
 

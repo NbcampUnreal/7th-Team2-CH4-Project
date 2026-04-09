@@ -173,10 +173,10 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 				FMassEntityHandle SpawnedUnit =	SpawnedEntities[0];
 				
 				//TODO 유닛 PlayerState에 추가
-				//int Idx = PlayerState->AddUnit(SpawnedUnit);
-				if (FTWOwnerFragment* TransformFragment =InOutEntityManager.GetFragmentDataPtr<FTWOwnerFragment>(SpawnedUnit))
+				PlayerState->AddUnit(SpawnedUnit);
+				if (FTWOwnerFragment* OwnerFragment =InOutEntityManager.GetFragmentDataPtr<FTWOwnerFragment>(SpawnedUnit))
 				{
-					TransformFragment->SetOwner(WeakPlayerController.Get());
+					OwnerFragment->SetOwner(WeakPlayerController.Get());
 				}
 				
 				if (FTransformFragment* TransformFragment =	InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))

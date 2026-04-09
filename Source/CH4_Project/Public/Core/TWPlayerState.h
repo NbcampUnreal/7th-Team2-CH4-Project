@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "MassEntityHandle.h"
 #include "GameFramework/PlayerState.h"
 #include "Data/TWBuildingTypes.h"
 #include "TWPlayerState.generated.h"
@@ -12,7 +13,7 @@ class CH4_PROJECT_API ATWPlayerState : public APlayerState
 
 public:
 	ATWPlayerState();
-
+	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
@@ -52,6 +53,10 @@ public:
 	
 	void AddPendingTroopCount(const int32 InAmount);
 	void RemovePendingTroopCount(const int32 InAmount);
+	
+	void AddUnit(FMassEntityHandle& Unit );
+	void RemoveUnit(int32 Idx);
+	TArray<FMassEntityHandle> Units;
 #pragma endregion
 	
 #pragma region 인구 수

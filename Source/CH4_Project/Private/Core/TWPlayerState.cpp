@@ -4,6 +4,7 @@
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
+#include "Mass/Fragments/TWOwnerFragment.h"
 
 ATWPlayerState::ATWPlayerState()
 {
@@ -15,6 +16,13 @@ ATWPlayerState::ATWPlayerState()
 	CurrentTroopCount = 0;
 	PendingTroopCount = 0;
 	MaxTroopCount = 1;
+}
+
+void ATWPlayerState::BeginPlay()
+{
+	Super::BeginPlay();
+	Units.SetNum(MaxTroopCount);
+	
 }
 
 void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
@@ -175,6 +183,40 @@ void ATWPlayerState::RemovePendingTroopCount(const int32 InAmount)
 
 	PendingTroopCount -= InAmount;
 	PendingTroopCount = FMath::Max(0, PendingTroopCount);
+}
+
+void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	checkf(Units.Num()<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
+a	Units[CurrentTroopCount] = Unit;
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
+	if (FTWOwnerFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWOwnerFragment>(Unit))
+	{
+		OwnerFragment->SetIdx(CurrentTroopCount);
+	}
+
+	++CurrentTroopCount;
+}
+
+void ATWPlayerState::RemoveUnit(int32 Idx)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	
+	--CurrentTroopCount;
+	Units.Swap(Idx, CurrentTroopCount);
+	if (Idx != CurrentTroopCount)
+	{
+		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
+		if (EntityManager.IsEntityActive(Units[Idx]))
+		{
+			if (FTWOwnerFragment* OwnerFragment =EntityManager.GetFragmentDataPtr<FTWOwnerFragment>(Units[Idx]))
+			{
+				OwnerFragment->SetIdx(Idx);
+			}
+		}
+	}
+	Units.RemoveAt(CurrentTroopCount);	
 }
 
 void ATWPlayerState::AddPopulationCap(const int32 InAmount)
