@@ -14,6 +14,7 @@ class UInputAction;
 class UInputMappingContext;
 class ATWPopulationBuilding;
 class ATWBlockingBuilding;
+class ATWBaseBuilding;
 class AGhostBuilding;
 /**
  * 
@@ -123,7 +124,7 @@ private:
 	
 protected:
 	UFUNCTION(Server,Reliable, Category = "Build")
-	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<AActor> ClassToSpawn);
+	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn);
 	
 public:
 	
@@ -144,7 +145,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<AGhostBuilding> BuildClass;
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
-	TSubclassOf<AActor> SelectedBuildingClass;
+	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
 	
 #pragma endregion
 	

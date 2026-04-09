@@ -37,7 +37,7 @@ void ATWBaseBuilding::SetOwnerPlayerState(ATWPlayerState* InPlayerState)
 	{
 		return;
 	}
-
+	
 	OwningPlayerState = InPlayerState;
 	OnOwnerPlayerStateAssigned();
 }

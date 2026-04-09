@@ -3,6 +3,8 @@
 #include "Building/TWTroopSpawnBuilding.h"
 #include "Building/TWPopulationBuilding.h"
 #include "Building/TWBlockingBuilding.h"
+#include "Building/TWBaseBuilding.h"
+#include "Core/TWGameMode.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
@@ -449,6 +451,20 @@ void ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	}
 }
 
+void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
+{
+	//TODO 마우스 커서 변경 등 처리
+	CurrentCommandType = CommandType;
+}
+
+void ATWPlayerController::TESTSPAWNCODE_Implementation()
+{
+	GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({123,456,123}, TestMassEntityConfigAsset, this);
+}
+
+#pragma endregion
+
+#pragma region 병력 스폰 대기열
 void ATWPlayerController::HandleTestSpawnTroop(const FInputActionValue& Value)
 {
 	ServerTestSpawnTroop();
@@ -481,7 +497,9 @@ void ATWPlayerController::ServerTestSpawnTroop_Implementation()
 		return;
 	}
 }
+#pragma endregion
 
+#pragma region 인구 수 대기열	
 void ATWPlayerController::HandleTestIncreasePopulation(const FInputActionValue& Value)
 {
 	ServerTestIncreasePopulation();
@@ -514,7 +532,9 @@ void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
 		return;
 	}
 }
+#pragma endregion
 
+#pragma region 방벽 데미지
 void ATWPlayerController::HandleTestDamageBlockingBuilding(const FInputActionValue& Value)
 {
 	ServerTestDamageBlockingBuilding();
@@ -547,33 +567,32 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 		return;
 	}
 }
-
-
-void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
-{
-	//TODO 마우스 커서 변경 등 처리
-	CurrentCommandType = CommandType;
-}
-
-void ATWPlayerController::TESTSPAWNCODE_Implementation()
-{
-	GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({123,456,123}, TestMassEntityConfigAsset, this);
-}
-
-
 #pragma endregion
 
 #pragma region 건설
 
-void ATWPlayerController::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<AActor> ClassToSpawn)
+void ATWPlayerController::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn)
 {
 	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+	
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
 	
 	if (GridSub && GridSub->CanBuildArea(Anchor, BuildSize))
 	{
 		FVector SpawnPos = GridSub->GetBuildingCenterPosition(Anchor, BuildSize);
-		AActor* NewBuilding = GetWorld()->SpawnActor<AActor>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
+		ATWBaseBuilding* NewBuilding = GetWorld()->SpawnActor<ATWBaseBuilding>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
 	
+		NewBuilding->OwnerPlayerSlot = TWPS->PlayerSlot;
+		
+		if (ATWGameMode* TWGM = GetWorld()->GetAuthGameMode<ATWGameMode>())
+		{
+			TWGM->TryBindBuilding(NewBuilding);
+		}
+		
 		GridSub->OccupyArea(Anchor, BuildSize, NewBuilding);
 	}
 }
