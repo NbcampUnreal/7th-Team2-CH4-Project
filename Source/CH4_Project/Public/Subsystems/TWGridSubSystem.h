@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "GridCellData.h"
+#include "TWGridCellData.h"
 #include "TWGridSubSystem.generated.h"
 
 
@@ -61,7 +61,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
 	FVector GridOrigin = FVector(-3100.0f, -3100.0f, 0.0f); // 그리드 기준점 이동 변수 / 현재 테스트 레벨 사용중이라 미사용
 	
-	TArray<FGridCellData> GridData;	
+	TArray<FTWGridCellData> GridData;	
 	
 	bool IsValidGridLocation(const FIntPoint& GridLocation) const;	// 그리드 좌표 유효 범위 확인
 };

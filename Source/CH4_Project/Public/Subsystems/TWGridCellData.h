@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "GridCellData.generated.h"
+#include "TWGridCellData.generated.h"
 
 UENUM(BlueprintType)
 enum class ECellVisibilityState : uint8
@@ -12,7 +12,7 @@ enum class ECellVisibilityState : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FGridCellData
+struct FTWGridCellData
 {
 	GENERATED_BODY()
 	
@@ -31,7 +31,7 @@ struct FGridCellData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Construction")
 	ECellVisibilityState VisibilityState;
 	
-	FGridCellData()
+	FTWGridCellData()
 		: bIsBuildable(true)
 		, bIsDestroyed(false)
 		, bHasTrap(false)
