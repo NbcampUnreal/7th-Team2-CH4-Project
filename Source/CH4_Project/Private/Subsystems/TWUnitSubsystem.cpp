@@ -40,19 +40,19 @@ void UTWUnitSubsystem::PostInitialize()
 bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle, float MaxDistance)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem) return false;
 
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
-    
+
 	TArray<FMassArchetypeHandle> MatchingArchetypes;
 	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
-	
+
 	float MinSquaredDistance = FMath::Square(MaxDistance);
 	FMassEntityHandle NearestEntity;
-	
-	TArray<FMassEntityHandle> EntityHandles ;
+
+	TArray<FMassEntityHandle> EntityHandles;
 	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
 	{
 		FMassArchetypeEntityCollection Collection(Archetype);
@@ -83,20 +83,21 @@ bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHan
 	return false;
 }
 
-bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVector& EndLocation, TArray<FMassEntityHandle>& OutEntityHandles)
+bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVector& EndLocation,
+                                      TArray<FMassEntityHandle>& OutEntityHandles)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem) return false;
 
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
-    
+
 	TArray<FMassArchetypeHandle> MatchingArchetypes;
 	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
-	
+
 	FMassEntityHandle NearestEntity;
-	
+
 	TArray<FMassEntityHandle> EntityHandles;
 	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
 	{
@@ -109,8 +110,8 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 			{
 				const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
 				//둔각이면 ok 예각이면 no
-				double DotResult = FVector::DotProduct(StartLocation-EntityPos, EndLocation-EntityPos);
-				if (DotResult<0)
+				double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
+				if (DotResult < 0)
 				{
 					OutEntityHandles.Add(Entity);
 				}
@@ -123,44 +124,60 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 		return false;
 	}
 	return true;
-	
 }
 
 void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	UWorld* World = GetWorld();
-	if (false == IsValid(World))
-	{
-		return;
-	}
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-    if (nullptr == EntityManager)
-    {
-	    return;
-    }
-	if (nullptr == UnitEntityConfig)
-	{
-		return;
-	}
-	
-	FMassArchetypeHandle ArchetypeHandle = UnitEntityConfig->GetConfig().GetOrCreateEntityTemplate(*GetWorld()).GetArchetype();
-	FMassEntityHandle SpawnedUnit = EntityManager->CreateEntity(ArchetypeHandle);
+	if (!IsValid(World) || !UnitEntityConfig) return;
 
-	// TArray<FMassEntityHandle> SpawnedEntities;
-	// EntityManager->BatchCreateEntities(TemplateData.GetArchetype(), 1, SpawnedEntities);
+	UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+	if (!MassSubsystem) return;
 
-	if (FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
-	{
-		TransformFragment->GetMutableTransform().SetLocation(Location);
-	}
-	// TODO HardCoded
-	 if (FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
-	 {
-	 	StatusFragment->SetDamage(100);
-	 	StatusFragment->SetHealth(100);
-	 	StatusFragment->SetRange(100);
-	 }
+	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
+
+	const FMassEntityTemplate& EntityTemplate = UnitEntityConfig->GetOrCreateEntityTemplate(*GetWorld());
+
+	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
+		[Location, EntityTemplate](FMassEntityManager& InOutEntityManager)
+		{
+			UWorld* World = InOutEntityManager.GetWorld();
+			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
+			UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+			if (!MassSubsystem)
+			{
+				return;
+			}
+
+			TArray<FMassEntityHandle> SpawnedEntities;
+			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
+
+			if (SpawnedEntities.Num() > 0)
+			{
+				FMassEntityHandle SpawnedUnit =
+					SpawnedEntities[0];
+
+				if (FTransformFragment* TransformFragment =
+					InOutEntityManager.GetFragmentDataPtr<
+						FTransformFragment>(SpawnedUnit))
+				{
+					TransformFragment->GetMutableTransform().
+					                   SetLocation(Location);
+					TransformFragment->GetMutableTransform().
+					                   SetScale3D(FVector(1.0f));
+				}
+
+				if (FTWStatusFragment* StatusFragment =
+					InOutEntityManager.GetFragmentDataPtr<
+						FTWStatusFragment>(SpawnedUnit))
+				{
+					StatusFragment->SetDamage(100);
+					StatusFragment->SetHealth(100);
+					StatusFragment->SetRange(100);
+				}
+			}
+		});
 }
 #endif

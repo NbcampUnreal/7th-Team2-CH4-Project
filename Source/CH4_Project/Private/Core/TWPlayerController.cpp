@@ -557,7 +557,7 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
 
 void ATWPlayerController::TESTSPAWNCODE_Implementation()
 {
-	GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({0,0,0}, TestMassEntityConfigAsset);
+	GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({123,456,123}, TestMassEntityConfigAsset);
 }
 
 
