@@ -34,6 +34,8 @@ void UTWUnitSubsystem::PostInitialize()
 //현재는 단순히 월드에 존재하는 모든 엔티티를 조회함.
 bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle, float MaxDistance)
 {
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem) return false;
 
@@ -74,4 +76,47 @@ bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHan
 	}
 
 	return false;
+}
+
+bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVector& EndLocation, TArray<FMassEntityHandle>& OutEntityHandles)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem) return false;
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+    
+	TArray<FMassArchetypeHandle> MatchingArchetypes;
+	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
+	
+	FMassEntityHandle NearestEntity;
+	
+	TArray<FMassEntityHandle> EntityHandles;
+	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
+	{
+		FMassArchetypeEntityCollection Collection(Archetype);
+		Collection.ExportEntityHandles(EntityHandles);
+
+		for (const FMassEntityHandle& Entity : EntityHandles)
+		{
+			if (const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
+			{
+				const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+				//둔각이면 ok 예각이면 no
+				double DotResult = FVector::DotProduct(StartLocation-EntityPos, EndLocation-EntityPos);
+				if (DotResult<0)
+				{
+					OutEntityHandles.Add(Entity);
+				}
+			}
+		}
+	}
+
+	if (OutEntityHandles.IsEmpty())
+	{
+		return false;
+	}
+	return true;
+	
 }

@@ -22,7 +22,8 @@ public:
 	virtual void PostInitialize() override;
 	
 	bool FindNearestEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle, float MaxDistance = 50.0f);
-	
+	bool GetAllEntities(const FVector& StartLocation, const FVector& EndLocation, TArray<FMassEntityHandle>& OutEntityHandles);
+
 private:
 	FMassEntityQuery FindNearestEntityQuery;
 	

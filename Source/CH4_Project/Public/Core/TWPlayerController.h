@@ -77,8 +77,9 @@ protected:
 	UFUNCTION(Server,Reliable)
 	void ServerHandleHoldCommand();
 	UFUNCTION(Server,Reliable)
-	void ServerHandleSelect(const FVector& CommandLocation);
-
+	void ServerHandleSingleSelect(const FVector& CommandLocation);
+	UFUNCTION(Server,Reliable)
+	void ServerHandleMultipleSelect(const FVector& StartLocation, const FVector& EndLocation);
 	
 private:
 	void HandleScreenEdgeScrolling(float DeltaSeconds);

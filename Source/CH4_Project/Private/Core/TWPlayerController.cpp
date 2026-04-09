@@ -22,7 +22,7 @@
 #include "Subsystems/TWUnitSubsystem.h"
 
 ATWPlayerController::ATWPlayerController()
-	:CurrentCommandType(ETWCommand::None)
+	: CurrentCommandType(ETWCommand::None)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	SelectedEntities.Empty();
@@ -44,17 +44,18 @@ void ATWPlayerController::BeginPlay()
 	}
 
 	check(IsValid(DefaultMappingContext));
-	
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
+		GetLocalPlayer()))
 	{
 		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
-	FInputModeGameAndUI InputMode = FInputModeGameAndUI();
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways); // 클릭(캡처) 중에는 마우스를 가둠
+	InputMode.SetHideCursorDuringCapture(false); // 드래그 중에도 커서가 보이게 설정
 	SetInputMode(InputMode);
 	SetShowMouseCursor(true);
-	
-	
 	
 }
 
@@ -94,15 +95,18 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
+
 	check(IsValid(BuildCommandAction));
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
 	{
 		return;
 	}
-	
-	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
-	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
+
+	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this,
+	                                   &ThisClass::OnStartLeftMouseAction);
+	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this,
+	                                   &ThisClass::OnEndLeftMouseAction);
 	EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
@@ -142,35 +146,36 @@ void ATWPlayerController::SetupInputComponent()
 
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	// FHitResult HitResult;
-	// FVector ClickLocation;
-	// if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-	// {
-	// 	ClickLocation = HitResult.Location;
-	// }else
-	// {
-	// 	return;
-	// }
-	//
-	// if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
-	// {
-	// 	switch (CurrentCommandType) {
-	// 	case ETWCommand::Move:
-	// 		ServerHandleMoveCommand(ClickLocation);
-	// 		break;
-	// 	case ETWCommand::Attack:
-	// 		ServerHandleAttackCommand(ClickLocation);
-	// 		break;
-	// 	default:
-	// 		check(false);
-	// 		break;
-	// 	}
-	// 	ChangeCurrentCommandType(ETWCommand::None);
-	// 	return;
-	// }
-	// ClickStartLocation = ClickLocation;
-	//
-	RequestBuild();
+	FHitResult HitResult;
+	FVector ClickLocation;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	{
+		ClickLocation = HitResult.Location;
+	}
+	else
+	{
+		return;
+	}
+
+	if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
+	{
+		switch (CurrentCommandType)
+		{
+		case ETWCommand::Move:
+			ServerHandleMoveCommand(ClickLocation);
+			break;
+		case ETWCommand::Attack:
+			ServerHandleAttackCommand(ClickLocation);
+			break;
+		default:
+			check(false);
+			break;
+		}
+		ChangeCurrentCommandType(ETWCommand::None);
+		return;
+	}
+	ClickStartLocation = ClickLocation;
+	//RequestBuild();
 }
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
@@ -178,11 +183,21 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 	ChangeCurrentCommandType(ETWCommand::None);
 	//TODO 다중선택 처리 필요
 	FHitResult HitResult;
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	if (false == GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
-		FVector ClickLocation = HitResult.Location;
-		ServerHandleSelect(ClickLocation);
+		return;
 	}
+	FVector ClickLocation = HitResult.Location;
+	//단일 선택
+	if (FVector::DistSquared(ClickLocation, ClickStartLocation) < 50.0f*50.0f)
+	{
+		ServerHandleSingleSelect(ClickLocation);
+	}
+	else//다중 선택
+	{
+		ServerHandleMultipleSelect(ClickStartLocation, ClickLocation);
+	}
+	
 	
 }
 
@@ -291,7 +306,8 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 					}
 				}
 
-				if (ThisWeakPtr->SelectedEntities.IsValidIndex(0) && InOutEntityManager.IsEntityActive(ThisWeakPtr->SelectedEntities[0]))
+				if (ThisWeakPtr->SelectedEntities.IsValidIndex(0) && InOutEntityManager.IsEntityActive(
+					ThisWeakPtr->SelectedEntities[0]))
 				{
 					if (FTWCommandDataFragment* SharedData = InOutEntityManager.GetSharedFragmentDataPtr<
 						FTWCommandDataFragment>(ThisWeakPtr->SelectedEntities[0]))
@@ -303,7 +319,8 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 				if (UMassSignalSubsystem* SignalSubsystem = InOutEntityManager.GetWorld()->GetSubsystem<
 					UMassSignalSubsystem>())
 				{
-					SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate, ThisWeakPtr->SelectedEntities);
+					SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate,
+					                                ThisWeakPtr->SelectedEntities);
 				}
 			});
 
@@ -312,6 +329,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 		}));
 	}
 }
+
 void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector& CommandLocation)
 {
 	// if (건물)
@@ -332,9 +350,17 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 }
 
 
-void ATWPlayerController::ServerHandleSelect_Implementation(const FVector& CommandLocation)
+void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector& CommandLocation)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	//TODO 건물이 대상인 경우를 먼저 처리해야함
+	// if (건물찾기)
+	// {
+	//	SelectedEntities.Empty();
+	// 	return;
+	// }
+	//
+	
 	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 	if (false == IsValid(UnitSubsystem))
 	{
@@ -342,12 +368,39 @@ void ATWPlayerController::ServerHandleSelect_Implementation(const FVector& Comma
 	}
 
 	FMassEntityHandle EntityHandle;
-	//TODO 건물이 대상인 경우 처리해야함
 	if (UnitSubsystem->FindNearestEntity(CommandLocation, EntityHandle))
 	{
+		//SelectedBuilding.Empty();
 		SelectedEntities.Empty();
 		SelectedEntities.Add(EntityHandle);
 	}
+}
+
+void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVector& StartLocation,
+	const FVector& EndLocation)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (false == IsValid(UnitSubsystem))
+	{
+		return;
+	}
+	TArray<FMassEntityHandle> EntityHandles;
+	if (UnitSubsystem->GetAllEntities(StartLocation, EndLocation, EntityHandles))
+	{
+		SelectedEntities.Empty();
+		SelectedEntities=EntityHandles;
+		//SelectedBuilding.Empty();
+		return;
+	}
+	// TODO
+	// if (건물)
+	// {
+	// 	
+	// }
+	//	SelectedEntities.Empty();
+	
 	
 }
 
