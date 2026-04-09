@@ -1,6 +1,7 @@
 ﻿#include "Core/TWPlayerState.h"
 
 #include "Data/TWBuildingTypes.h"
+#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 
 ATWPlayerState::ATWPlayerState()
@@ -15,9 +16,26 @@ ATWPlayerState::ATWPlayerState()
 	MaxTroopCount = 1;
 }
 
-void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
+void ATWPlayerState::SetPlayerSlot(const int32 NewSlot)
 {
-	PlayerSlot = InPlayerSlot;
+	if (HasAuthority())
+	{
+		PlayerSlot = NewSlot;
+		OnRep_PlayerSlot();
+	}
+}
+
+void ATWPlayerState::OnRep_PlayerSlot()
+{
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn) {
+		return;
+	}
+	
+	if (ITWPlayerSlotInterface* Interface = Cast<ITWPlayerSlotInterface>(MyPawn))
+	{
+		Interface->UpdatePlayerSlot(PlayerSlot);
+	}
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
