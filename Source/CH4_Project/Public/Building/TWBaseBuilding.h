@@ -17,6 +17,7 @@ class CH4_PROJECT_API ATWBaseBuilding : public AActor
 public:
 	ATWBaseBuilding();
 
+	virtual void BeginPlay() override;
 	virtual void Destroyed() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -36,16 +37,32 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Building")
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
+	
+	UFUNCTION(BlueprintCallable, Category="Building|HP")
+	virtual void ApplyDamageToBuilding(const int32 InDamageAmount);
+
+	UFUNCTION(BlueprintCallable, Category="Building|HP")
+	int32 GetCurrentHP() const { return CurrentHP; }
+
+	UFUNCTION(BlueprintCallable, Category="Building|HP")
+	int32 GetMaxHP() const { return MaxHP; }
 
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;
 
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
+	int32 MaxHP = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
+	int32 CurrentHP = 0;
+	
 public:
 	void SetOwnerPlayerState(ATWPlayerState* InPlayerState);
 	ATWPlayerState* GetOwnerPlayerState() const { return OwningPlayerState; }
 
 protected:
+	virtual void HandleDestroyedByDamage();
 	virtual void OnOwnerPlayerStateAssigned();
 	virtual void ClearAllBuildingTimers();
 };

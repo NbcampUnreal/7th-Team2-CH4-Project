@@ -5,7 +5,7 @@
 #include "TWNexusBuildingDataAsset.generated.h"
 
 UCLASS()
-class CH4_PROJECT_API UTWNexusBuildingDataAsset : public UTWBlockingBuildingDataAsset
+class CH4_PROJECT_API UTWNexusBuildingDataAsset : public UTWBuildingDataAsset
 {
 	GENERATED_BODY()
 

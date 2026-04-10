@@ -7,7 +7,7 @@
 class UTWNexusBuildingDataAsset;
 
 UCLASS()
-class CH4_PROJECT_API ATWNexusBuilding : public ATWBlockingBuilding
+class CH4_PROJECT_API ATWNexusBuilding : public ATWBaseBuilding
 {
 	GENERATED_BODY()
 
