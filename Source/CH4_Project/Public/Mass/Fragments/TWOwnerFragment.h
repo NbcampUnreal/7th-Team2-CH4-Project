@@ -34,6 +34,6 @@ protected:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ATWPlayerController> Owner;
 	UPROPERTY(Transient)
-	int32 Idx;
+	int32 Idx = -1;
 };
 

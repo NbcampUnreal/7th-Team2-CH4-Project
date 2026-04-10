@@ -186,9 +186,15 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 				//TODO Stat HardCoded
 				if (FTWStatusFragment* StatusFragment =	InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 				{
-					StatusFragment->SetDamage(100);
-					StatusFragment->SetHealth(100);
-					StatusFragment->SetRange(100);
+					FTWUnitStatus Status;
+					Status.SetStatus(ETWStatusType::Armor,100.0f);
+					Status.SetStatus(ETWStatusType::AttackSpeed,100.0f);
+					Status.SetStatus(ETWStatusType::Damage,100.0f);
+					Status.SetStatus(ETWStatusType::Health,100.0f);
+					Status.SetStatus(ETWStatusType::MoveSpeed,100.0f);
+					Status.SetStatus(ETWStatusType::Range,100.0f);
+
+					StatusFragment->SetStatus(Status);
 				}
 			}
 		});
