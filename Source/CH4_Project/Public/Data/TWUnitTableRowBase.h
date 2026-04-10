@@ -18,7 +18,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Unit")
 	TObjectPtr<UMassEntityConfigAsset> MassEntityConfigAsset;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Unit")
-	FTWUnitStatus BastStatus;
+	FTWUnitStatus BaseStatus;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Unit")
 	int32 Population = 1;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Unit")

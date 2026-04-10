@@ -9,7 +9,8 @@
 #include "MassEntityConfigAsset.h"
 #include "MassSpawner.h"
 #include "Core/TWPlayerState.h"
-#include "Mass/Fragments/TWOwnerFragment.h"
+#include "Data/TWUnitTableRowBase.h"
+#include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
@@ -128,6 +129,7 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 	return true;
 }
 
+//구버전 아래에 있는 새거 써야함
 void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig,
                                  ATWPlayerController* PlayerController)
 {
@@ -174,7 +176,7 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 				
 				//TODO 유닛 PlayerState에 추가
 				PlayerState->AddUnit(SpawnedUnit);
-				if (FTWOwnerFragment* OwnerFragment =InOutEntityManager.GetFragmentDataPtr<FTWOwnerFragment>(SpawnedUnit))
+				if (FTWUnitFragment* OwnerFragment =InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
 				{
 					OwnerFragment->SetOwner(WeakPlayerController.Get());
 				}
@@ -198,5 +200,75 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfi
 				}
 			}
 		});
+}
+
+void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowBase& UnitTableRowBase,
+	ATWPlayerController* PlayerController)
+{
+	
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World) || !UnitTableRowBase.MassEntityConfigAsset) return;
+
+	UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+	if (!MassSubsystem) return;
+
+	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
+
+	const FMassEntityTemplate& EntityTemplate = UnitTableRowBase.MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
+
+	TWeakObjectPtr<ATWPlayerController> WeakPlayerController = PlayerController;
+	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
+		[Location, EntityTemplate, WeakPlayerController, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
+		{
+			UWorld* World = InOutEntityManager.GetWorld();
+			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
+			UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+			if (nullptr == MassSubsystem)
+			{
+				return;
+			}
+			if (false == WeakPlayerController.IsValid())
+			{
+				return;
+			}
+			ATWPlayerState* PlayerState = WeakPlayerController->GetPlayerState<ATWPlayerState>();
+			if (false == IsValid(PlayerState))
+			{
+				return;
+			}
+
+			
+			TArray<FMassEntityHandle> SpawnedEntities;
+			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
+
+			if (SpawnedEntities.Num() > 0)
+			{
+				FMassEntityHandle SpawnedUnit =	SpawnedEntities[0];
+				
+				//TODO 유닛 PlayerState에 추가
+				PlayerState->AddUnit(SpawnedUnit);
+				if (FTWUnitFragment* UnitFragment =InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
+				{
+					UnitFragment->SetOwner(WeakPlayerController.Get());
+					UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
+				}
+				
+				if (FTransformFragment* TransformFragment =	InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+				{
+					TransformFragment->GetMutableTransform().SetLocation(Location);
+				}
+				//TODO Stat HardCoded
+				//TODO 유닛 아이디 fragment에 주입
+				//TODO 업그레이드 현황에 따른 스탯 설정
+				if (FTWStatusFragment* StatusFragment =	InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+				{
+					StatusFragment->SetStatus(UnitTableRowBase.BaseStatus);
+				}
+			}
+		});
+	
+
 }
 #endif
