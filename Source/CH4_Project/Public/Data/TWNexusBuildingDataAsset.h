@@ -21,4 +21,12 @@ public:
 	// 재생량
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Nexus", meta=(ClampMin="1"))
 	int32 RegenAmount = 50;
+	
+	// 나무 생산 주기
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Nexus|Resource", meta=(ClampMin="0.1"))
+	float WoodProductionInterval = 5.0f;
+
+	// 한 번에 얻는 나무 양
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Nexus|Resource", meta=(ClampMin="1"))
+	int32 WoodProductionAmount = 10;
 };

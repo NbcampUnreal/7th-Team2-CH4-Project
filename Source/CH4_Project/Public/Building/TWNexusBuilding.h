@@ -13,19 +13,23 @@ class CH4_PROJECT_API ATWNexusBuilding : public ATWBaseBuilding
 
 public:
 	virtual void BeginPlay() override;
-	
 	virtual void ApplyDamageToBuilding(const int32 InDamageAmount) override;
 
 protected:
 	FTimerHandle RegenDelayTimerHandle;
 	FTimerHandle RegenTickTimerHandle;
+	FTimerHandle WoodProductionTimerHandle;
 
 protected:
 	const UTWNexusBuildingDataAsset* GetNexusBuildingData() const;
 
 	void StartHPRegen();
 	void HandleHPRegen();
+	
+	void StartWoodProduction();
+	void HandleWoodProduction();
 
+	virtual void OnOwnerPlayerStateAssigned() override;
 	virtual void HandleDestroyedByDamage() override;
 	virtual void ClearAllBuildingTimers() override;
 };

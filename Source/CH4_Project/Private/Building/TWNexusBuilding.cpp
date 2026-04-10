@@ -1,6 +1,8 @@
 ﻿#include "Building/TWNexusBuilding.h"
 #include "Data/TWNexusBuildingDataAsset.h"
 #include "Core/TWGameMode.h"
+#include "Core/TWPlayerState.h"
+#include "Data/TWBuildingTypes.h"
 #include "TimerManager.h"
 
 void ATWNexusBuilding::BeginPlay()
@@ -13,11 +15,28 @@ void ATWNexusBuilding::BeginPlay()
 	}
 
 	StartHPRegen();
+	
+	if (OwningPlayerState)
+	{
+		StartWoodProduction();
+	}
 }
 
 const UTWNexusBuildingDataAsset* ATWNexusBuilding::GetNexusBuildingData() const
 {
 	return Cast<UTWNexusBuildingDataAsset>(BuildingData);
+}
+
+void ATWNexusBuilding::OnOwnerPlayerStateAssigned()
+{
+	Super::OnOwnerPlayerStateAssigned();
+
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	StartWoodProduction();
 }
 
 void ATWNexusBuilding::ApplyDamageToBuilding(const int32 InDamageAmount)
@@ -127,6 +146,83 @@ void ATWNexusBuilding::HandleHPRegen()
 	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Regen : %d / %d"), CurrentHP, MaxHP);
 }
 
+void ATWNexusBuilding::StartWoodProduction()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const UTWNexusBuildingDataAsset* NexusData = GetNexusBuildingData();
+	if (!NexusData)
+	{
+		return;
+	}
+
+	if (!OwningPlayerState)
+	{
+		return;
+	}
+
+	if (NexusData->WoodProductionInterval <= 0.0f)
+	{
+		return;
+	}
+
+	if (NexusData->WoodProductionAmount <= 0)
+	{
+		return;
+	}
+
+	if (GetWorldTimerManager().IsTimerActive(WoodProductionTimerHandle))
+	{
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		WoodProductionTimerHandle,
+		this,
+		&ATWNexusBuilding::HandleWoodProduction,
+		NexusData->WoodProductionInterval,
+		true
+	);
+}
+
+void ATWNexusBuilding::HandleWoodProduction()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const UTWNexusBuildingDataAsset* NexusData = GetNexusBuildingData();
+	if (!NexusData)
+	{
+		return;
+	}
+
+	if (!OwningPlayerState)
+	{
+		return;
+	}
+
+	if (CurrentHP <= 0)
+	{
+		return;
+	}
+
+	OwningPlayerState->AddResource(EResourceType::Wood, NexusData->WoodProductionAmount);
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[Nexus] +Wood : %d | PlayerSlot: %d | Current Wood : %d"),
+		NexusData->WoodProductionAmount,
+		OwnerPlayerSlot,
+		OwningPlayerState->Wood
+	);
+}
+
 void ATWNexusBuilding::HandleDestroyedByDamage()
 {
 	if (!HasAuthority())
@@ -149,4 +245,5 @@ void ATWNexusBuilding::ClearAllBuildingTimers()
 	Super::ClearAllBuildingTimers();
 	GetWorldTimerManager().ClearTimer(RegenDelayTimerHandle);
 	GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
+	GetWorldTimerManager().ClearTimer(WoodProductionTimerHandle);
 }
