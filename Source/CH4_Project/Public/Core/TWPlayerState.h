@@ -1,10 +1,14 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "MassCommonTypes.h"
+#include "Core/TWPlayerUnitContainer.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Subsystems/TWUnitSubsystem.h"
 #include "TWPlayerState.generated.h"
+
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
@@ -13,7 +17,6 @@ class CH4_PROJECT_API ATWPlayerState : public APlayerState
 
 public:
 	ATWPlayerState();
-	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
@@ -34,8 +37,6 @@ public:
 #pragma endregion	
 	
 #pragma region 병력 스폰
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
-	int32 CurrentTroopCount = 0;
 	
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
 	int32 PendingTroopCount = 0;
@@ -53,10 +54,7 @@ public:
 	
 	void AddPendingTroopCount(const int32 InAmount);
 	void RemovePendingTroopCount(const int32 InAmount);
-	
-	void AddUnit(FMassEntityHandle& Unit );
-	void RemoveUnit(int32 Idx);
-	TArray<FMassEntityHandle> Units;
+
 #pragma endregion
 	
 #pragma region 인구 수
@@ -77,4 +75,10 @@ public:
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();
 #pragma endregion
+	
+private:
+	FORCEINLINE UTWUnitSubsystem* GetUnitSubsystem() const
+	{
+		return GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	}
 };

@@ -3,8 +3,11 @@
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
+#include "MassReplicationFragments.h"
+#include "MassReplicationSubsystem.h"
 #include "TimerManager.h"
 #include "Mass/Fragments/TWUnitFragment.h"
+#include "Subsystems/TWUnitSubsystem.h"
 
 ATWPlayerState::ATWPlayerState()
 {
@@ -13,21 +16,19 @@ ATWPlayerState::ATWPlayerState()
 	PlayerSlot = -1;
 	Wood = 0;
 	Ore = 0;
-	CurrentTroopCount = 0;
 	PendingTroopCount = 0;
 	MaxTroopCount = 1;
 }
 
-void ATWPlayerState::BeginPlay()
-{
-	Super::BeginPlay();
-	Units.SetNum(MaxTroopCount);
-	
-}
 
 void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
 {
 	PlayerSlot = InPlayerSlot;
+	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
+	if (IsValid(UnitSubsystem))
+	{
+		UnitSubsystem->AddPlayer(PlayerSlot);
+	}
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
@@ -185,39 +186,8 @@ void ATWPlayerState::RemovePendingTroopCount(const int32 InAmount)
 	PendingTroopCount = FMath::Max(0, PendingTroopCount);
 }
 
-void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
-{
-	checkf(HasAuthority(), TEXT("Server Logic Called!"));
-	checkf(CurrentTroopCount<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
-	Units[CurrentTroopCount] = Unit;
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
-	if (FTWUnitFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit))
-	{
-		OwnerFragment->SetIdx(CurrentTroopCount);
-	}
 
-	++CurrentTroopCount;
-}
 
-void ATWPlayerState::RemoveUnit(int32 Idx)
-{
-	checkf(HasAuthority(), TEXT("Server Logic Called!"));
-	
-	--CurrentTroopCount;
-	Units.Swap(Idx, CurrentTroopCount);
-	if (Idx != CurrentTroopCount)
-	{
-		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
-		if (EntityManager.IsEntityActive(Units[Idx]))
-		{
-			if (FTWUnitFragment* OwnerFragment =EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Units[Idx]))
-			{
-				OwnerFragment->SetIdx(Idx);
-			}
-		}
-	}
-	Units[CurrentTroopCount] = FMassEntityHandle();
-}
 
 void ATWPlayerState::AddPopulationCap(const int32 InAmount)
 {
@@ -246,7 +216,6 @@ void ATWPlayerState::AddPopulationCap(const int32 InAmount)
 FBuildingResourceCost ATWPlayerState::GetTotalTroopUpkeepCost() const
 {
 	FBuildingResourceCost TotalCost;
-
 	TotalCost.Wood = UpkeepCost.Wood * CurrentTroopCount;
 	TotalCost.Ore = UpkeepCost.Ore * CurrentTroopCount;
 
