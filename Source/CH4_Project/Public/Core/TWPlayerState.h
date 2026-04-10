@@ -48,9 +48,6 @@ public:
 	
 	int8 CanQueueTroop(const int32 InAmount = 1) const;
 	
-	void AddTroopCount(const int32 InAmount);
-	void RemoveTroopCount(const int32 InAmount);
-	
 	void AddPendingTroopCount(const int32 InAmount);
 	void RemovePendingTroopCount(const int32 InAmount);
 	

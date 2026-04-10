@@ -103,57 +103,6 @@ int8 ATWPlayerState::CanQueueTroop(const int32 InAmount) const
 	return 0;
 }
 
-void ATWPlayerState::AddTroopCount(const int32 InAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	CurrentTroopCount += InAmount;
-	RefreshTroopUpkeepTimer();
-	
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
-		PlayerSlot,
-		CurrentTroopCount,
-		MaxTroopCount
-	);
-}
-
-void ATWPlayerState::RemoveTroopCount(const int32 InAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	CurrentTroopCount -= InAmount;
-	CurrentTroopCount = FMath::Max(0, CurrentTroopCount);
-	RefreshTroopUpkeepTimer();
-	
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
-		PlayerSlot,
-		CurrentTroopCount,
-		MaxTroopCount
-	);
-}
-
 void ATWPlayerState::AddPendingTroopCount(const int32 InAmount)
 {
 	if (!HasAuthority())
@@ -189,7 +138,7 @@ void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 	checkf(Units.Num()<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
-a	Units[CurrentTroopCount] = Unit;
+	Units[CurrentTroopCount] = Unit;
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
 	if (FTWOwnerFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWOwnerFragment>(Unit))
 	{
@@ -197,6 +146,16 @@ a	Units[CurrentTroopCount] = Unit;
 	}
 
 	++CurrentTroopCount;
+	RefreshTroopUpkeepTimer();
+	
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
+		PlayerSlot,
+		CurrentTroopCount,
+		MaxTroopCount
+	);
 }
 
 void ATWPlayerState::RemoveUnit(int32 Idx)
@@ -217,6 +176,16 @@ void ATWPlayerState::RemoveUnit(int32 Idx)
 		}
 	}
 	Units.RemoveAt(CurrentTroopCount);	
+	RefreshTroopUpkeepTimer();
+	
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
+		PlayerSlot,
+		CurrentTroopCount,
+		MaxTroopCount
+	);
 }
 
 void ATWPlayerState::AddPopulationCap(const int32 InAmount)
