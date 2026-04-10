@@ -216,7 +216,7 @@ void ATWPlayerState::RemoveUnit(int32 Idx)
 			}
 		}
 	}
-	Units.RemoveAt(CurrentTroopCount);	
+	Units[CurrentTroopCount] = FMassEntityHandle();
 }
 
 void ATWPlayerState::AddPopulationCap(const int32 InAmount)
