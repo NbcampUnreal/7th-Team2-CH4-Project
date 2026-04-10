@@ -18,6 +18,7 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	
 	void TryBindBuilding(ATWBaseBuilding* InBuilding);
+	void HandlePlayerDefeat(int32 DefeatedPlayerSlot);
 
 protected:
 	void BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState);

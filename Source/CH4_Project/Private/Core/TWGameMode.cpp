@@ -101,6 +101,39 @@ void ATWGameMode::TryBindBuilding(ATWBaseBuilding* InBuilding)
 	InBuilding->SetOwnerPlayerState(FoundPlayerState);
 }
 
+void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
+{
+	int32 WinnerPlayerSlot = -1;
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
+		if (!PS)
+		{
+			continue;
+		}
+
+		if (PS->PlayerSlot != DefeatedPlayerSlot)
+		{
+			WinnerPlayerSlot = PS->PlayerSlot;
+			break;
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Player %d Defeated / Player %d Victory"), DefeatedPlayerSlot, WinnerPlayerSlot);
+	
+	// 1) 입력 막기
+	// 2) 승패 UI 표시
+	// 3) MatchState 변경
+	// 4) 리스타트/결과 화면 이동
+}
+
 // 미리 설치되어 있는 건물 바인딩
 void ATWGameMode::BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState)
 {

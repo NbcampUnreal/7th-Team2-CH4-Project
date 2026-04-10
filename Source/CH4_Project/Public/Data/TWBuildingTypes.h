@@ -10,7 +10,8 @@ enum class EBuildingCategory : uint8
 	ResourceProduction  UMETA(DisplayName="ResourceProduction"),
 	TroopProduction     UMETA(DisplayName="TroopProduction"),
 	PopulationProduction     UMETA(DisplayName="PopulationProduction"),
-	Blocking                UMETA(DisplayName="Blocking")
+	Blocking                UMETA(DisplayName="Blocking"),
+	Nexus                   UMETA(DisplayName="Nexus")
 };
 
 UENUM(BlueprintType)

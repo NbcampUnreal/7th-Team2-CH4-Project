@@ -17,7 +17,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
-	void ApplyDamageToBuilding(const int32 InDamageAmount);
+	virtual void ApplyDamageToBuilding(const int32 InDamageAmount);
 
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
 	int32 GetCurrentHP() const { return CurrentHP; }
@@ -27,7 +27,7 @@ public:
 
 protected:
 	const UTWBlockingBuildingDataAsset* GetBlockingBuildingData() const;
-	void HandleDestroyedByDamage();
+	virtual void HandleDestroyedByDamage();
 
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
