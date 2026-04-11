@@ -21,7 +21,6 @@ class CH4_PROJECT_API UTWPlayerUnitContainer : public UObject
 	
 public:
 	void Init(int32 InOwnerSlot);
-	void Clear();
 	void SetOwnerSlot(int32 InOwnerSlot);
 	void AddUnit(FMassEntityHandle& Unit);
 	void RemoveUnit(int32 Idx);
@@ -32,7 +31,9 @@ public:
 	FORCEINLINE int32 GetCurrentUnitCount() const{return Units.Num();}
 	FORCEINLINE const TMap<EResourceType, int32>& GetUpkeep() const{return Upkeep;}
 #pragma endregion
-	
+private:
+	void IncreaseUpkeep(TMap<EResourceType, int32> Amount);
+	void DecreaseUpkeep(TMap<EResourceType, int32> Amount);
 private:
 	UPROPERTY()
 	int32 OwnerSlot;

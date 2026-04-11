@@ -6,6 +6,7 @@
 #include "GameFramework/GameState.h"
 #include "TWGameState.generated.h"
 
+class ATWPlayerState;
 /**
  * 
  */
@@ -15,6 +16,7 @@ class CH4_PROJECT_API ATWGameState : public AGameState
 	GENERATED_BODY()
 public:
 	FORCEINLINE float GetUpkeepRatio()const{return UpkeepRatio;}
+	ATWPlayerState* GetPlayerState(int32 PlayerSlot);
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float UpkeepRatio;

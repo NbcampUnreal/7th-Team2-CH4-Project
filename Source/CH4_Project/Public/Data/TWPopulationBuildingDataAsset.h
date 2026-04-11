@@ -20,5 +20,5 @@ public:
 	
 	// 생산 비용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Population")
-	FBuildingResourceCost ProductionCost;
+	TMap<EResourceType, int32> ProductionCost;
 };

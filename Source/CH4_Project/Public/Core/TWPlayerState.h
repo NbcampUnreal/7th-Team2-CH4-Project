@@ -27,25 +27,24 @@ public:
 	void SetPlayerSlot(const int32 InPlayerSlot);
 	
 #pragma region 자원
+protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Resource")
-	int32 Wood = 0;
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Resource")
-	int32 Ore = 0;
-	
+	TArray<int32> Resources;
+public:
 	void AddResource(const EResourceType ResourceType, const int32 Amount);
+	
 #pragma endregion	
 	
 #pragma region 병력 스폰
-	
+protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
 	int32 PendingTroopCount = 0;
 	
 	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Troop")
 	int32 MaxTroopCount = 1;
-	
-	int8 CanAffordCost(const int32 InWoodCost, const int32 InOreCost) const;
-	void SpendCost(const int32 InWoodCost, const int32 InOreCost);
+public:
+	int8 CanAffordCost(const TMap<EResourceType, int32>& Cost) const;
+	void SpendCost(const TMap<EResourceType, int32>& Cost);
 	
 	int8 CanQueueTroop(const int32 InAmount = 1) const;
 	
@@ -64,15 +63,16 @@ public:
 #pragma endregion
 	
 #pragma region 병력 유지비
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep")
-	FBuildingResourceCost UpkeepCost;
-
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Troop|Upkeep")
+	TMap<EResourceType, int32> UpkeepCost;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep", meta=(ClampMin="0.1"))
 	float UpkeepInterval = 60.0f;
 
 	FTimerHandle TroopUpkeepTimerHandle;
-
-	FBuildingResourceCost GetTotalTroopUpkeepCost() const;
+public:
+	FORCEINLINE const TMap<EResourceType, int32>& GetTotalTroopUpkeepCost() const{return UpkeepCost;}
+	void SetTotalTroopUpkeepCost(const TMap<EResourceType, int32>& Upkeep){UpkeepCost = Upkeep;}
 	void RefreshTroopUpkeepTimer();
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();

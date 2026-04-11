@@ -16,6 +16,15 @@
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
 
+// UTWUnitSubsystem::UTWUnitSubsystem()
+// {
+// 	// ConstructorHelpers::FObjectFinder<UDataTable> f(TEXT("/Game/CH4_Project/Mass/MASSTEST/NewDataTable.NewDataTable"));
+// 	// if (f.Succeeded())
+// 	// {
+// 	// 	UnitTable = f.Object;
+// 	// }
+// }
+
 void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
@@ -32,7 +41,7 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
 		for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
 		{
-			CachedUnitTableRows[UnitTableRowBase->UnitID] = UnitTableRowBase;
+			CachedUnitTableRows.Add(UnitTableRowBase->UnitID, UnitTableRowBase);
 		}
 	}
 }
