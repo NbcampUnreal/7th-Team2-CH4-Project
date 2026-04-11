@@ -54,6 +54,8 @@ public:
 	
 	void AddPendingTroopCount(const int32 InAmount);
 	void RemovePendingTroopCount(const int32 InAmount);
+	
+	int32 CurrentTroopCount=10;
 
 #pragma endregion
 	

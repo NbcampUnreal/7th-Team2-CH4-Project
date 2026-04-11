@@ -34,7 +34,7 @@ struct FTWUnitFragment : public FMassFragment
 	void SetUnitID(FName InUnitID) { UnitID = InUnitID; }
 protected:
 	UPROPERTY(Transient)
-	int32 Owner;
+	int32 Owner = -1;
 	UPROPERTY(Transient)
 	int32 Idx = -1;
 	UPROPERTY(Transient)

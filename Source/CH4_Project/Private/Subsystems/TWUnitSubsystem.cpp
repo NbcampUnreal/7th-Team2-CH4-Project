@@ -27,10 +27,13 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		FindNearestEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	}
 	TArray<FTWUnitTableRowBase*> UnitTableRowBases;
-	UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
-	for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
+	if (UnitTable)
 	{
-		CachedUnitTableRows[UnitTableRowBase->UnitID] = UnitTableRowBase;
+		UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
+		for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
+		{
+			CachedUnitTableRows[UnitTableRowBase->UnitID] = UnitTableRowBase;
+		}
 	}
 }
 
@@ -218,7 +221,7 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowB
 				}
 
 				//TODO 유닛 PlayerState에 추가
-				PlayerState->AddUnit(SpawnedUnit);
+				// PlayerState->AddUnit(SpawnedUnit);
 				WeakThis->AddUnit(WeakPlayerController->GetPlayerState<ATWPlayerState>()->PlayerSlot, SpawnedUnit);
 			}
 		});

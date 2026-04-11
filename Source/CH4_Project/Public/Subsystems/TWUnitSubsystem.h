@@ -40,7 +40,7 @@ private:
 	
 	
 #endif
-	
+public:
 	FTWUnitTableRowBase* GetUnitTableRowBase(FName UnitID) const;
 
 protected:
