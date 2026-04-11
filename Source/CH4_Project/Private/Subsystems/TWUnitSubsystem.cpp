@@ -68,7 +68,7 @@ void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
 	check(GameState);
-	UnitContainers[PlayerSlot] = NewObject<UTWPlayerUnitContainer>();
+	UnitContainers.Add(PlayerSlot, NewObject<UTWPlayerUnitContainer>());
 	UnitContainers[PlayerSlot]->Init(PlayerSlot);
 }
 

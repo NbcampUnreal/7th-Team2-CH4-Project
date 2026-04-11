@@ -46,8 +46,6 @@ private:
 	UPROPERTY()
 	TArray<FMassNetworkID> Units;
 	UPROPERTY()
-	TObjectPtr<UMassReplicationSubsystem> MassReplicationSubsystem;
-	UPROPERTY()
 	TMap<EResourceType, int32> Upkeep;
 	UPROPERTY()
 	int32 CurrentPopulation = 0;

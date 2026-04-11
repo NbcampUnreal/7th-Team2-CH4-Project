@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "TWPlayerState.h"
+#include "GameFramework/GameMode.h"
 #include "GameFramework/GameModeBase.h"
 #include "TWGameMode.generated.h"
 
@@ -10,7 +11,7 @@ class ATWBaseBuilding;
 class APlayerController;
 
 UCLASS()
-class CH4_PROJECT_API ATWGameMode : public AGameModeBase
+class CH4_PROJECT_API ATWGameMode : public AGameMode
 {
 	GENERATED_BODY()
 

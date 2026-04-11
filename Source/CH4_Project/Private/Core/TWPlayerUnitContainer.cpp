@@ -10,7 +10,6 @@
 
 void UTWPlayerUnitContainer::Init(int32 InOwnerSlot)
 {
-	MassReplicationSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
 	OwnerSlot = InOwnerSlot;
 	CurrentPopulation = 0;
 }
@@ -23,6 +22,7 @@ void UTWPlayerUnitContainer::SetOwnerSlot(int32 InOwnerSlot)
 
 FMassEntityHandle UTWPlayerUnitContainer::GetEntityHandle(int32 Idx) const
 {
+	UMassReplicationSubsystem* MassReplicationSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
 	return MassReplicationSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
 }
 
