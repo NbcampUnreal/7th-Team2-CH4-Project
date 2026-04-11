@@ -26,5 +26,5 @@ public:
 	
 	// 생산 비용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Troop")
-	FBuildingResourceCost SpawnCost;
+	TMap<EResourceType, int32> SpawnCost;
 };

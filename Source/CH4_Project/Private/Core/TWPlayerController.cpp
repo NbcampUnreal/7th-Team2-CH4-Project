@@ -228,7 +228,6 @@ inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& In
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
 	ChangeCurrentCommandType(ETWCommand::Attack);
-	TESTSPAWNCODE();
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
@@ -390,7 +389,7 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		return;
 	}
 	TArray<FMassEntityHandle> EntityHandles;
-	if (UnitSubsystem->GetAllEntities(StartLocation, EndLocation, EntityHandles))
+	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, EntityHandles))
 	{
 		SelectedEntities.Empty();
 		SelectedEntities=EntityHandles;
@@ -455,11 +454,6 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
 {
 	//TODO 마우스 커서 변경 등 처리
 	CurrentCommandType = CommandType;
-}
-
-void ATWPlayerController::TESTSPAWNCODE_Implementation()
-{
-	GetWorld()->GetSubsystem<UTWUnitSubsystem>()->SpawnUnit({123,456,123}, TestMassEntityConfigAsset, this);
 }
 
 #pragma endregion

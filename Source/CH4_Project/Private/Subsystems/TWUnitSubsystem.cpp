@@ -8,12 +8,22 @@
 #include "MassReplicationSubsystem.h"
 #include "MassEntityConfigAsset.h"
 #include "MassSpawner.h"
+#include "Core/TWGameState.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWUnitTableRowBase.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
+
+// UTWUnitSubsystem::UTWUnitSubsystem()
+// {
+// 	// ConstructorHelpers::FObjectFinder<UDataTable> f(TEXT("/Game/CH4_Project/Mass/MASSTEST/NewDataTable.NewDataTable"));
+// 	// if (f.Succeeded())
+// 	// {
+// 	// 	UnitTable = f.Object;
+// 	// }
+// }
 
 void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
@@ -25,6 +35,15 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		FindNearestEntityQuery.Initialize(EntityManager.AsShared());
 		FindNearestEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	}
+	TArray<FTWUnitTableRowBase*> UnitTableRowBases;
+	if (UnitTable)
+	{
+		UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
+		for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
+		{
+			CachedUnitTableRows.Add(UnitTableRowBase->UnitID, UnitTableRowBase);
+		}
+	}
 }
 
 void UTWUnitSubsystem::PostInitialize()
@@ -34,6 +53,22 @@ void UTWUnitSubsystem::PostInitialize()
 	UMassReplicationSubsystem* ReplicationSubsystem = UWorld::GetSubsystem<UMassReplicationSubsystem>(World);
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
+}
+
+void UTWUnitSubsystem::Deinitialize()
+{
+	UnitContainers.Empty();
+	CachedUnitTableRows.Empty();
+	Super::Deinitialize();
+}
+
+void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
+	check(GameState);
+	UnitContainers[PlayerSlot] = NewObject<UTWPlayerUnitContainer>();
+	UnitContainers[PlayerSlot]->Init(PlayerSlot);
 }
 
 #ifdef WITH_SERVER_CODE
@@ -86,8 +121,8 @@ bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHan
 	return false;
 }
 
-bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVector& EndLocation,
-                                      TArray<FMassEntityHandle>& OutEntityHandles)
+bool UTWUnitSubsystem::GetEntitiesInRectangle(const FVector& StartLocation, const FVector& EndLocation,
+                                              TArray<FMassEntityHandle>& OutEntityHandles)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
@@ -129,83 +164,10 @@ bool UTWUnitSubsystem::GetAllEntities(const FVector& StartLocation, const FVecto
 	return true;
 }
 
-//구버전 아래에 있는 새거 써야함
-void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const UMassEntityConfigAsset* UnitEntityConfig,
-                                 ATWPlayerController* PlayerController)
-{
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-
-	UWorld* World = GetWorld();
-	if (!IsValid(World) || !UnitEntityConfig) return;
-
-	UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
-	if (!MassSubsystem) return;
-
-	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
-
-	const FMassEntityTemplate& EntityTemplate = UnitEntityConfig->GetOrCreateEntityTemplate(*GetWorld());
-
-	TWeakObjectPtr<ATWPlayerController> WeakPlayerController = PlayerController;
-	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
-		[Location, EntityTemplate, WeakPlayerController](FMassEntityManager& InOutEntityManager)
-		{
-			UWorld* World = InOutEntityManager.GetWorld();
-			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
-			UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
-			if (nullptr == MassSubsystem)
-			{
-				return;
-			}
-			if (false == WeakPlayerController.IsValid())
-			{
-				return;
-			}
-			ATWPlayerState* PlayerState = WeakPlayerController->GetPlayerState<ATWPlayerState>();
-			if (false == IsValid(PlayerState))
-			{
-				return;
-			}
-
-			
-			TArray<FMassEntityHandle> SpawnedEntities;
-			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
-
-			if (SpawnedEntities.Num() > 0)
-			{
-				FMassEntityHandle SpawnedUnit =	SpawnedEntities[0];
-				
-				//TODO 유닛 PlayerState에 추가
-				PlayerState->AddUnit(SpawnedUnit);
-				if (FTWUnitFragment* OwnerFragment =InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
-				{
-					OwnerFragment->SetOwner(WeakPlayerController.Get());
-				}
-				
-				if (FTransformFragment* TransformFragment =	InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
-				{
-					TransformFragment->GetMutableTransform().SetLocation(Location);
-				}
-				//TODO Stat HardCoded
-				if (FTWStatusFragment* StatusFragment =	InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
-				{
-					FTWUnitStatus Status;
-					Status.SetStatus(ETWStatusType::Armor,100.0f);
-					Status.SetStatus(ETWStatusType::AttackSpeed,100.0f);
-					Status.SetStatus(ETWStatusType::Damage,100.0f);
-					Status.SetStatus(ETWStatusType::Health,100.0f);
-					Status.SetStatus(ETWStatusType::MoveSpeed,100.0f);
-					Status.SetStatus(ETWStatusType::Range,100.0f);
-
-					StatusFragment->SetStatus(Status);
-				}
-			}
-		});
-}
 
 void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowBase& UnitTableRowBase,
-	ATWPlayerController* PlayerController)
+                                 ATWPlayerController* PlayerController)
 {
-	
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
 	UWorld* World = GetWorld();
@@ -216,59 +178,83 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowB
 
 	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
 
-	const FMassEntityTemplate& EntityTemplate = UnitTableRowBase.MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
+	const FMassEntityTemplate& EntityTemplate = UnitTableRowBase.MassEntityConfigAsset->
+	                                                             GetOrCreateEntityTemplate(*GetWorld());
 
 	TWeakObjectPtr<ATWPlayerController> WeakPlayerController = PlayerController;
+	TWeakObjectPtr<ThisClass> WeakThis = this;
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
-		[Location, EntityTemplate, WeakPlayerController, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
+		[Location, EntityTemplate, WeakPlayerController, WeakThis, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
 		{
-			UWorld* World = InOutEntityManager.GetWorld();
-			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
-			UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
-			if (nullptr == MassSubsystem)
-			{
-				return;
-			}
 			if (false == WeakPlayerController.IsValid())
 			{
 				return;
 			}
+			if (false == WeakThis.IsValid())
+			{
+				return;
+			}
+			UWorld* World = InOutEntityManager.GetWorld();
+			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
+
 			ATWPlayerState* PlayerState = WeakPlayerController->GetPlayerState<ATWPlayerState>();
 			if (false == IsValid(PlayerState))
 			{
 				return;
 			}
-
-			
 			TArray<FMassEntityHandle> SpawnedEntities;
 			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
 
 			if (SpawnedEntities.Num() > 0)
 			{
-				FMassEntityHandle SpawnedUnit =	SpawnedEntities[0];
-				
-				//TODO 유닛 PlayerState에 추가
-				PlayerState->AddUnit(SpawnedUnit);
-				if (FTWUnitFragment* UnitFragment =InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
+				FMassEntityHandle SpawnedUnit = SpawnedEntities[0];
+
+
+				if (FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
 				{
-					UnitFragment->SetOwner(WeakPlayerController.Get());
 					UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
 				}
-				
-				if (FTransformFragment* TransformFragment =	InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+
+				if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(
+					SpawnedUnit))
 				{
 					TransformFragment->GetMutableTransform().SetLocation(Location);
 				}
 				//TODO Stat HardCoded
 				//TODO 유닛 아이디 fragment에 주입
 				//TODO 업그레이드 현황에 따른 스탯 설정
-				if (FTWStatusFragment* StatusFragment =	InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+				if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(
+					SpawnedUnit))
 				{
 					StatusFragment->SetStatus(UnitTableRowBase.BaseStatus);
 				}
+
+				//TODO 유닛 PlayerState에 추가
+				// PlayerState->AddUnit(SpawnedUnit);
+				WeakThis->AddUnit(WeakPlayerController->GetPlayerState<ATWPlayerState>()->PlayerSlot, SpawnedUnit);
 			}
 		});
-	
+}
 
+TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
+{
+	return UnitContainers[PlayerSlot]->GetUpkeep();
+}
+
+void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	UnitContainers[PlayerSlot]->AddUnit(Unit);
+}
+
+void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	UnitContainers[PlayerSlot]->RemoveUnit(Idx);
+}
+
+FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
+{
+	return CachedUnitTableRows[UnitID];
 }
 #endif

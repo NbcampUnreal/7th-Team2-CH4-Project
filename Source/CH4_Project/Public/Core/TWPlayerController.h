@@ -157,9 +157,5 @@ private:
 	FVector ClickStartLocation;
 	
 	
-	UFUNCTION(Server, Reliable)
-	void TESTSPAWNCODE();
-protected:
-	UPROPERTY(EditAnywhere)
-	TObjectPtr<UMassEntityConfigAsset> TestMassEntityConfigAsset;
+	
 };

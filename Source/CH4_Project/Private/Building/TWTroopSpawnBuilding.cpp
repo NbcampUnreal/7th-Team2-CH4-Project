@@ -75,13 +75,13 @@ void ATWTroopSpawnBuilding::RequestEnqueueTroop()
         return;
     }
     
-    if (OwningPlayerState->CanAffordCost(TroopData->SpawnCost.Wood, TroopData->SpawnCost.Ore) == 0)
+    if (OwningPlayerState->CanAffordCost(TroopData->SpawnCost) == 0)
     {
         UE_LOG(LogTemp, Warning, TEXT("병력 대기열 추가 실패: 자원 부족"));
         return;
     }
     
-    OwningPlayerState->SpendCost(TroopData->SpawnCost.Wood, TroopData->SpawnCost.Ore);
+    OwningPlayerState->SpendCost(TroopData->SpawnCost);
 
     CurrentQueueCount += 1;
     OwningPlayerState->AddPendingTroopCount(1);

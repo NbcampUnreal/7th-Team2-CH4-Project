@@ -37,7 +37,7 @@ public:
 
 	// 건설 비용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction")
-	FBuildingResourceCost BuildCost;
+	TMap<EResourceType, int32> BuildCost;
 	
 	// 건물 설치 크기(그리드 기준)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction")
