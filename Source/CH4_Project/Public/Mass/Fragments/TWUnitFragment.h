@@ -10,7 +10,7 @@
 #include "MassEntityTraitBase.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "StructUtils/SharedStruct.h"
-#include "TWOwnerFragment.generated.h"
+#include "TWUnitFragment.generated.h"
 
 /**
  * 
@@ -19,21 +19,25 @@
 
 
 USTRUCT()
-struct FTWOwnerFragment : public FMassFragment
+struct FTWUnitFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	FTWOwnerFragment() = default;
+	FTWUnitFragment() = default;
 	
 
 	ATWPlayerController* GetOwner() const { return Owner.Get(); }
 	void SetOwner(ATWPlayerController* InOwner) { Owner = InOwner; }
 	int32 GetIdx()const { return Idx; }
 	void SetIdx(int32 InIdx) { Idx = InIdx; }
+	FName GetUnitID()const { return UnitID; }
+	void SetUnitID(FName InUnitID) { UnitID = InUnitID; }
 protected:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ATWPlayerController> Owner;
 	UPROPERTY(Transient)
 	int32 Idx = -1;
+	UPROPERTY(Transient)
+	FName UnitID;
 };
 
