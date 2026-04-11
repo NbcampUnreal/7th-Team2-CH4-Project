@@ -1,10 +1,12 @@
 ﻿#include "Building/TWTroopSpawnBuilding.h"
 #include "Data/TWTroopBuildingDataAsset.h"
+#include "Data/TWUnitTableRowBase.h"
 #include "Components/SceneComponent.h"
+#include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Engine/World.h"
-#include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/TWUnitSubsystem.h"
 #include "TimerManager.h"
 
 ATWTroopSpawnBuilding::ATWTroopSpawnBuilding()
@@ -29,7 +31,7 @@ const UTWTroopBuildingDataAsset* ATWTroopSpawnBuilding::GetTroopBuildingData() c
     return Cast<UTWTroopBuildingDataAsset>(BuildingData);
 }
 
-void ATWTroopSpawnBuilding::RequestEnqueueTroop()
+void ATWTroopSpawnBuilding::RequestEnqueueTroop(const FName InUnitID)
 {
     if (!HasAuthority())
     {
@@ -53,13 +55,29 @@ void ATWTroopSpawnBuilding::RequestEnqueueTroop()
         return;
     }
 
-    if (!TroopData->SpawnActorClass)
+    UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+    if (!UnitSubsystem)
     {
         return;
     }
 
-    if (TroopData->SpawnInterval <= 0.0f)
+    const FName RequestUnitID = InUnitID.IsNone() ? TroopData->DefaultUnitID : InUnitID;
+    if (RequestUnitID.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("생산할 UnitID가 설정되지 않음"));
+		return;
+	}
+
+    if (TroopData->TrainableUnitIDs.Num() > 0 && !TroopData->TrainableUnitIDs.Contains(RequestUnitID))
     {
+        UE_LOG(LogTemp, Warning, TEXT("이 건물은 해당 유닛을 생산할 수 없음: %s"), *RequestUnitID.ToString());
+        return;
+    }
+
+    FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(RequestUnitID);
+    if (!UnitRow)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("유닛 데이터 테이블에서 UnitID를 찾지 못함: %s"), *RequestUnitID.ToString());
         return;
     }
 
@@ -69,24 +87,31 @@ void ATWTroopSpawnBuilding::RequestEnqueueTroop()
         return;
     }
 
-    if (OwningPlayerState->CanQueueTroop(1) == 0)
+    if (OwningPlayerState->CanQueueTroop(UnitRow->Population) == 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("최대 병력 수 보유(대기열 추가 X) - 최대 인구수"));
+        UE_LOG(LogTemp, Warning, TEXT("인구수 부족 - 병력 대기열 추가 불가"));
         return;
     }
-    
-    if (OwningPlayerState->CanAffordCost(TroopData->SpawnCost) == 0)
+
+    if (OwningPlayerState->CanAffordCost(UnitRow->Cost) == 0)
     {
         UE_LOG(LogTemp, Warning, TEXT("병력 대기열 추가 실패: 자원 부족"));
         return;
     }
+
+    OwningPlayerState->SpendCost(UnitRow->Cost);
+    OwningPlayerState->AddPendingPopulation(UnitRow->Population);
+
+    FTWQueuedTroopData NewQueueData;
+    NewQueueData.UnitID = RequestUnitID;
+    TroopQueue.Add(NewQueueData);
     
-    OwningPlayerState->SpendCost(TroopData->SpawnCost);
+    CurrentQueueCount = TroopQueue.Num();
 
-    CurrentQueueCount += 1;
-    OwningPlayerState->AddPendingTroopCount(1);
+    UE_LOG(LogTemp, Log, TEXT("병력 대기열 추가: %s | 현재 대기열 수: %d"),
+        *RequestUnitID.ToString(),
+        CurrentQueueCount);
 
-    UE_LOG(LogTemp, Warning, TEXT("병력 대기열 추가: %d"), CurrentQueueCount);
     StartSpawnQueueTimer();
 }
 
@@ -97,49 +122,56 @@ int8 ATWTroopSpawnBuilding::SpawnUnitNow()
         return 0;
     }
 
-    const UTWTroopBuildingDataAsset* TroopData = GetTroopBuildingData();
-    if (!TroopData)
-    {
-        return 0;
-    }
-
-    if (!TroopData->SpawnActorClass)
-    {
-        return 0;
-    }
-    
     if (!OwningPlayerState)
     {
         return 0;
     }
 
-    const FVector SpawnLocation = SpawnPoint
-        ? SpawnPoint->GetComponentLocation()
-        : GetActorLocation() + GetActorForwardVector() * 150.0f;
+    if (TroopQueue.IsEmpty())
+    {
+        return 0;
+    }
 
-    const FRotator SpawnRotation = SpawnPoint
-        ? SpawnPoint->GetComponentRotation()
-        : GetActorRotation();
+    UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+    if (!UnitSubsystem)
+    {
+        return 0;
+    }
 
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = this;
-    SpawnParams.Instigator = GetInstigator();
-    SpawnParams.SpawnCollisionHandlingOverride =
-        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-    AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
-        TroopData->SpawnActorClass,
-        SpawnLocation,
-        SpawnRotation,
-        SpawnParams
-    );
-    
-    if (!SpawnedActor)
+    const FTWQueuedTroopData& QueueData = TroopQueue[0];
+    FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(QueueData.UnitID);
+    if (!UnitRow)
     {
         return 0;
     }
     
-    OwningPlayerState->AddTroopCount(1);
+    ATWPlayerController* OwningPlayerController = nullptr;
+
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        ATWPlayerController* PC = Cast<ATWPlayerController>(It->Get());
+        if (!PC)
+        {
+            continue;
+        }
+
+        if (PC->GetPlayerState<ATWPlayerState>() == OwningPlayerState)
+        {
+            OwningPlayerController = PC;
+            break;
+        }
+    }
+
+    if (!OwningPlayerController)
+    {
+        return 0;
+    }
+    
+    const FVector SpawnLocation = SpawnPoint
+        ? SpawnPoint->GetComponentLocation()
+        : GetActorLocation() + GetActorForwardVector() * 150.0f;
+
+    UnitSubsystem->SpawnUnit(SpawnLocation, *UnitRow, OwningPlayerController);
     return 1;
 }
 
@@ -160,13 +192,29 @@ void ATWTroopSpawnBuilding::StartSpawnQueueTimer()
         return;
     }
 
-    const UTWTroopBuildingDataAsset* TroopData = GetTroopBuildingData();
-    if (!TroopData)
+    if (GetWorldTimerManager().IsTimerActive(SpawnQueueTimerHandle))
     {
         return;
     }
 
-    if (GetWorldTimerManager().IsTimerActive(SpawnQueueTimerHandle))
+    if (TroopQueue.IsEmpty())
+    {
+        return;
+    }
+
+    UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+    if (!UnitSubsystem)
+    {
+        return;
+    }
+
+    FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(TroopQueue[0].UnitID);
+    if (!UnitRow)
+    {
+        return;
+    }
+
+    if (UnitRow->SpawnDuration <= 0.0f)
     {
         return;
     }
@@ -175,8 +223,8 @@ void ATWTroopSpawnBuilding::StartSpawnQueueTimer()
         SpawnQueueTimerHandle,
         this,
         &ATWTroopSpawnBuilding::HandleSpawnQueue,
-        TroopData->SpawnInterval,
-        true
+        UnitRow->SpawnDuration,
+        false
     );
 }
 
@@ -187,14 +235,22 @@ void ATWTroopSpawnBuilding::HandleSpawnQueue()
         return;
     }
 
-    if (CurrentQueueCount <= 0)
+    if (TroopQueue.IsEmpty())
     {
+        CurrentQueueCount = 0;
         ClearAllBuildingTimers();
         return;
     }
-    
+
     if (QueuePausedByUpkeep == 1)
     {
+        GetWorldTimerManager().SetTimer(
+            SpawnQueueTimerHandle,
+            this,
+            &ATWTroopSpawnBuilding::HandleSpawnQueue,
+            0.2f,
+            false
+        );
         return;
     }
 
@@ -204,19 +260,18 @@ void ATWTroopSpawnBuilding::HandleSpawnQueue()
         return;
     }
 
-    CurrentQueueCount = FMath::Max(0, CurrentQueueCount - 1);
-
-    if (OwningPlayerState)
-    {
-        OwningPlayerState->RemovePendingTroopCount(1);
-    }
+    TroopQueue.RemoveAt(0);
+    CurrentQueueCount = TroopQueue.Num();
 
     UE_LOG(LogTemp, Log, TEXT("현재 병력 대기열 수: %d"), CurrentQueueCount);
 
     if (CurrentQueueCount <= 0)
     {
         ClearAllBuildingTimers();
+        return;
     }
+
+    StartSpawnQueueTimer();
 }
 
 void ATWTroopSpawnBuilding::ClearAllBuildingTimers()

@@ -74,7 +74,7 @@ int8 ATWPopulationBuilding::IncreasePopulationNow()
 		return 0;
 	}
 
-	OwningPlayerState->AddPopulationCap(1);
+	OwningPlayerState->AddPopulationLimit(1);
 	return 1;
 }
 

@@ -51,6 +51,7 @@ void UTWUnitSubsystem::PostInitialize()
 	Super::PostInitialize();
 	const UWorld* World = GetWorld();
 	UMassReplicationSubsystem* ReplicationSubsystem = UWorld::GetSubsystem<UMassReplicationSubsystem>(World);
+	if (!ReplicationSubsystem) return;
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
 }
@@ -232,6 +233,8 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowB
 				//TODO 유닛 PlayerState에 추가
 				// PlayerState->AddUnit(SpawnedUnit);
 				WeakThis->AddUnit(WeakPlayerController->GetPlayerState<ATWPlayerState>()->PlayerSlot, SpawnedUnit);
+				
+				PlayerState->RemovePendingPopulation(UnitTableRowBase.Population);
 			}
 		});
 }
@@ -239,6 +242,11 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowB
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
 {
 	return UnitContainers[PlayerSlot]->GetUpkeep();
+}
+
+int32 UTWUnitSubsystem::GetCurrentPopulation(int32 PlayerSlot) const
+{
+	return UnitContainers[PlayerSlot]->GetCurrentPopulation();
 }
 
 void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)

@@ -212,15 +212,6 @@ void ATWNexusBuilding::HandleWoodProduction()
 	}
 
 	OwningPlayerState->AddResource(EResourceType::Wood, NexusData->WoodProductionAmount);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[Nexus] +Wood : %d | PlayerSlot: %d | Current Wood : %d"),
-		NexusData->WoodProductionAmount,
-		OwnerPlayerSlot,
-		OwningPlayerState->Wood
-	);
 }
 
 void ATWNexusBuilding::HandleDestroyedByDamage()

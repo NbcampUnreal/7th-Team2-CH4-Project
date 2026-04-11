@@ -35,31 +35,32 @@ public:
 	
 #pragma endregion	
 	
-#pragma region 병력 스폰
+#pragma region 인구 / 병력
 protected:
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
-	int32 PendingTroopCount = 0;
-	
-	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Troop")
-	int32 MaxTroopCount = 1;
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 PendingPopulation = 0;
+
+	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Population")
+	int32 MaxPopulation = 200;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 PopulationLimit = 1;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 CurrentPopulation = 0;
 public:
 	int8 CanAffordCost(const TMap<EResourceType, int32>& Cost) const;
 	void SpendCost(const TMap<EResourceType, int32>& Cost);
 	
-	int8 CanQueueTroop(const int32 InAmount = 1) const;
+	int8 CanQueueTroop(const int32 RequiredPopulation) const;
 	
-	void AddTroopCount(const int32 InAmount);
-	void RemoveTroopCount(const int32 InAmount);
+	void SetCurrentPopulationFromContainer(const int32 InAmount);
 	
-	void AddPendingTroopCount(const int32 InAmount);
-	void RemovePendingTroopCount(const int32 InAmount);
-	
-	int32 CurrentTroopCount=10;
+	void AddPendingPopulation(const int32 InAmount);
+	void RemovePendingPopulation(const int32 InAmount);
 
-#pragma endregion
-	
-#pragma region 인구 수
-	void AddPopulationCap(const int32 InAmount);
+	void AddPopulationLimit(const int32 InAmount);
+
 #pragma endregion
 	
 #pragma region 병력 유지비

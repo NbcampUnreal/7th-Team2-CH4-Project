@@ -19,8 +19,10 @@ ATWPlayerState::ATWPlayerState()
 	{
 		Resource = 0;
 	}
-	PendingTroopCount = 0;
-	MaxTroopCount = 1;
+	PendingPopulation = 0;
+	MaxPopulation = 200;
+	PopulationLimit = 1;
+	CurrentPopulation = 0;
 }
 
 
@@ -86,14 +88,14 @@ void ATWPlayerState::SpendCost(const TMap<EResourceType, int32>& Cost)
 	}
 }
 
-int8 ATWPlayerState::CanQueueTroop(const int32 InAmount) const
+int8 ATWPlayerState::CanQueueTroop(const int32 RequiredPopulation) const
 {
-	if (InAmount <= 0)
+	if (RequiredPopulation <= 0)
 	{
 		return 0;
 	}
 
-	if ((CurrentTroopCount + PendingTroopCount + InAmount) <= MaxTroopCount)
+	if ((CurrentPopulation + PendingPopulation + RequiredPopulation) <= PopulationLimit)
 	{
 		return 1;
 	}
@@ -101,32 +103,28 @@ int8 ATWPlayerState::CanQueueTroop(const int32 InAmount) const
 	return 0;
 }
 
-void ATWPlayerState::AddTroopCount(const int32 InAmount)
+void ATWPlayerState::SetCurrentPopulationFromContainer(const int32 InAmount)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	CurrentTroopCount += InAmount;
+	CurrentPopulation = FMath::Max(0, InAmount);
 	RefreshTroopUpkeepTimer();
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
+		TEXT("PlayerSlot: %d | CurrentPopulation(Container): %d / %d (Max: %d)"),
 		PlayerSlot,
-		CurrentTroopCount,
-		MaxTroopCount
+		CurrentPopulation,
+		PopulationLimit,
+		MaxPopulation
 	);
 }
 
-void ATWPlayerState::RemoveTroopCount(const int32 InAmount)
+void ATWPlayerState::AddPendingPopulation(const int32 InAmount)
 {
 	if (!HasAuthority())
 	{
@@ -138,73 +136,48 @@ void ATWPlayerState::RemoveTroopCount(const int32 InAmount)
 		return;
 	}
 
-	CurrentTroopCount -= InAmount;
-	CurrentTroopCount = FMath::Max(0, CurrentTroopCount);
-	RefreshTroopUpkeepTimer();
+	PendingPopulation += InAmount;
+}
+
+void ATWPlayerState::RemovePendingPopulation(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PendingPopulation -= InAmount;
+	PendingPopulation = FMath::Max(0, PendingPopulation);
+}
+
+void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PopulationLimit += InAmount;
+	PopulationLimit = FMath::Min(PopulationLimit, MaxPopulation);
+	PopulationLimit = FMath::Max(1, PopulationLimit);
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("PlayerSlot: %d | CurrentTroopCount: %d / %d"),
+		TEXT("PlayerSlot: %d | PopulationLimit: %d / %d"),
 		PlayerSlot,
-		CurrentTroopCount,
-		MaxTroopCount
-	);
-}
-
-void ATWPlayerState::AddPendingTroopCount(const int32 InAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	PendingTroopCount += InAmount;
-}
-
-void ATWPlayerState::RemovePendingTroopCount(const int32 InAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	PendingTroopCount -= InAmount;
-	PendingTroopCount = FMath::Max(0, PendingTroopCount);
-}
-
-
-void ATWPlayerState::AddPopulationCap(const int32 InAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
-	{
-		return;
-	}
-
-	MaxTroopCount += InAmount;
-	MaxTroopCount = FMath::Max(1, MaxTroopCount);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("PlayerSlot: %d | PopulationCap(MaxTroopCount): %d"),
-		PlayerSlot,
-		MaxTroopCount
+		PopulationLimit,
+		MaxPopulation
 	);
 }
 
@@ -215,7 +188,7 @@ void ATWPlayerState::RefreshTroopUpkeepTimer()
 		return;
 	}
 
-	if (CurrentTroopCount <= 0)
+	if (CurrentPopulation <= 0)
 	{
 		GetWorldTimerManager().ClearTimer(TroopUpkeepTimerHandle);
 
@@ -295,7 +268,7 @@ int8 ATWPlayerState::TrySpendTroopUpkeep()
 		return 0;
 	}
 
-	if (CurrentTroopCount <= 0)
+	if (CurrentPopulation <= 0)
 	{
 		return 1;
 	}
@@ -317,7 +290,8 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	DOREPLIFETIME(ATWPlayerState, PlayerSlot);
 	DOREPLIFETIME(ATWPlayerState, Resources);
-	DOREPLIFETIME(ATWPlayerState, CurrentTroopCount);
-	DOREPLIFETIME(ATWPlayerState, PendingTroopCount);
-	DOREPLIFETIME(ATWPlayerState, MaxTroopCount);
+	DOREPLIFETIME(ATWPlayerState, PendingPopulation);
+	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
+	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
+	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
 }

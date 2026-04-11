@@ -1,7 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
-#include "TWPlayerUnitContainer.h"
+﻿#include "TWPlayerUnitContainer.h"
 
 #include "MassReplicationFragments.h"
 #include "MassReplicationSubsystem.h"
@@ -15,6 +12,7 @@ void UTWPlayerUnitContainer::Init(int32 InOwnerSlot)
 {
 	MassReplicationSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
 	OwnerSlot = InOwnerSlot;
+	CurrentPopulation = 0;
 }
 
 
@@ -26,6 +24,24 @@ void UTWPlayerUnitContainer::SetOwnerSlot(int32 InOwnerSlot)
 FMassEntityHandle UTWPlayerUnitContainer::GetEntityHandle(int32 Idx) const
 {
 	return MassReplicationSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
+}
+
+void UTWPlayerUnitContainer::SyncCachedValuesToPlayerState()
+{
+	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
+	if (!IsValid(GameState))
+	{
+		return;
+	}
+
+	ATWPlayerState* PlayerState = GameState->GetPlayerState(OwnerSlot);
+	if (!IsValid(PlayerState))
+	{
+		return;
+	}
+
+	PlayerState->SetCurrentPopulationFromContainer(CurrentPopulation);
+	PlayerState->SetTotalTroopUpkeepCost(Upkeep);
 }
 
 void UTWPlayerUnitContainer::IncreaseUpkeep(TMap<EResourceType, int32> Amount)
@@ -41,7 +57,7 @@ void UTWPlayerUnitContainer::IncreaseUpkeep(TMap<EResourceType, int32> Amount)
 	{
 		Upkeep[Pair.Key] += Pair.Value * UpkeepRatio;
 	}
-	GameState->GetPlayerState(OwnerSlot)->SetTotalTroopUpkeepCost(Upkeep);
+	SyncCachedValuesToPlayerState();
 }
 
 void UTWPlayerUnitContainer::DecreaseUpkeep(TMap<EResourceType, int32> Amount)
@@ -56,7 +72,30 @@ void UTWPlayerUnitContainer::DecreaseUpkeep(TMap<EResourceType, int32> Amount)
 	{
 		Upkeep[Pair.Key] -= Pair.Value * UpkeepRatio;
 	}
-	GameState->GetPlayerState(OwnerSlot)->SetTotalTroopUpkeepCost(Upkeep);
+	SyncCachedValuesToPlayerState();
+}
+
+void UTWPlayerUnitContainer::IncreasePopulation(const int32 Amount)
+{
+	if (Amount <= 0)
+	{
+		return;
+	}
+
+	CurrentPopulation += Amount;
+	SyncCachedValuesToPlayerState();
+}
+
+void UTWPlayerUnitContainer::DecreasePopulation(const int32 Amount)
+{
+	if (Amount <= 0)
+	{
+		return;
+	}
+
+	CurrentPopulation -= Amount;
+	CurrentPopulation = FMath::Max(0, CurrentPopulation);
+	SyncCachedValuesToPlayerState();
 }
 
 
@@ -78,6 +117,7 @@ void UTWPlayerUnitContainer::AddUnit(FMassEntityHandle& Unit)
 			FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
 			if (nullptr != UnitTableRowBase)
 			{
+				IncreasePopulation(UnitTableRowBase->Population);
 				IncreaseUpkeep(UnitTableRowBase->Cost);
 			}
 		}
@@ -98,6 +138,7 @@ void UTWPlayerUnitContainer::RemoveUnit(int32 Idx)
 			FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
 			if (nullptr != UnitTableRowBase)
 			{
+				DecreasePopulation(UnitTableRowBase->Population);
 				DecreaseUpkeep(UnitTableRowBase->Cost);
 			}
 		}

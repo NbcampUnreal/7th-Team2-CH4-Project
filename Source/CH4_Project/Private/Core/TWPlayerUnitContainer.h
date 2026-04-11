@@ -29,11 +29,17 @@ public:
 #pragma region Getter
 	FMassEntityHandle GetEntityHandle(int32 Idx) const;
 	FORCEINLINE int32 GetCurrentUnitCount() const{return Units.Num();}
+	FORCEINLINE int32 GetCurrentPopulation() const { return CurrentPopulation;}
 	FORCEINLINE const TMap<EResourceType, int32>& GetUpkeep() const{return Upkeep;}
 #pragma endregion
 private:
 	void IncreaseUpkeep(TMap<EResourceType, int32> Amount);
 	void DecreaseUpkeep(TMap<EResourceType, int32> Amount);
+	
+	void IncreasePopulation(const int32 Amount);
+	void DecreasePopulation(const int32 Amount);
+	void SyncCachedValuesToPlayerState();
+	
 private:
 	UPROPERTY()
 	int32 OwnerSlot;
@@ -43,5 +49,7 @@ private:
 	TObjectPtr<UMassReplicationSubsystem> MassReplicationSubsystem;
 	UPROPERTY()
 	TMap<EResourceType, int32> Upkeep;
+	UPROPERTY()
+	int32 CurrentPopulation = 0;
 	
 };

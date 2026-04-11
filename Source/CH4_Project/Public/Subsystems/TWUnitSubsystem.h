@@ -33,6 +33,7 @@ public:
 	bool GetEntitiesInRectangle(const FVector& StartLocation, const FVector& EndLocation, TArray<FMassEntityHandle>& OutEntityHandles);
 	void SpawnUnit(const FVector& Location, const FTWUnitTableRowBase& UnitTableRowBase, ATWPlayerController* PlayerController);
 	TMap<EResourceType, int32> GetUpkeep(int32 PlayerSlot);
+	int32 GetCurrentPopulation(int32 PlayerSlot) const;
 	
 	
 private:
