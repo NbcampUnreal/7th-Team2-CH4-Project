@@ -109,7 +109,7 @@ private:
 	void ServerTestIncreasePopulation();
 #pragma endregion
 	
-#pragma region 방벽 데미지
+#pragma region 넥서스 데미지
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	UInputAction* IA_TestDamageBlockingBuilding;
 

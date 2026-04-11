@@ -2,7 +2,7 @@
 #include "Core/TWPlayerState.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "Building/TWPopulationBuilding.h"
-#include "Building/TWBlockingBuilding.h"
+#include "Building/TWNexusBuilding.h"
 #include "Building/TWBaseBuilding.h"
 #include "Core/TWGameMode.h"
 #include "EnhancedInputComponent.h"
@@ -528,7 +528,7 @@ void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
 }
 #pragma endregion
 
-#pragma region 방벽 데미지
+#pragma region 넥서스 데미지
 void ATWPlayerController::HandleTestDamageBlockingBuilding(const FInputActionValue& Value)
 {
 	ServerTestDamageBlockingBuilding();
@@ -544,20 +544,20 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 
 	const int32 MyPlayerSlot = TWPS->PlayerSlot;
 
-	for (TActorIterator<ATWBlockingBuilding> It(GetWorld()); It; ++It)
+	for (TActorIterator<ATWNexusBuilding> It(GetWorld()); It; ++It)
 	{
-		ATWBlockingBuilding* BlockingBuilding = *It;
-		if (!BlockingBuilding)
+		ATWNexusBuilding* NexusBuilding = *It;
+		if (!NexusBuilding)
+		{
+			continue;
+		}
+		
+		if (NexusBuilding->OwnerPlayerSlot == MyPlayerSlot)
 		{
 			continue;
 		}
 
-		if (BlockingBuilding->OwnerPlayerSlot == MyPlayerSlot)
-		{
-			continue;
-		}
-
-		BlockingBuilding->ApplyDamageToBuilding(10);
+		NexusBuilding->ApplyDamageToBuilding(10);
 		return;
 	}
 }
