@@ -1,8 +1,5 @@
 ﻿#include "Building/TWTroopSpawnBuilding.h"
 #include "Data/TWTroopBuildingDataAsset.h"
-#include "Core/TWPlayerController.h"
-#include "Subsystems/TWUnitSubsystem.h"
-#include "MassEntityConfigAsset.h"
 #include "Components/SceneComponent.h"
 #include "Core/TWPlayerState.h"
 #include "Engine/World.h"
@@ -56,7 +53,7 @@ void ATWTroopSpawnBuilding::RequestEnqueueTroop()
         return;
     }
 
-    if (!TroopData->UnitEntityConfig)
+    if (!TroopData->SpawnActorClass)
     {
         return;
     }
@@ -106,7 +103,7 @@ int8 ATWTroopSpawnBuilding::SpawnUnitNow()
         return 0;
     }
 
-    if (!TroopData->UnitEntityConfig)
+    if (!TroopData->SpawnActorClass)
     {
         return 0;
     }
@@ -115,29 +112,34 @@ int8 ATWTroopSpawnBuilding::SpawnUnitNow()
     {
         return 0;
     }
-    
-    ATWPlayerController* OwnerPC = Cast<ATWPlayerController>(OwningPlayerState->GetOwningController());
-    if (!OwnerPC)
-    {
-        return 0;
-    }
-
-    UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
-    if (!UnitSubsystem)
-    {
-        return 0;
-    }
 
     const FVector SpawnLocation = SpawnPoint
         ? SpawnPoint->GetComponentLocation()
         : GetActorLocation() + GetActorForwardVector() * 150.0f;
 
-    UnitSubsystem->SpawnUnit(
+    const FRotator SpawnRotation = SpawnPoint
+        ? SpawnPoint->GetComponentRotation()
+        : GetActorRotation();
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    SpawnParams.Instigator = GetInstigator();
+    SpawnParams.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+    AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
+        TroopData->SpawnActorClass,
         SpawnLocation,
-        TroopData->UnitEntityConfig,
-        OwnerPC
+        SpawnRotation,
+        SpawnParams
     );
     
+    if (!SpawnedActor)
+    {
+        return 0;
+    }
+    
+    OwningPlayerState->AddTroopCount(1);
     return 1;
 }
 

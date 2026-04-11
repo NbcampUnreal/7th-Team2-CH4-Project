@@ -12,9 +12,9 @@ class CH4_PROJECT_API UTWTroopBuildingDataAsset : public UTWBuildingDataAsset
 	GENERATED_BODY()
 	
 public:
-	// 스폰할 병력 Mass Entity Config
+	// 스폰할 병력 블루프린트 클래스
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Troop")
-	TObjectPtr<UMassEntityConfigAsset> UnitEntityConfig = nullptr;
+	TSubclassOf<AActor> SpawnActorClass;
 	
 	// 생산 시간
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Troop", meta=(ClampMin="0.1"))
