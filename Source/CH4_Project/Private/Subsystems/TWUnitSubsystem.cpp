@@ -2,6 +2,8 @@
 
 
 #include "Subsystems/TWUnitSubsystem.h"
+
+#include "EngineUtils.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassNavigationSubsystem.h"
@@ -18,16 +20,14 @@
 
 UTWUnitSubsystem::UTWUnitSubsystem()
 {
-	ConstructorHelpers::FObjectFinder<UDataTable> f(TEXT("/Game/CH4_Project/Datas/Tables/DT_UnitTableRowBase.DT_UnitTableRowBase"));
-	if (f.Succeeded())
-	{
-		UnitTable = f.Object;
-	}
+
 }
 
 void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	FString Path = TEXT("/Game/CH4_Project/Datas/Tables/DT_UnitTableRowBase.DT_UnitTableRowBase");
+	UnitTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *Path));
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (IsValid(EntitySubsystem))
 	{
@@ -68,7 +68,7 @@ void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
 	check(GameState);
-	UnitContainers.Add(PlayerSlot, NewObject<UTWPlayerUnitContainer>());
+	UnitContainers.Add(PlayerSlot, NewObject<UTWPlayerUnitContainer>(this));
 	UnitContainers[PlayerSlot]->Init(PlayerSlot);
 }
 

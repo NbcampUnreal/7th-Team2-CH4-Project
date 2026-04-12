@@ -12,6 +12,16 @@ void UTWPlayerUnitContainer::Init(int32 InOwnerSlot)
 {
 	OwnerSlot = InOwnerSlot;
 	CurrentPopulation = 0;
+	UEnum* EnumPtr = StaticEnum<EResourceType>();
+	if (EnumPtr)
+	{
+		for (int32 i = 0; i < (int32)EResourceType::Count; ++i)
+		{
+			EResourceType EnumValue = static_cast<EResourceType>(i);
+			Upkeep.Add(EnumValue);
+		}
+	}
+
 }
 
 
@@ -101,10 +111,7 @@ void UTWPlayerUnitContainer::DecreasePopulation(const int32 Amount)
 
 void UTWPlayerUnitContainer::AddUnit(FMassEntityHandle& Unit)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-
-
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetOuter());
 	Units.Add(EntityManager->GetFragmentDataPtr<FMassNetworkIDFragment>(Unit)->NetID);
 
 	if (FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit))

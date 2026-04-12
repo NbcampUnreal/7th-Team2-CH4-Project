@@ -22,9 +22,10 @@ class CH4_PROJECT_API UTWPlayerUnitContainer : public UObject
 public:
 	void Init(int32 InOwnerSlot);
 	void SetOwnerSlot(int32 InOwnerSlot);
+#ifdef WITH_SERVER_CODE
 	void AddUnit(FMassEntityHandle& Unit);
 	void RemoveUnit(int32 Idx);
-	
+#endif
 	
 #pragma region Getter
 	FMassEntityHandle GetEntityHandle(int32 Idx) const;
