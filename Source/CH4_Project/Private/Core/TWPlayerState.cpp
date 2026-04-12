@@ -189,7 +189,7 @@ void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 	checkf(Units.Num()<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
-a	Units[CurrentTroopCount] = Unit;
+	Units[CurrentTroopCount] = Unit;
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
 	if (FTWOwnerFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWOwnerFragment>(Unit))
 	{

@@ -14,4 +14,7 @@ USTRUCT()
 struct FTWStandFragment : public FMassFragment
 {
 	GENERATED_BODY()
+	
+	UPROPERTY()
+	bool bIsStopping = false;
 };
