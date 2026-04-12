@@ -14,6 +14,7 @@ class UInputMappingContext;
 class ATWPopulationBuilding;
 class ATWBlockingBuilding;
 class AGhostBuilding;
+class ATWBaseBuilding;
 /**
  * 
  */
@@ -142,7 +143,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<AGhostBuilding> BuildClass;
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
-	TSubclassOf<AActor> SelectedBuildingClass;
+	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
 	
 #pragma endregion
 	

@@ -111,10 +111,7 @@ void UTWGridSubSystem::OccupyArea(FIntPoint AnchorLocation, FIntPoint BuildingSi
 		{
 			FIntPoint TargetGrid(AnchorLocation.X + X, AnchorLocation.Y + Y);
 			
-			if (!CanBuildAt(TargetGrid))
-			{
-				PlaceBuildingAt(TargetGrid, BuildingAnchor);
-			}
+			PlaceBuildingAt(TargetGrid, BuildingAnchor);
 		}
 	}
 }
