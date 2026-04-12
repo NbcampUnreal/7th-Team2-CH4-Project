@@ -9,6 +9,7 @@
 #include "MassNavigationSubsystem.h"
 #include "MassReplicationSubsystem.h"
 #include "MassEntityConfigAsset.h"
+#include "MassNavigationFragments.h"
 #include "MassSpawner.h"
 #include "Core/TWGameState.h"
 #include "Core/TWPlayerState.h"
@@ -221,6 +222,12 @@ void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowB
 				{
 					TransformFragment->GetMutableTransform().SetLocation(Location);
 				}
+				if (FMassMoveTargetFragment* MoveTargetFragment =
+					InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
+				{
+					MoveTargetFragment->Center = Location;
+				}
+				
 				//TODO Stat HardCoded
 				//TODO 유닛 아이디 fragment에 주입
 				//TODO 업그레이드 현황에 따른 스탯 설정
