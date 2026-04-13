@@ -7,6 +7,7 @@
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
 #include "UI/Data/TWSelectionQueueItemObject.h"
+#include "Components/ProgressBar.h"
 #include "UI/Data/TWSelectionSummaryItemObject.h"
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
@@ -121,6 +122,11 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 	if (TextProductionProgress)
 	{
 		TextProductionProgress->SetText(FText::FromString(InData.Production.ProgressText));
+	}
+	if (ProductionProgressBar)
+	{
+		const float SafeRatio = FMath::Clamp(InData.Production.ProgressRatio, 0.f, 1.f);
+		ProductionProgressBar->SetPercent(SafeRatio);
 	}
 
 	if (InData.bShowProductionPanel)

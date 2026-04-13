@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/ProgressBar.h"
 #include "UI/Data/TWUIDataTypes.h"
 #include "TWSelectionPanelWidget.generated.h"
 
@@ -70,4 +71,7 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TextProductionProgress = nullptr;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> ProductionProgressBar = nullptr;
 };
