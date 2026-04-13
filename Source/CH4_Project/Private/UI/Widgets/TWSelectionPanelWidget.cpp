@@ -6,6 +6,7 @@
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
+#include "UI/Data/TWSelectionQueueItemObject.h"
 #include "UI/Data/TWSelectionSummaryItemObject.h"
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
@@ -13,14 +14,19 @@ void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[SelectionPanel] SetSelectionData - Name: %s / Type: %s / HP: %s / ViewMode: %d"),
+		TEXT("[SelectionPanel] SetSelectionData - Name: %s / Type: %s / HP: %s / ViewMode: %d / SummaryCount: %d / ProductionVisible: %d / QueueCount: %d"),
 		*InData.DisplayName,
 		*InData.TypeLabel,
 		*InData.HPText,
-		static_cast<int32>(InData.ViewMode));
+		static_cast<int32>(InData.ViewMode),
+		InData.SummaryItems.Num(),
+		InData.bShowProductionPanel ? 1 : 0,
+		InData.Production.QueueItems.Num()
+	);
 
 	if (!StateSwitcher)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SelectionPanel] StateSwitcher is null"));
 		return;
 	}
 
@@ -31,7 +37,7 @@ void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData
 			StateSwitcher->SetActiveWidget(EmptyStateBox);
 		}
 
-		RebuildMultiSummaryTiles({});
+		ClearAllDynamicViews();
 		return;
 	}
 
@@ -97,6 +103,34 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 	}
 
 	RebuildMultiSummaryTiles({});
+
+	if (ProductionPanelBox)
+	{
+		ProductionPanelBox->SetVisibility(
+			InData.bShowProductionPanel
+				? ESlateVisibility::SelfHitTestInvisible
+				: ESlateVisibility::Collapsed
+		);
+	}
+
+	if (TextProductionTitle)
+	{
+		TextProductionTitle->SetText(FText::FromString(InData.Production.Title));
+	}
+
+	if (TextProductionProgress)
+	{
+		TextProductionProgress->SetText(FText::FromString(InData.Production.ProgressText));
+	}
+
+	if (InData.bShowProductionPanel)
+	{
+		RebuildProductionQueueTiles(InData.Production.QueueItems);
+	}
+	else
+	{
+		RebuildProductionQueueTiles({});
+	}
 }
 
 void UTWSelectionPanelWidget::RefreshMultiState(const FSelectionViewModel& InData)
@@ -113,6 +147,23 @@ void UTWSelectionPanelWidget::RefreshMultiState(const FSelectionViewModel& InDat
 	}
 
 	RebuildMultiSummaryTiles(InData.SummaryItems);
+
+	if (ProductionPanelBox)
+	{
+		ProductionPanelBox->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (TextProductionTitle)
+	{
+		TextProductionTitle->SetText(FText::GetEmpty());
+	}
+
+	if (TextProductionProgress)
+	{
+		TextProductionProgress->SetText(FText::GetEmpty());
+	}
+
+	RebuildProductionQueueTiles({});
 }
 
 void UTWSelectionPanelWidget::RebuildMultiSummaryTiles(const TArray<FSelectionSummaryItemViewModel>& InItems)
@@ -135,4 +186,73 @@ void UTWSelectionPanelWidget::RebuildMultiSummaryTiles(const TArray<FSelectionSu
 		ItemObject->SummaryData = Item;
 		SummaryTileView->AddItem(ItemObject);
 	}
+}
+
+void UTWSelectionPanelWidget::RebuildProductionQueueTiles(const TArray<FProductionQueueItemViewModel>& InItems)
+{
+	if (!ProductionQueueTileView)
+	{
+		return;
+	}
+
+	ProductionQueueTileView->ClearListItems();
+
+	for (const FProductionQueueItemViewModel& Item : InItems)
+	{
+		UTWSelectionQueueItemObject* ItemObject = NewObject<UTWSelectionQueueItemObject>(this);
+		if (!ItemObject)
+		{
+			continue;
+		}
+
+		ItemObject->QueueData = Item;
+		ProductionQueueTileView->AddItem(ItemObject);
+	}
+}
+
+void UTWSelectionPanelWidget::ClearAllDynamicViews()
+{
+	if (TextName)
+	{
+		TextName->SetText(FText::GetEmpty());
+	}
+
+	if (TextType)
+	{
+		TextType->SetText(FText::GetEmpty());
+	}
+
+	if (TextHP)
+	{
+		TextHP->SetText(FText::GetEmpty());
+	}
+
+	if (TextCountLabel)
+	{
+		TextCountLabel->SetText(FText::GetEmpty());
+	}
+
+	if (ImagePortrait)
+	{
+		ImagePortrait->SetBrushFromTexture(nullptr, true);
+		ImagePortrait->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	if (ProductionPanelBox)
+	{
+		ProductionPanelBox->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (TextProductionTitle)
+	{
+		TextProductionTitle->SetText(FText::GetEmpty());
+	}
+
+	if (TextProductionProgress)
+	{
+		TextProductionProgress->SetText(FText::GetEmpty());
+	}
+
+	RebuildMultiSummaryTiles({});
+	RebuildProductionQueueTiles({});
 }

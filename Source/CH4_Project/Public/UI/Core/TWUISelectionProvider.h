@@ -33,7 +33,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="UI")
 	void DebugClearSelection();
 
-	// MVP 런타임 연결용: 실제 선택 시스템이 아직 없을 때 PlayerController가 직접 주입.
 	UFUNCTION(BlueprintCallable, Category="UI")
 	void SetRuntimeSelection(
 		const FSelectionViewModel& InSelectionViewModel,
@@ -43,8 +42,18 @@ public:
 		int32 InTotalSelectedCount,
 		const TArray<FSelectionSummaryItemViewModel>& InSummaryItems
 	);
+
 	UFUNCTION(BlueprintCallable, Category="UI")
 	void ClearRuntimeSelection();
+
+	UFUNCTION(BlueprintCallable, Category="UI")
+	void ClearRuntimeCommandData();
+
+	UFUNCTION(BlueprintCallable, Category="UI")
+	void SetRuntimeCommandQueueCount(FName CommandId, int32 QueueCount);
+
+	UFUNCTION(BlueprintCallable, Category="UI")
+	int32 GetRuntimeCommandQueueCount(FName CommandId) const;
 
 	virtual FSelectionViewModel GetSelectionViewModel_Implementation() const override;
 	virtual TArray<FName> GetCurrentCommandIds_Implementation() const override;
@@ -59,7 +68,6 @@ public:
 	virtual TArray<FName> GetCommandIdsForCurrentContext() const override;
 	virtual void HandleCommandInput(const FName& InCommandId, const FUICommandMetaRow* InCommandMetaRow = nullptr) override;
 	virtual FOnUICommandContextChanged& GetOnCommandContextChangedDelegate() override;
-
 	virtual FOnUISelectionChanged& GetOnSelectionChangedDelegate() override;
 
 protected:
@@ -114,6 +122,7 @@ protected:
 
 	TMap<FName, TArray<FName>> EntityCommandMap;
 	TMap<FName, TArray<FName>> ContextCommandMap;
+	TMap<FName, int32> RuntimeCommandQueueCounts;
 
 	FOnUISelectionChanged OnSelectionChanged;
 	FOnUICommandContextChanged OnCommandContextChanged;

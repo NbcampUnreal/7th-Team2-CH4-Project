@@ -13,6 +13,7 @@ void UTWUIHUDCoordinator::Initialize(
 	UDataTable* InSelectionPresentationTable)
 {
 	UnbindProviderDelegates();
+	UnbindHUDDelegates();
 
 	HUDRoot = InHUDRoot;
 	SelectionProvider = InSelectionProvider;
@@ -22,6 +23,8 @@ void UTWUIHUDCoordinator::Initialize(
 	LastBuiltCommandViewModels.Reset();
 
 	BindProviderDelegates();
+	BindHUDDelegates();
+
 	RefreshAll();
 	RefreshMenuPanel();
 	RefreshMinimapPanel();
@@ -30,6 +33,7 @@ void UTWUIHUDCoordinator::Initialize(
 void UTWUIHUDCoordinator::Shutdown()
 {
 	UnbindProviderDelegates();
+	UnbindHUDDelegates();
 
 	HUDRoot = nullptr;
 	SelectionProvider = nullptr;
@@ -75,6 +79,44 @@ void UTWUIHUDCoordinator::UnbindProviderDelegates()
 	{
 		ResourceProviderInterface->GetOnResourceChangedDelegate().RemoveAll(this);
 	}
+}
+
+void UTWUIHUDCoordinator::BindHUDDelegates()
+{
+	if (!HUDRoot)
+	{
+		return;
+	}
+
+	HUDRoot->GetOnHUDCommandClickedDelegate().RemoveAll(this);
+	HUDRoot->GetOnHUDCommandClickedDelegate().AddUObject(
+		this,
+		&UTWUIHUDCoordinator::HandleHUDCommandClicked
+	);
+
+	UE_LOG(LogTemp, Warning, TEXT("[HUDCoordinator] Bound HUD command click delegate"));
+}
+
+void UTWUIHUDCoordinator::UnbindHUDDelegates()
+{
+	if (!HUDRoot)
+	{
+		return;
+	}
+
+	HUDRoot->GetOnHUDCommandClickedDelegate().RemoveAll(this);
+}
+
+void UTWUIHUDCoordinator::HandleHUDCommandClicked(FName InCommandId)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[HUDCoordinator] HandleHUDCommandClicked: %s"), *InCommandId.ToString());
+
+	if (InCommandId.IsNone())
+	{
+		return;
+	}
+
+	OnCommandRequested.Broadcast(InCommandId);
 }
 
 void UTWUIHUDCoordinator::HandleSelectionChanged()

@@ -23,7 +23,10 @@ public:
 protected:
 	void RefreshSingleState(const FSelectionViewModel& InData);
 	void RefreshMultiState(const FSelectionViewModel& InData);
+
 	void RebuildMultiSummaryTiles(const TArray<FSelectionSummaryItemViewModel>& InItems);
+	void RebuildProductionQueueTiles(const TArray<FProductionQueueItemViewModel>& InItems);
+	void ClearAllDynamicViews();
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -55,4 +58,16 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTileView> SummaryTileView = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> ProductionPanelBox = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTileView> ProductionQueueTileView = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextProductionTitle = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextProductionProgress = nullptr;
 };
