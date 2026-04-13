@@ -30,9 +30,6 @@ protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
 	FName CurrentUpgradeID = NAME_None;
 
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
-	ETWStatusType CurrentTargetStatus = ETWStatusType::Damage;
-
 	FTimerHandle UpgradeTimerHandle;
 
 protected:

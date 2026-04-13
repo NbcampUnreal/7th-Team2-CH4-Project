@@ -1,5 +1,7 @@
 ﻿#include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Data/TWUpgradeTableRowBase.h"
+#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
@@ -18,8 +20,6 @@ ATWPlayerState::ATWPlayerState()
 	{
 		Resource = 0;
 	}
-	
-	StatusUpgradeLevels.SetNumZeroed(static_cast<int32>(ETWStatusType::Count));
 	
 	PendingPopulation = 0;
 	MaxPopulation = 200;
@@ -298,38 +298,70 @@ int8 ATWPlayerState::TrySpendTroopUpkeep()
 	return 1;
 }
 
-int32 ATWPlayerState::GetStatusUpgradeLevel(const ETWStatusType StatusType) const
+int32 ATWPlayerState::GetUpgradeLevelByID(const FName UpgradeID) const
 {
-	const int32 Index = static_cast<int32>(StatusType);
-
-	if (!StatusUpgradeLevels.IsValidIndex(Index))
+	if (const int32* FoundLevel = UpgradeLevelsByID.Find(UpgradeID))
 	{
-		return 0;
+		return *FoundLevel;
 	}
 
-	return StatusUpgradeLevels[Index];
+	return 0;
 }
 
-void ATWPlayerState::AddStatusUpgradeLevel(const ETWStatusType StatusType, const int32 InAmount)
+void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	if (InAmount <= 0)
+	if (UpgradeRow.UpgradeID.IsNone())
 	{
 		return;
 	}
 
-	const int32 Index = static_cast<int32>(StatusType);
+	int32& UpgradeLevel = UpgradeLevelsByID.FindOrAdd(UpgradeRow.UpgradeID);
+	UpgradeLevel += 1;
 
-	if (!StatusUpgradeLevels.IsValidIndex(Index))
+	for (const TPair<FName, int32>& Pair : UpgradeRow.TargetUnits)
 	{
-		return;
+		FTWUnitStatus& BonusStatus = UnitUpgradeBonusMap.FindOrAdd(Pair.Key);
+
+		const float CurrentValue = BonusStatus.GetStatus(UpgradeRow.TargetStatus);
+		BonusStatus.SetStatus(
+			UpgradeRow.TargetStatus,
+			CurrentValue + static_cast<float>(Pair.Value)
+		);
+
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("Upgrade Applied | UpgradeID: %s | UnitID: %s | StatusType: %s | AddedValue: %d"),
+			*UpgradeRow.UpgradeID.ToString(),
+			*Pair.Key.ToString(),
+			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
+			Pair.Value
+		);
 	}
 
-	StatusUpgradeLevels[Index] += InAmount;
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("Upgrade Level | UpgradeID: %s | Level: %d"),
+		*UpgradeRow.UpgradeID.ToString(),
+		UpgradeLevel
+	);
+}
+
+float ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const
+{
+	const FTWUnitStatus* FoundStatus = UnitUpgradeBonusMap.Find(UnitID);
+	if (!FoundStatus)
+	{
+		return 0.0f;
+	}
+
+	return FoundStatus->GetStatus(StatusType);
 }
 
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -342,7 +374,6 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
 	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
 	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
-	DOREPLIFETIME(ATWPlayerState, StatusUpgradeLevels);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()

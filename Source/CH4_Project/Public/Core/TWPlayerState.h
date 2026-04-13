@@ -10,6 +10,8 @@
 #include "Subsystems/TWUnitSubsystem.h"
 #include "TWPlayerState.generated.h"
 
+struct FTWUpgradeTableRowBase;
+
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
 {
@@ -106,12 +108,16 @@ public:
 	
 #pragma region 업그레이드
 protected:
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
-	TArray<int32> StatusUpgradeLevels;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
+	TMap<FName, int32> UpgradeLevelsByID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
+	TMap<FName, FTWUnitStatus> UnitUpgradeBonusMap;
 
 public:
-	int32 GetStatusUpgradeLevel(const ETWStatusType StatusType) const;
-	void AddStatusUpgradeLevel(const ETWStatusType StatusType, const int32 InAmount = 1);
+	int32 GetUpgradeLevelByID(const FName UpgradeID) const;
+	void ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow);
+	float GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const;
 #pragma endregion
 	
 

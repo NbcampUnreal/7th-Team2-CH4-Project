@@ -54,7 +54,6 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 
 	bIsUpgradeInProgress = 1;
 	CurrentUpgradeID = InUpgradeID;
-	CurrentTargetStatus = UpgradeRow->TargetStatus;
 
 	const float UpgradeDuration = FMath::Max(0.01f, UpgradeRow->Duration);
 
@@ -69,9 +68,10 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("업그레이드 시작 | UpgradeID: %s | StatusType: %s"),
+		TEXT("업그레이드 시작 | UpgradeID: %s | StatusType: %s | TargetUnitCount: %d"),
 		*CurrentUpgradeID.ToString(),
-		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(CurrentTargetStatus))
+		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow->TargetStatus)),
+		UpgradeRow->TargetUnits.Num()
 	);
 
 	return 1;
@@ -91,15 +91,25 @@ void ATWUpgradeBuilding::FinishUpgrade()
 		return;
 	}
 
-	OwningPlayerState->AddStatusUpgradeLevel(CurrentTargetStatus, 1);
+	FTWUpgradeTableRowBase* UpgradeRow = GetUpgradeRow(CurrentUpgradeID);
+	if (!UpgradeRow)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("업그레이드 완료 실패: 데이터 없음 | UpgradeID: %s"), *CurrentUpgradeID.ToString());
+
+		bIsUpgradeInProgress = 0;
+		CurrentUpgradeID = NAME_None;
+		return;
+	}
+
+	OwningPlayerState->ApplyUpgradeRow(*UpgradeRow);
 
 	UE_LOG(
 		LogTemp,
 		Log,
 		TEXT("업그레이드 완료 | UpgradeID: %s | StatusType: %s | Level: %d"),
 		*CurrentUpgradeID.ToString(),
-		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(CurrentTargetStatus)),
-		OwningPlayerState->GetStatusUpgradeLevel(CurrentTargetStatus)
+		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow->TargetStatus)),
+		OwningPlayerState->GetUpgradeLevelByID(CurrentUpgradeID)
 	);
 
 	bIsUpgradeInProgress = 0;
@@ -128,7 +138,7 @@ TMap<EResourceType, int32> ATWUpgradeBuilding::BuildCurrentUpgradeCost(const FTW
 		return FinalCost;
 	}
 
-	const int32 CurrentLevel = OwningPlayerState->GetStatusUpgradeLevel(UpgradeRow.TargetStatus);
+	const int32 CurrentLevel = OwningPlayerState->GetUpgradeLevelByID(UpgradeRow.UpgradeID);
 
 	for (const TPair<EResourceType, int32>& Pair : UpgradeRow.CostIncreaseAmount)
 	{
@@ -154,5 +164,4 @@ void ATWUpgradeBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 	DOREPLIFETIME(ATWUpgradeBuilding, bIsUpgradeInProgress);
 	DOREPLIFETIME(ATWUpgradeBuilding, CurrentUpgradeID);
-	DOREPLIFETIME(ATWUpgradeBuilding, CurrentTargetStatus);
 }
