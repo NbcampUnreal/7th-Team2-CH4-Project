@@ -6,6 +6,7 @@
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Data/TWUnitStatus.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "TWPlayerState.generated.h"
 
@@ -102,6 +103,17 @@ public:
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();
 #pragma endregion
+	
+#pragma region 업그레이드
+protected:
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
+	TArray<int32> StatusUpgradeLevels;
+
+public:
+	int32 GetStatusUpgradeLevel(const ETWStatusType StatusType) const;
+	void AddStatusUpgradeLevel(const ETWStatusType StatusType, const int32 InAmount = 1);
+#pragma endregion
+	
 
 private:
 	void NotifyUIResourceStateChanged();

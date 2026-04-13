@@ -67,7 +67,6 @@ void UTWPlayerUnitContainer::IncreaseUpkeep(TMap<EResourceType, int32> Amount)
 	{
 		Upkeep[Pair.Key] += Pair.Value * UpkeepRatio;
 	}
-	SyncCachedValuesToPlayerState();
 }
 
 void UTWPlayerUnitContainer::DecreaseUpkeep(TMap<EResourceType, int32> Amount)
@@ -82,7 +81,6 @@ void UTWPlayerUnitContainer::DecreaseUpkeep(TMap<EResourceType, int32> Amount)
 	{
 		Upkeep[Pair.Key] -= Pair.Value * UpkeepRatio;
 	}
-	SyncCachedValuesToPlayerState();
 }
 
 void UTWPlayerUnitContainer::IncreasePopulation(const int32 Amount)
@@ -93,7 +91,6 @@ void UTWPlayerUnitContainer::IncreasePopulation(const int32 Amount)
 	}
 
 	CurrentPopulation += Amount;
-	SyncCachedValuesToPlayerState();
 }
 
 void UTWPlayerUnitContainer::DecreasePopulation(const int32 Amount)
@@ -105,7 +102,6 @@ void UTWPlayerUnitContainer::DecreasePopulation(const int32 Amount)
 
 	CurrentPopulation -= Amount;
 	CurrentPopulation = FMath::Max(0, CurrentPopulation);
-	SyncCachedValuesToPlayerState();
 }
 
 
@@ -126,6 +122,7 @@ void UTWPlayerUnitContainer::AddUnit(FMassEntityHandle& Unit)
 			{
 				IncreasePopulation(UnitTableRowBase->Population);
 				IncreaseUpkeep(UnitTableRowBase->Cost);
+				SyncCachedValuesToPlayerState();
 			}
 		}
 	}
@@ -147,6 +144,7 @@ void UTWPlayerUnitContainer::RemoveUnit(int32 Idx)
 			{
 				DecreasePopulation(UnitTableRowBase->Population);
 				DecreaseUpkeep(UnitTableRowBase->Cost);
+				SyncCachedValuesToPlayerState();
 			}
 		}
 	}

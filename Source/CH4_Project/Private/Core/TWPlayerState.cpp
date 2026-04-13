@@ -18,7 +18,9 @@ ATWPlayerState::ATWPlayerState()
 	{
 		Resource = 0;
 	}
-
+	
+	StatusUpgradeLevels.SetNumZeroed(static_cast<int32>(ETWStatusType::Count));
+	
 	PendingPopulation = 0;
 	MaxPopulation = 200;
 	PopulationLimit = 1;
@@ -296,6 +298,40 @@ int8 ATWPlayerState::TrySpendTroopUpkeep()
 	return 1;
 }
 
+int32 ATWPlayerState::GetStatusUpgradeLevel(const ETWStatusType StatusType) const
+{
+	const int32 Index = static_cast<int32>(StatusType);
+
+	if (!StatusUpgradeLevels.IsValidIndex(Index))
+	{
+		return 0;
+	}
+
+	return StatusUpgradeLevels[Index];
+}
+
+void ATWPlayerState::AddStatusUpgradeLevel(const ETWStatusType StatusType, const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	const int32 Index = static_cast<int32>(StatusType);
+
+	if (!StatusUpgradeLevels.IsValidIndex(Index))
+	{
+		return;
+	}
+
+	StatusUpgradeLevels[Index] += InAmount;
+}
+
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -306,6 +342,7 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
 	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
 	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
+	DOREPLIFETIME(ATWPlayerState, StatusUpgradeLevels);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()
