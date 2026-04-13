@@ -19,9 +19,6 @@ void ATWFogManager::BeginPlay()
     UWorld* World = GetWorld();
     if (!World) return;
     
-    CurrentFogRT = UKismetRenderingLibrary::CreateRenderTarget2D(World, 1024, 1024, RTF_R8);
-    ExploredFogRT = UKismetRenderingLibrary::CreateRenderTarget2D(World, 1024, 1024, RTF_R8);
-    
     if (CurrentFogRT && ExploredFogRT)
     {
         CurrentFogRT->UpdateResource();
