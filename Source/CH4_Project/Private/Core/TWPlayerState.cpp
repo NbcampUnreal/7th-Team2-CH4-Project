@@ -1,5 +1,6 @@
 ﻿#include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
@@ -26,13 +27,31 @@ ATWPlayerState::ATWPlayerState()
 }
 
 
-void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
+void ATWPlayerState::SetPlayerSlot(const int32 NewSlot)
 {
-	PlayerSlot = InPlayerSlot;
+	PlayerSlot = NewSlot;
 	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
 	if (IsValid(UnitSubsystem))
 	{
 		UnitSubsystem->AddPlayer(PlayerSlot);
+	}
+	if (HasAuthority())
+	{
+		PlayerSlot = NewSlot;
+		OnRep_PlayerSlot();
+	}
+}
+
+void ATWPlayerState::OnRep_PlayerSlot()
+{
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn) {
+		return;
+	}
+	
+	if (ITWPlayerSlotInterface* Interface = Cast<ITWPlayerSlotInterface>(MyPawn))
+	{
+		Interface->UpdatePlayerSlot(PlayerSlot);
 	}
 }
 

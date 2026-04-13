@@ -21,10 +21,13 @@ public:
 
 public:
 	// 0 = Player1, 1 = Player2
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Player")
+	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlot,VisibleAnywhere, BlueprintReadOnly, Category="Player")
 	int32 PlayerSlot = -1;
 	
-	void SetPlayerSlot(const int32 InPlayerSlot);
+	void SetPlayerSlot(const int32 NewSlot);
+	
+	UFUNCTION()
+	void OnRep_PlayerSlot();
 	
 #pragma region 자원
 protected:

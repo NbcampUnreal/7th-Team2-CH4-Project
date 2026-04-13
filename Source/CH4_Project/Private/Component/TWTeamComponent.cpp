@@ -1,25 +1,25 @@
-#include "Component/TW_TeamComponent.h"
+#include "Component/TWTeamComponent.h"
 
 #include "Net/UnrealNetwork.h"
 
-UTW_TeamComponent::UTW_TeamComponent()
+UTWTeamComponent::UTWTeamComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
 
-void UTW_TeamComponent::BeginPlay()
+void UTWTeamComponent::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-void UTW_TeamComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UTWTeamComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UTW_TeamComponent, TeamID);
+	DOREPLIFETIME(UTWTeamComponent, TeamID);
 }
 
-void UTW_TeamComponent::OnRep_TeamID()
+void UTWTeamComponent::OnRep_TeamID()
 {
 	if (OnTeamChanged.IsBound())
 	{
@@ -28,7 +28,7 @@ void UTW_TeamComponent::OnRep_TeamID()
 }
 
 
-void UTW_TeamComponent::SetTeamID(int32 NewTeamID)
+void UTWTeamComponent::SetTeamID(int32 NewTeamID)
 {
 	// 서버에서만 실행되도록 보장
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;

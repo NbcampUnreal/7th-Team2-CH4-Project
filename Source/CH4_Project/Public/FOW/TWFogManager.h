@@ -2,22 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "TW_FogManager.generated.h"
+#include "TWFogManager.generated.h"
 
-class UTW_VisionComponent;
+class UTWVisionComponent;
 
 UCLASS()
-class CH4_PROJECT_API ATW_FogManager : public AActor
+class CH4_PROJECT_API ATWFogManager : public AActor
 {
     GENERATED_BODY()
 
 public:
-    ATW_FogManager();
-
-protected:
+    ATWFogManager();
+    
     virtual void BeginPlay() override;
-
-public:
     virtual void Tick(float DeltaTime) override;
 
 public:
@@ -58,16 +55,22 @@ private:
     float AccumulatedTime = 0.f;
 
     UPROPERTY()
-    TArray<TWeakObjectPtr<UTW_VisionComponent>> RegisteredVisionComponents;
+    TArray<TWeakObjectPtr<UTWVisionComponent>> RegisteredVisionComponents;
     
     UPROPERTY()
     UMaterialInstanceDynamic* FogPostProcessMID;
 
 public:
-    void RegisterVision(UTW_VisionComponent* Comp);
-    void UnregisterVision(UTW_VisionComponent* Comp);
-
+    void RegisterVision(UTWVisionComponent* Comp);
+    void UnregisterVision(UTWVisionComponent* Comp);
+    
 private:
     void UpdateFog();
+    
     FVector2D WorldToUV(FVector WorldPos);
+    
+#pragma region EnemyVisibility
+private:
+    void UpdateEnemyVisibility();
+#pragma endregion
 };

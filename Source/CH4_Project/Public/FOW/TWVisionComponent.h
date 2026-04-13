@@ -4,16 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "TW_VisionComponent.generated.h"
+#include "TWVisionComponent.generated.h"
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), DisplayName="Fog Vision")
-class CH4_PROJECT_API UTW_VisionComponent : public UActorComponent
+class CH4_PROJECT_API UTWVisionComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	UTW_VisionComponent();
+	UTWVisionComponent();
 
 protected:
 	virtual void BeginPlay() override;
