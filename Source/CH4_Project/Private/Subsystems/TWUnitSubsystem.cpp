@@ -43,6 +43,10 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
 		for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
 		{
+			if (UnitTableRowBase->MassEntityConfigAsset)
+			{
+				UnitTableRowBase->MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
+			}
 			CachedUnitTableRows.Add(UnitTableRowBase->UnitID, UnitTableRowBase);
 		}
 	}
