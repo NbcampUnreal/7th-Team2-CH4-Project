@@ -6,6 +6,7 @@
 #include "MassEntityElementTypes.h"
 #include "Core/TWPlayerController.h"
 
+#include "Subsystems/TWUnitSubsystem.h"
 #include "MassEntityHandle.h"
 #include "MassEntityTraitBase.h"
 #include "AssetRegistry/IAssetRegistry.h"

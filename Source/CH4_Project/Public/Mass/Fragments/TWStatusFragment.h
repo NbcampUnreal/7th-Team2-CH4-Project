@@ -22,9 +22,10 @@ struct FTWStatusFragment : public FMassFragment
 	GENERATED_BODY()
 
 	FTWStatusFragment() = default;
-	FORCEINLINE FTWUnitStatus& GetMutableStatus(){return CurrentStatus;}
+	FORCEINLINE FTWUnitStatus& GetMutableStatus() { return CurrentStatus; }
+	FORCEINLINE const FTWUnitStatus& GetStatus() const { return CurrentStatus; }
 	//TODO 이동속도 적용해야함
-	void SetStatus(const FTWUnitStatus& InStatus){CurrentStatus = InStatus;}
+	void SetStatus(const FTWUnitStatus& InStatus) { CurrentStatus = InStatus; }
 
 protected:
 	FTWUnitStatus CurrentStatus;
