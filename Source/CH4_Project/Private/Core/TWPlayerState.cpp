@@ -26,7 +26,6 @@ void ATWPlayerState::BeginPlay()
 	
 }
 
-
 void ATWPlayerState::SetPlayerSlot(const int32 NewSlot)
 {
 	if (HasAuthority())
