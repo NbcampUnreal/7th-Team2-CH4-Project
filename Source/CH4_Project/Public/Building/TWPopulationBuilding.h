@@ -31,6 +31,6 @@ protected:
 
 	void StartPopulationQueueTimer();
 	void HandlePopulationQueue();
-	void CancelQueuedPopulation();
+	
 	virtual void ClearAllBuildingTimers() override;
 };
