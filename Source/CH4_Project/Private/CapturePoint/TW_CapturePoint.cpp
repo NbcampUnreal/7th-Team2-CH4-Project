@@ -74,7 +74,6 @@ void ATW_CapturePoint::StopCaptureTimer()
     if (GetWorld()->GetTimerManager().IsTimerActive(CaptureTimerHandle))
     {
         GetWorld()->GetTimerManager().ClearTimer(CaptureTimerHandle);
-        UE_LOG(LogTemp, Log, TEXT("=== [SERVER] Capture Timer Stopped ==="));
     }
 }
 
