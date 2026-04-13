@@ -14,6 +14,7 @@ class UInputAction;
 class UInputMappingContext;
 class ATWPopulationBuilding;
 class ATWBlockingBuilding;
+class ATWBaseBuilding;
 class AGhostBuilding;
 /**
  * 
@@ -108,7 +109,7 @@ private:
 	void ServerTestIncreasePopulation();
 #pragma endregion
 	
-#pragma region 방벽 데미지
+#pragma region 넥서스 데미지
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	UInputAction* IA_TestDamageBlockingBuilding;
 
@@ -123,7 +124,7 @@ private:
 	
 protected:
 	UFUNCTION(Server,Reliable, Category = "Build")
-	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<AActor> ClassToSpawn);
+	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn);
 	
 public:
 	
@@ -144,7 +145,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<AGhostBuilding> BuildClass;
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
-	TSubclassOf<AActor> SelectedBuildingClass;
+	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
 	
 #pragma endregion
 	
@@ -156,9 +157,5 @@ private:
 	FVector ClickStartLocation;
 	
 	
-	UFUNCTION(Server, Reliable)
-	void TESTSPAWNCODE();
-protected:
-	UPROPERTY(EditAnywhere)
-	TObjectPtr<UMassEntityConfigAsset> TestMassEntityConfigAsset;
+	
 };

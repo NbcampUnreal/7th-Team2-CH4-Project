@@ -1,10 +1,14 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "MassCommonTypes.h"
+#include "Core/TWPlayerUnitContainer.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Subsystems/TWUnitSubsystem.h"
 #include "TWPlayerState.generated.h"
+
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
@@ -13,7 +17,6 @@ class CH4_PROJECT_API ATWPlayerState : public APlayerState
 
 public:
 	ATWPlayerState();
-	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
@@ -24,57 +27,61 @@ public:
 	void SetPlayerSlot(const int32 InPlayerSlot);
 	
 #pragma region 자원
+protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Resource")
-	int32 Wood = 0;
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Resource")
-	int32 Ore = 0;
-	
+	TArray<int32> Resources;
+public:
 	void AddResource(const EResourceType ResourceType, const int32 Amount);
+	
 #pragma endregion	
 	
-#pragma region 병력 스폰
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
-	int32 CurrentTroopCount = 0;
+#pragma region 인구 / 병력
+protected:
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 PendingPopulation = 0;
+
+	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Population")
+	int32 MaxPopulation = 200;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 PopulationLimit = 1;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Population")
+	int32 CurrentPopulation = 0;
+public:
+	int8 CanAffordCost(const TMap<EResourceType, int32>& Cost) const;
+	void SpendCost(const TMap<EResourceType, int32>& Cost);
 	
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Troop")
-	int32 PendingTroopCount = 0;
+	int8 CanQueueTroop(const int32 RequiredPopulation) const;
 	
-	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Troop")
-	int32 MaxTroopCount = 1;
+	void SetCurrentPopulationFromContainer(const int32 InAmount);
 	
-	int8 CanAffordCost(const int32 InWoodCost, const int32 InOreCost) const;
-	void SpendCost(const int32 InWoodCost, const int32 InOreCost);
-	
-	int8 CanQueueTroop(const int32 InAmount = 1) const;
-	
-	void AddTroopCount(const int32 InAmount);
-	void RemoveTroopCount(const int32 InAmount);
-	
-	void AddPendingTroopCount(const int32 InAmount);
-	void RemovePendingTroopCount(const int32 InAmount);
-	
-	void AddUnit(FMassEntityHandle& Unit );
-	void RemoveUnit(int32 Idx);
-	TArray<FMassEntityHandle> Units;
-#pragma endregion
-	
-#pragma region 인구 수
-	void AddPopulationCap(const int32 InAmount);
+	void AddPendingPopulation(const int32 InAmount);
+	void RemovePendingPopulation(const int32 InAmount);
+
+	void AddPopulationLimit(const int32 InAmount);
+
 #pragma endregion
 	
 #pragma region 병력 유지비
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep")
-	FBuildingResourceCost UpkeepCost;
-
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Troop|Upkeep")
+	TMap<EResourceType, int32> UpkeepCost;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep", meta=(ClampMin="0.1"))
 	float UpkeepInterval = 60.0f;
 
 	FTimerHandle TroopUpkeepTimerHandle;
-
-	FBuildingResourceCost GetTotalTroopUpkeepCost() const;
+public:
+	FORCEINLINE const TMap<EResourceType, int32>& GetTotalTroopUpkeepCost() const{return UpkeepCost;}
+	void SetTotalTroopUpkeepCost(const TMap<EResourceType, int32>& Upkeep){UpkeepCost = Upkeep;}
 	void RefreshTroopUpkeepTimer();
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();
 #pragma endregion
+	
+private:
+	FORCEINLINE UTWUnitSubsystem* GetUnitSubsystem() const
+	{
+		return GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	}
 };

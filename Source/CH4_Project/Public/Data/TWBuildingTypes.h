@@ -10,29 +10,19 @@ enum class EBuildingCategory : uint8
 	ResourceProduction  UMETA(DisplayName="ResourceProduction"),
 	TroopProduction     UMETA(DisplayName="TroopProduction"),
 	PopulationProduction     UMETA(DisplayName="PopulationProduction"),
-	Blocking                UMETA(DisplayName="Blocking")
+	Blocking                UMETA(DisplayName="Blocking"),
+	Nexus                   UMETA(DisplayName="Nexus")
 };
 
 UENUM(BlueprintType)
 enum class EResourceType : uint8
 {
-	None    UMETA(DisplayName="None"),
 	Wood    UMETA(DisplayName="Wood"),
-	Ore     UMETA(DisplayName="Ore")
+	Ore     UMETA(DisplayName="Ore"),
+	Count	UMETA(DisplayName="Count"),
+	None	UMETA(DisplayName="None"),
 };
 
-USTRUCT(BlueprintType)
-struct FBuildingResourceCost
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Cost", meta=(ClampMin="0"))
-	int32 Wood = 0;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Cost", meta=(ClampMin="0"))
-	int32 Ore = 0;
-};
 
 USTRUCT(BlueprintType)
 struct FBuildingGridSize

@@ -39,13 +39,13 @@ int8 ATWPopulationBuilding::RequestEnqueuePopulation()
 		return 0;
 	}
 
-	if (OwningPlayerState->CanAffordCost(PopulationData->ProductionCost.Wood, PopulationData->ProductionCost.Ore) == 0)
+	if (OwningPlayerState->CanAffordCost(PopulationData->ProductionCost) == 0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("인구수 대기열 추가 실패: 자원 부족"));
 		return 0;
 	}
 
-	OwningPlayerState->SpendCost(PopulationData->ProductionCost.Wood, PopulationData->ProductionCost.Ore);
+	OwningPlayerState->SpendCost(PopulationData->ProductionCost);
 
 	CurrentQueueCount += 1;
 	
@@ -74,7 +74,7 @@ int8 ATWPopulationBuilding::IncreasePopulationNow()
 		return 0;
 	}
 
-	OwningPlayerState->AddPopulationCap(1);
+	OwningPlayerState->AddPopulationLimit(1);
 	return 1;
 }
 

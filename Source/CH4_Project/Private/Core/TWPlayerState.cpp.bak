@@ -1,0 +1,399 @@
+﻿#include "Core/TWPlayerState.h"
+#include "Data/TWBuildingTypes.h"
+#include "Net/UnrealNetwork.h"
+#include "Building/TWTroopSpawnBuilding.h"
+#include "EngineUtils.h"
+#include "MassReplicationFragments.h"
+#include "MassReplicationSubsystem.h"
+#include "TimerManager.h"
+#include "Mass/Fragments/TWUnitFragment.h"
+#include "Subsystems/TWUnitSubsystem.h"
+
+ATWPlayerState::ATWPlayerState()
+{
+	bReplicates = true;
+
+	PlayerSlot = -1;
+	Resources.SetNum(static_cast<int32>(EResourceType::Count));
+	for (int32& Resource : Resources)
+	{
+		Resource = 0;
+	}
+	PendingPopulation = 0;
+	MaxPopulation = 200;
+	PopulationLimit = 1;
+	CurrentPopulation = 0;
+}
+
+
+void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
+{
+	PlayerSlot = InPlayerSlot;
+	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
+	if (IsValid(UnitSubsystem))
+	{
+		UnitSubsystem->AddPlayer(PlayerSlot);
+	}
+}
+
+void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (Amount <= 0)
+	{
+		return;
+	}
+	if (ResourceType == EResourceType::Count)
+	{
+		return;
+	}
+	Resources[static_cast<int32>(ResourceType)] += Amount;
+
+	UE_LOG(LogTemp, Warning, TEXT("Player %d | Wood: %d | Ore: %d"),
+	       PlayerSlot,
+	       Resources[(int32)EResourceType::Wood],
+	       Resources[(int32)EResourceType::Ore]);
+}
+
+int8 ATWPlayerState::CanAffordCost(const TMap<EResourceType, int32>& Cost) const
+{
+	for (const TPair<EResourceType, int32>& Pair : Cost)
+	{
+		if (Resources[static_cast<int32>(Pair.Key)] < Pair.Value)
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void ATWPlayerState::SpendCost(const TMap<EResourceType, int32>& Cost)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (CanAffordCost(Cost) == 0)
+	{
+		return;
+	}
+	for (const TPair<EResourceType, int32>& Pair : Cost)
+	{
+		Resources[static_cast<int32>(Pair.Key)] -= Pair.Value;
+	}
+}
+
+int8 ATWPlayerState::CanQueueTroop(const int32 RequiredPopulation) const
+{
+	if (RequiredPopulation <= 0)
+	{
+		return 0;
+	}
+
+	if ((CurrentPopulation + PendingPopulation + RequiredPopulation) <= PopulationLimit)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+void ATWPlayerState::SetCurrentPopulationFromContainer(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CurrentPopulation = FMath::Max(0, InAmount);
+	RefreshTroopUpkeepTimer();
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("PlayerSlot: %d | CurrentPopulation(Container): %d / %d (Max: %d)"),
+		PlayerSlot,
+		CurrentPopulation,
+		PopulationLimit,
+		MaxPopulation
+	);
+}
+
+void ATWPlayerState::AddPendingPopulation(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PendingPopulation += InAmount;
+}
+
+void ATWPlayerState::RemovePendingPopulation(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PendingPopulation -= InAmount;
+	PendingPopulation = FMath::Max(0, PendingPopulation);
+}
+
+void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PopulationLimit += InAmount;
+	PopulationLimit = FMath::Min(PopulationLimit, MaxPopulation);
+	PopulationLimit = FMath::Max(1, PopulationLimit);
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("PlayerSlot: %d | PopulationLimit: %d / %d"),
+		PlayerSlot,
+		PopulationLimit,
+		MaxPopulation
+	);
+}
+
+<<<<<<< HEAD
+void ATWPlayerState::AddPendingTroopCount(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PendingTroopCount += InAmount;
+}
+
+void ATWPlayerState::RemovePendingTroopCount(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	PendingTroopCount -= InAmount;
+	PendingTroopCount = FMath::Max(0, PendingTroopCount);
+}
+
+void ATWPlayerState::AddUnit(FMassEntityHandle& Unit)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	checkf(Units.Num()<MaxTroopCount, TEXT("MaxTroopCount OverFlow!"));
+	Units[CurrentTroopCount] = Unit;
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(this);
+	if (FTWOwnerFragment* OwnerFragment =EntityManager->GetFragmentDataPtr<FTWOwnerFragment>(Unit))
+	{
+		OwnerFragment->SetIdx(CurrentTroopCount);
+	}
+
+	++CurrentTroopCount;
+}
+
+void ATWPlayerState::RemoveUnit(int32 Idx)
+{
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	
+	--CurrentTroopCount;
+	Units.Swap(Idx, CurrentTroopCount);
+	if (Idx != CurrentTroopCount)
+	{
+		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
+		if (EntityManager.IsEntityActive(Units[Idx]))
+		{
+			if (FTWOwnerFragment* OwnerFragment =EntityManager.GetFragmentDataPtr<FTWOwnerFragment>(Units[Idx]))
+			{
+				OwnerFragment->SetIdx(Idx);
+			}
+		}
+	}
+	Units.RemoveAt(CurrentTroopCount);	
+}
+
+void ATWPlayerState::AddPopulationCap(const int32 InAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (InAmount <= 0)
+	{
+		return;
+	}
+
+	MaxTroopCount += InAmount;
+	MaxTroopCount = FMath::Max(1, MaxTroopCount);
+	
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("PlayerSlot: %d | PopulationCap(MaxTroopCount): %d"),
+		PlayerSlot,
+		MaxTroopCount
+	);
+}
+
+FBuildingResourceCost ATWPlayerState::GetTotalTroopUpkeepCost() const
+{
+	FBuildingResourceCost TotalCost;
+
+	TotalCost.Wood = UpkeepCost.Wood * CurrentTroopCount;
+	TotalCost.Ore = UpkeepCost.Ore * CurrentTroopCount;
+
+	return TotalCost;
+}
+
+=======
+>>>>>>> origin/feature/status-replication
+void ATWPlayerState::RefreshTroopUpkeepTimer()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (CurrentPopulation <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(TroopUpkeepTimerHandle);
+
+		for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
+		{
+			ATWTroopSpawnBuilding* TroopBuilding = *It;
+			if (!TroopBuilding)
+			{
+				continue;
+			}
+
+			if (TroopBuilding->GetOwnerPlayerState() != this)
+			{
+				continue;
+			}
+
+			TroopBuilding->SetQueuePausedByUpkeep(0);
+		}
+
+		return;
+	}
+
+	if (GetWorldTimerManager().IsTimerActive(TroopUpkeepTimerHandle))
+	{
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		TroopUpkeepTimerHandle,
+		this,
+		&ATWPlayerState::HandleTroopUpkeep,
+		UpkeepInterval,
+		true
+	);
+}
+
+void ATWPlayerState::HandleTroopUpkeep()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const TMap<EResourceType, int32>& TotalCost = GetTotalTroopUpkeepCost();
+	const int8 bPaidUpkeep = TrySpendTroopUpkeep();
+
+	for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWTroopSpawnBuilding* TroopBuilding = *It;
+		if (!TroopBuilding)
+		{
+			continue;
+		}
+
+		if (TroopBuilding->GetOwnerPlayerState() != this)
+		{
+			continue;
+		}
+
+		TroopBuilding->SetQueuePausedByUpkeep(bPaidUpkeep == 1 ? 0 : 1);
+	}
+
+	if (bPaidUpkeep == 1)
+	{
+		UE_LOG(LogTemp, Log, TEXT("PlayerSlot: %d | 유지비 지불 성공"), PlayerSlot);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PlayerSlot: %d | 유지비 부족 - 다음 체크까지 대기열 정지"), PlayerSlot);
+	}
+}
+
+int8 ATWPlayerState::TrySpendTroopUpkeep()
+{
+	if (!HasAuthority())
+	{
+		return 0;
+	}
+
+	if (CurrentPopulation <= 0)
+	{
+		return 1;
+	}
+
+	const TMap<EResourceType, int32>& TotalCost = GetTotalTroopUpkeepCost();
+
+	if (CanAffordCost(TotalCost) == 0)
+	{
+		return 0;
+	}
+
+	SpendCost(TotalCost);
+	return 1;
+}
+
+void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ATWPlayerState, PlayerSlot);
+	DOREPLIFETIME(ATWPlayerState, Resources);
+	DOREPLIFETIME(ATWPlayerState, PendingPopulation);
+	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
+	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
+	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
+}

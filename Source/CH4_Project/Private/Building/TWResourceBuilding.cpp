@@ -71,10 +71,7 @@ void ATWResourceBuilding::HandleProduceResource()
         ResourceData->ProductionAmount
     );
 
-    UE_LOG(LogTemp, Warning, TEXT("Player %d | Wood: %d | Ore: %d"),
-    OwnerPlayerSlot,
-    OwningPlayerState->Wood,
-    OwningPlayerState->Ore);
+
 }
 
 void ATWResourceBuilding::ClearAllBuildingTimers()

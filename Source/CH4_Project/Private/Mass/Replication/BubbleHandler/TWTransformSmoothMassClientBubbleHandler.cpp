@@ -32,7 +32,6 @@ void UTWTransformSmoothMassClientBubbleHandler::PostReplicatedChangeEntity(const
 	const float DeltaYaw = FMath::FindDeltaAngleDegrees(NewYaw, PreviousYaw);
 	if (OffsetParams.MaxSmoothNetUpdateYaw > FMath::Abs(DeltaYaw))
 	{
-		// 기존 오프셋에 최단 거리 각도 차이를 더해줌
 		float CurrentYawOffset = TranslationOffset.TransformOffset.GetYaw();
 		TranslationOffset.TransformOffset.SetYaw(FRotator::NormalizeAxis(CurrentYawOffset + DeltaYaw));
 	}

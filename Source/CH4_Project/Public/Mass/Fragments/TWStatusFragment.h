@@ -7,6 +7,7 @@
 #include "MassEntityHandle.h"
 #include "MassEntityTraitBase.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "Data/TWUnitStatus.h"
 #include "StructUtils/SharedStruct.h"
 #include "TWStatusFragment.generated.h"
 
@@ -21,19 +22,11 @@ struct FTWStatusFragment : public FMassFragment
 	GENERATED_BODY()
 
 	FTWStatusFragment() = default;
-
-	float GetHealth() const { return Health; }
-	float GetDamage() const { return Damage; }
-	float GetRange() const { return Range; }
-	void SetHealth(float InHealth){Health = InHealth;}
-	void SetDamage(float InDamage){Damage = InDamage;}
-	void SetRange(float InRange){Range = InRange;}
+	FORCEINLINE FTWUnitStatus& GetMutableStatus() { return CurrentStatus; }
+	FORCEINLINE const FTWUnitStatus& GetStatus() const { return CurrentStatus; }
+	//TODO 이동속도 적용해야함
+	void SetStatus(const FTWUnitStatus& InStatus) { CurrentStatus = InStatus; }
 
 protected:
-	UPROPERTY(Transient)
-	float Health=100;
-	UPROPERTY(Transient)
-	float Damage=100;
-	UPROPERTY(Transient)
-	float Range=100;
+	FTWUnitStatus CurrentStatus;
 };

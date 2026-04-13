@@ -27,13 +27,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building")
 	TSubclassOf<class ATWBaseBuilding> BuildingClass;
 	
+	// 최대 체력
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|HP", meta=(ClampMin="1"))
+	int32 MaxHP = 100;
+	
 	// 건설 시간(초)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction", meta=(ClampMin="0.0"))
 	float BuildTime = 0.0f;
 
 	// 건설 비용
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction")
-	FBuildingResourceCost BuildCost;
+	TMap<EResourceType, int32> BuildCost;
 	
 	// 건물 설치 크기(그리드 기준)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction")
