@@ -18,6 +18,7 @@
 #include "MassStateTreeFragments.h"
 #include "NavigationSystem.h"
 #include "Building/GhostBuilding.h"
+#include "Data/TWBuildingDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/TWGridSubSystem.h"
@@ -649,12 +650,19 @@ void ATWPlayerController::ToggleBuildMode()
 	}
 	else
 	{
-		if (!BuildClass)
+		if (!BuildClass || !SelectedBuildingClass)
 		{
 			UE_LOG(LogTemp, Error, TEXT("BuildingClass가 설정안됨"));
 			return;
 		}
 		
+		ATWBaseBuilding* DefaultBuilding = SelectedBuildingClass->GetDefaultObject<ATWBaseBuilding>();
+		
+		if (!DefaultBuilding || !DefaultBuilding->BuildingData)
+		{
+			UE_LOG(LogTemp, Error, TEXT("DA BuildingData이 없음"));
+			return;
+		}
 		bIsBuildMode = true;
 		
 		FActorSpawnParameters SpawnParams;
@@ -664,7 +672,7 @@ void ATWPlayerController::ToggleBuildMode()
 		
 		if (CurrentGhost)
 		{
-			CurrentGhost->BuildingSize = FIntPoint(3,3);
+			CurrentGhost->BuildingSize = DefaultBuilding->BuildingData->GridSize.BuildingSize;
 		}
 	}
 }
@@ -674,6 +682,13 @@ void ATWPlayerController::RequestBuild()
 	if (bIsBuildMode && CurrentGhost)
 	{
 		Server_SpawnBuilding(CurrentAnchor,CurrentGhost->BuildingSize, SelectedBuildingClass);
+		
+		auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+		if (GridSub)
+		{
+			GridSub->OccupyArea(CurrentAnchor, CurrentGhost->BuildingSize, nullptr);
+		}
+		
 		EndBuildMode();
 	}
 }

@@ -16,6 +16,7 @@ class ATWPopulationBuilding;
 class ATWBlockingBuilding;
 class ATWBaseBuilding;
 class AGhostBuilding;
+class ATWBaseBuilding;
 /**
  * 
  */
