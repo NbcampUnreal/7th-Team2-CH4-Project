@@ -134,6 +134,29 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 	}
 }
 
+void ATWPopulationBuilding::CancelQueuedPopulation()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (CurrentQueueCount <= 0)
+	{
+		CurrentQueueCount = 0;
+		return;
+	}
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("인구수 대기열 모두 취소 | 남은 대기열 수: %d"),
+		CurrentQueueCount
+	);
+
+	CurrentQueueCount = 0;
+}
+
 void ATWPopulationBuilding::ClearAllBuildingTimers()
 {
 	if (!HasAuthority())
@@ -142,6 +165,7 @@ void ATWPopulationBuilding::ClearAllBuildingTimers()
 	}
 
 	GetWorldTimerManager().ClearTimer(PopulationQueueTimerHandle);
+	CancelQueuedPopulation();
 }
 
 void ATWPopulationBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
