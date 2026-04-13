@@ -60,6 +60,11 @@ void ATWResourceBuilding::HandleProduceResource()
         return;
     }
 
+    if (BuildingState != ETWBuildingState::Completed)
+    {
+        return;
+    }
+    
     const UTWResourceBuildingDataAsset* ResourceData = GetResourceBuildingData();
     if (!ResourceData || !OwningPlayerState)
     {

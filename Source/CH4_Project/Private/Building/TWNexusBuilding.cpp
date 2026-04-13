@@ -39,7 +39,7 @@ void ATWNexusBuilding::OnOwnerPlayerStateAssigned()
 	StartWoodProduction();
 }
 
-void ATWNexusBuilding::ApplyDamageToBuilding(const int32 InDamageAmount)
+void ATWNexusBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 {
 	Super::ApplyDamageToBuilding(InDamageAmount);
 
@@ -48,17 +48,17 @@ void ATWNexusBuilding::ApplyDamageToBuilding(const int32 InDamageAmount)
 		return;
 	}
 	
-	if (InDamageAmount <= 0)
+	if (InDamageAmount <= 0.0f)
 	{
 		return;
 	}
 
-	if (CurrentHP <= 0)
+	if (CurrentHP <= 0.0f)
 	{
 		return;
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Damage : %d / %d"), CurrentHP, MaxHP);
+	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Damage : %.2f / %.2f"), CurrentHP, MaxHP);
 
 	const UTWNexusBuildingDataAsset* NexusData = GetNexusBuildingData();
 	if (!NexusData)
@@ -143,7 +143,7 @@ void ATWNexusBuilding::HandleHPRegen()
 		GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Regen : %d / %d"), CurrentHP, MaxHP);
+	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Regen : %.2f / %.2f"), CurrentHP, MaxHP);
 }
 
 void ATWNexusBuilding::StartWoodProduction()

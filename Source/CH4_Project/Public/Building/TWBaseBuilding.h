@@ -9,6 +9,14 @@ class ATWPlayerState;
 class USceneComponent;
 class UStaticMeshComponent;
 
+UENUM(BlueprintType)
+enum class ETWBuildingState : uint8
+{
+	None,
+	UnderConstruction,
+	Completed
+};
+
 UCLASS()
 class CH4_PROJECT_API ATWBaseBuilding : public AActor
 {
@@ -39,23 +47,53 @@ public:
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
 	
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
-	virtual void ApplyDamageToBuilding(const int32 InDamageAmount);
+	virtual void ApplyDamageToBuilding(const float InDamageAmount);
 
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
-	int32 GetCurrentHP() const { return CurrentHP; }
+	float GetCurrentHP() const { return CurrentHP; }
 
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
-	int32 GetMaxHP() const { return MaxHP; }
+	float GetMaxHP() const { return MaxHP; }
 
+	UFUNCTION(BlueprintCallable, Category="Building|Construction")
+	float GetBuildingProgress() const;
+	
+	UFUNCTION(BlueprintCallable, Category="Building|Construction")
+	float GetRemainingBuildTime() const;
+	
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
-	int32 MaxHP = 0;
+	float MaxHP = 0.0f;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
-	int32 CurrentHP = 0;
+	float CurrentHP = 0.0f;
+	
+	UPROPERTY(ReplicatedUsing=OnRep_BuildingState, VisibleAnywhere, BlueprintReadOnly, Category="Building|Construction")
+	ETWBuildingState BuildingState = ETWBuildingState::None;
+	
+	UFUNCTION()
+	void OnRep_BuildingState();
+	
+	UPROPERTY(EditAnywhere, Category="Building|Visual")
+	TObjectPtr<UMaterialInterface> ConstructionMaterial;
+	
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
+	
+	FTimerHandle ConstructionTimerHandle;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Building|Construction")
+	float ConstructionTickInterval = 0.1f;
+	
+	float CurrentBuildTime = 0.0f;
+	float MaxBuildTime = 0.0f;
+	
+	void StartConstruction();
+	void UpdateConstruction();
+	void FinishConstruction();
 	
 public:
 	void SetOwnerPlayerState(ATWPlayerState* InPlayerState);

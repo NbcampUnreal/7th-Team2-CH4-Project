@@ -36,7 +36,12 @@ void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(bool bInPaused)
 	{
 		return;
 	}
-
+	
+	if (BuildingState != ETWBuildingState::Completed)
+	{
+		return;
+	}
+    
 	const bool bPrevPaused = bQueuePausedByUpkeep;
 	if (bPrevPaused == bInPaused)
 	{

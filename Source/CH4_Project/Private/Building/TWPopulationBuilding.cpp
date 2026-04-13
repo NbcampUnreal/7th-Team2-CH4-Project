@@ -27,6 +27,11 @@ int8 ATWPopulationBuilding::RequestEnqueuePopulation()
 		return 0;
 	}
 
+	if (BuildingState != ETWBuildingState::Completed)
+	{
+		return 0;
+	}
+	
 	const UTWPopulationBuildingDataAsset* PopulationData = GetPopulationBuildingData();
 	if (!PopulationData)
 	{

@@ -29,7 +29,7 @@ public:
 	
 	// 최대 체력
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|HP", meta=(ClampMin="1"))
-	int32 MaxHP = 100;
+	float MaxHP = 100;
 	
 	// 건설 시간(초)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Building|Construction", meta=(ClampMin="0.0"))

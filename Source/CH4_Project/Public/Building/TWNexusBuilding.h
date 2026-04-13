@@ -13,7 +13,7 @@ class CH4_PROJECT_API ATWNexusBuilding : public ATWBaseBuilding
 
 public:
 	virtual void BeginPlay() override;
-	virtual void ApplyDamageToBuilding(const int32 InDamageAmount) override;
+	virtual void ApplyDamageToBuilding(const float InDamageAmount) override;
 
 protected:
 	FTimerHandle RegenDelayTimerHandle;
