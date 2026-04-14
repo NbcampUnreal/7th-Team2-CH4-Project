@@ -3,6 +3,7 @@
 #include "MassCommonTypes.h"
 #include "MassCommonFragments.h"
 #include "MassExecutionContext.h"
+#include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWTargetFragment.h"
 
@@ -20,6 +21,7 @@ void UTWSearchProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& 
 {
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTWTargetFragment>(EMassFragmentAccess::ReadWrite);
 }
 
@@ -30,7 +32,7 @@ void UTWSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 	{
 		const int32 EntityMaxCount = Context.GetNumEntities();
 		const auto Transforms = Context.GetFragmentView<FTransformFragment>();
-		const auto Range = Context.GetFragmentView<FTWAttackFragment>();
+		const auto Range = Context.GetFragmentView<FTWStatusFragment>();
 		const auto Targets = Context.GetMutableFragmentView<FTWTargetFragment>();
 
 		for (int32 EntityIdx = 0; EntityIdx < EntityMaxCount; ++EntityIdx)
@@ -38,7 +40,9 @@ void UTWSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			// 1. 초기화
 			Targets[EntityIdx].bIsTargetInRange = false;  // 일단 false
 			FVector MyLoc = Transforms[EntityIdx].GetTransform().GetLocation();  // 현재 유닛의 위치
-			float AttackRange = Range[EntityIdx].AttackRange;   // 현재 유닛의 공격 사거리
+			
+			const FTWUnitStatus& UnitStatus = Range[EntityIdx].GetStatus();
+			float AttackRange = UnitStatus.GetStatus(ETWStatusType::Range);
 			
 			FMassEntityHandle ClosestEnemy;  // 가장 가까운 엔티티 저장
 			float ClosestDistSq = FMath::Square(AttackRange);  // 가장 가까운 엔티티와의 거리
