@@ -36,6 +36,7 @@ struct FTWUnitFragment : public FMassFragment
 protected:
 	UPROPERTY(Transient)
 	int32 Owner = -1;
+	//Server Only Member
 	UPROPERTY(Transient)
 	int32 Idx = -1;
 	UPROPERTY(Transient)

@@ -19,6 +19,7 @@
 #include "Mass/Replication/BubbleInfo/TWStatusMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
 #include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
+#include "Mass/Replication/BubbleInfo/TWUnitMassClientBubbleInfo.h"
 
 UTWUnitSubsystem::UTWUnitSubsystem()
 {
@@ -75,6 +76,7 @@ void UTWUnitSubsystem::PostInitialize()
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWStatusMassClientBubbleInfo::StaticClass());
+	ReplicationSubsystem->RegisterBubbleInfoClass(ATWUnitMassClientBubbleInfo::StaticClass());
 }
 
 void UTWUnitSubsystem::Deinitialize()
