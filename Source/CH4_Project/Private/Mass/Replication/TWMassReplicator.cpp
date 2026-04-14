@@ -34,7 +34,13 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
  
 		
 		FTWUnitStatus StatusData;
-		StatusData.Status = StatusFragments[EntityIdx].GetStatus().Status;
+		// StatusData.Status = StatusFragments[EntityIdx].GetStatus().Status;
+		
+		for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
+		{
+			StatusData.Status[i] = StatusFragments[EntityIdx].GetStatus().Status[i];
+		}
+		
 		InReplicatedAgent.SetStatus(StatusData);		
  
 		FReplicatedAgentPositionYawData PositionYawData;

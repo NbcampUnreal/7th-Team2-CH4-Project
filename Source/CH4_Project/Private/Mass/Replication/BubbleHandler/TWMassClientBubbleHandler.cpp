@@ -37,7 +37,12 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 	(const FMassEntityView& EntityView, const FTWReplicatedAgent& ReplicatedEntity, const int32 EntityIdx)
 	{
 		const FTWUnitStatus& StatusData = ReplicatedEntity.GetStatus();
-		StatusFragments[EntityIdx].GetMutableStatus().Status = StatusData.Status;
+		// StatusFragments[EntityIdx].GetMutableStatus().Status = StatusData.Status;
+		for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
+		{
+			StatusFragments[EntityIdx].GetMutableStatus().Status[i] = StatusData.Status[i];
+		}
+		
 		
 		const FReplicatedAgentPositionYawData& PositionYawData = ReplicatedEntity.GetPositionYawData();
 		TransformFragments[EntityIdx].GetMutableTransform().SetLocation(PositionYawData.GetPosition());
@@ -76,8 +81,11 @@ void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityVie
 
 	// Sets the status with the agent status  
 	const FTWUnitStatus& StatusData = Item.GetStatus();
-	StatusFragment.GetMutableStatus().Status = StatusData.Status;
-	
+	//StatusFragment.GetMutableStatus().Status = StatusData.Status;
+	for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
+	{
+		StatusFragment.GetMutableStatus().Status[i] = StatusData.Status[i];
+	}
 	
 	FTransformFragment& TransformFragment = EntityView.GetFragmentData<FTransformFragment>();
   	

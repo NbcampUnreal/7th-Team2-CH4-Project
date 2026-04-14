@@ -359,6 +359,50 @@ void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 	UnitContainers[PlayerSlot]->RemoveUnit(Idx);
 }
 
+FTWUnitStatus UTWUnitSubsystem::GetUnitDefaultStatus(FName UnitID, int32 PlayerSlot)
+{
+	FTWUnitStatus UnitStatus= GetUnitTableRowBase(UnitID)->BaseStatus;
+	ATWGameState* GameState = Cast<ATWGameState> (GetWorld()->GetGameState());
+	if (false == IsValid(GameState))
+	{
+		return UnitStatus;
+	}
+
+	ATWPlayerState* PlayerState = GameState->GetPlayerState(PlayerSlot);
+	if (false == IsValid(PlayerState))
+	{
+		return UnitStatus;
+	}
+	UnitStatus += PlayerState->GetUnitUpgradeBonus(UnitID);
+	return UnitStatus;
+}
+
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, const int32 PlayerSlot)
+{
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (EntityManager)
+	{
+		return EntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit)->GetStatus();
+	}
+	return FTWUnitStatus();
+}
+
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, const int32 PlayerSlot)
+{
+	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
+	if (false == IsValid(RepSubsystem))
+	{
+		return FTWUnitStatus();
+	}
+	const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(UnitNetID);
+	if (!EntityInfo)
+	{
+		return FTWUnitStatus();
+	}
+	FMassEntityHandle EntityHandle = EntityInfo->Entity;
+	return GetUnitCurrentStatus(EntityHandle, PlayerSlot);
+}
+
 FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
 {
 	if (FTWUnitTableRowBase* const* FoundRow = CachedUnitTableRows.Find(UnitID))

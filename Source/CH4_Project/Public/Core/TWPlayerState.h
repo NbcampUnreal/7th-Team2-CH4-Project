@@ -118,6 +118,7 @@ public:
 	int32 GetUpgradeLevelByID(const FName UpgradeID) const;
 	void ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow);
 	float GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const;
+	FTWUnitStatus GetUnitUpgradeBonus(const FName UnitID) const;
 #pragma endregion
 	
 

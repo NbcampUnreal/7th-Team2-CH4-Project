@@ -364,6 +364,16 @@ float ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID, const ETWStatusTyp
 	return FoundStatus->GetStatus(StatusType);
 }
 
+FTWUnitStatus ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID) const
+{
+	const FTWUnitStatus* FoundStatus = UnitUpgradeBonusMap.Find(UnitID);
+	if (!FoundStatus)
+	{
+		return FTWUnitStatus();
+	}
+	return *FoundStatus;
+}
+
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
