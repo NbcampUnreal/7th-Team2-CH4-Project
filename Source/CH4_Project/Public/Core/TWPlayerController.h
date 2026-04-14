@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MassCommonTypes.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
@@ -214,14 +215,14 @@ private:
 	void RebuildLocalSelectionSummary(const TArray<FName>& InUnitIds);
 	void BuildSelectionPayloadFromEntities(
 		const TArray<FMassEntityHandle>& InSelectedEntities,
-		TArray<FName>& OutUnitIds,
+		TArray<FMassNetworkID>& OutUnitIds,
 		float& OutPrimaryHealth,
 		bool& bOutHasPrimaryHealth);
 
 	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
 
 	UFUNCTION(Client, Reliable)
-	void ClientApplyUnitSelection(const TArray<FName>& InUnitIds, float InPrimaryHealth, bool bInHasPrimaryHealth);
+	void ClientApplyUnitSelection(const TArray<FMassNetworkID>& InNetworkIds, float InPrimaryHealth, bool bInHasPrimaryHealth);
 
 	UFUNCTION(Client, Reliable)
 	void ClientApplyBuildingSelection(ATWBaseBuilding* InBuilding);
@@ -260,7 +261,10 @@ private:
 	ETWCommand CurrentCommandType = ETWCommand::None;
 
 	UPROPERTY(Transient)
-	TArray<FMassEntityHandle> SelectedEntities;
+	TArray<FMassEntityHandle> ServerSelectedEntities;
+	UPROPERTY(Transient)
+	TArray<FMassNetworkID> ClientSelectedEntities;
+
 
 	UPROPERTY(Transient)
 	TObjectPtr<ATWBaseBuilding> SelectedBuilding = nullptr;

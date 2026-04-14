@@ -282,7 +282,14 @@ void UTWUnitSubsystem::SpawnUnit(
 			}
 
 			FMassEntityHandle SpawnedUnit = SpawnedEntities[0];
-
+			
+			if (FMassNetworkIDFragment* NetworkIDFragment = InOutEntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(SpawnedUnit))
+			{
+				FMassNetworkID NetID = NetworkIDFragment->NetID;
+				UE_LOG(LogTemp, Warning, TEXT("%d"), NetID.GetValue());
+			}
+			
+			
 			if (FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
 			{
 				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
