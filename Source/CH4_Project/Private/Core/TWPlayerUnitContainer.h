@@ -6,6 +6,7 @@
 #include "MassCommonTypes.h"
 #include "MassEntityHandle.h"
 #include "Data/TWBuildingTypes.h"
+#include "Data/TWUnitStatus.h"
 #include "UObject/Object.h"
 #include "TWPlayerUnitContainer.generated.h"
 
@@ -32,6 +33,7 @@ public:
 	FORCEINLINE int32 GetCurrentUnitCount() const{return Units.Num();}
 	FORCEINLINE int32 GetCurrentPopulation() const { return CurrentPopulation;}
 	FORCEINLINE const TMap<EResourceType, int32>& GetUpkeep() const{return Upkeep;}
+	void ApplyStatus(FName UnitID, const FTWUnitStatus& UnitStatus);
 #pragma endregion
 private:
 	void IncreaseUpkeep(TMap<EResourceType, int32> Amount);
@@ -45,7 +47,7 @@ private:
 	UPROPERTY()
 	int32 OwnerSlot;
 	UPROPERTY()
-	TArray<FMassNetworkID> Units;
+	TArray<FMassEntityHandle> Units;
 	UPROPERTY()
 	TMap<EResourceType, int32> Upkeep;
 	UPROPERTY()

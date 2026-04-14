@@ -56,12 +56,22 @@ private:
 #endif
 
 public:
+#pragma region Status
 	//업그레이드까지 적용된 풀컨디션 스탯임 BaseStat아님
 	FTWUnitStatus GetUnitDefaultStatus(FName UnitID, int32 PlayerSlot);
 	FTWUnitStatus GetUnitCurrentStatus(const FMassEntityHandle& Unit, const int32 PlayerSlot);
+	
 #ifdef WITH_CLIENT_CODE
 	FTWUnitStatus GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, const int32 PlayerSlot);
 #endif
+
+#ifdef WITH_SERVER_CODE
+	void ApplyStatus(FName UnitID, int32 PlayerSlot);
+#endif
+	
+#pragma endregion
+	
+	
 	
 	FTWUnitTableRowBase* GetUnitTableRowBase(FName UnitID) const;
 

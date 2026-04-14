@@ -128,24 +128,6 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 			CurrentGhost->SetActorLocation(CenterPos);
 		}
 	}
-	//TEST
-	if (!ClientSelectedEntities.IsEmpty())
-	{
-		UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-		const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(ClientSelectedEntities[0]);
-		
-		
-		FTWUnitStatus CurrentStatus = GetWorld()->GetSubsystem<UTWUnitSubsystem>()->GetUnitCurrentStatus(EntityInfo->Entity,GetPlayerState<ATWPlayerState>()->PlayerSlot);
-		FTWUnitStatus DefaultStatus = GetWorld()->GetSubsystem<UTWUnitSubsystem>()->GetUnitDefaultStatus(UE::Mass::Utils::GetEntityManager(this)->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity)->GetUnitID(),GetPlayerState<ATWPlayerState>()->PlayerSlot);
-		for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("%f"), CurrentStatus.GetStatus((ETWStatusType)i));
-		}
-		for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("%f"), DefaultStatus.GetStatus((ETWStatusType)i));
-		}
-	}
 }
 
 

@@ -303,13 +303,12 @@ void UTWUnitSubsystem::SpawnUnit(
 				MoveTargetFragment->Center = Location;
 			}
 
-			// TODO Stat HardCoded
-			// TODO 유닛 아이디 fragment에 주입
-			// TODO 업그레이드 현황에 따른 스탯 설정
 			if (FTWStatusFragment* StatusFragment =
 				InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 			{
-				StatusFragment->SetStatus(UnitTableRowBase.BaseStatus);
+				FTWUnitStatus UnitStatus = WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID,PlayerState->PlayerSlot);
+				StatusFragment->SetStatus(UnitStatus);
+				//TODO Apply Move Speed;
 			}
 
 			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
@@ -401,6 +400,14 @@ FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitN
 	}
 	FMassEntityHandle EntityHandle = EntityInfo->Entity;
 	return GetUnitCurrentStatus(EntityHandle, PlayerSlot);
+}
+
+void UTWUnitSubsystem::ApplyStatus(FName UnitID, int32 PlayerSlot)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	FTWUnitStatus UnitStatus = GetUnitDefaultStatus(UnitID, PlayerSlot);
+	UnitContainers[PlayerSlot]->ApplyStatus(UnitID, UnitStatus);
 }
 
 FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const

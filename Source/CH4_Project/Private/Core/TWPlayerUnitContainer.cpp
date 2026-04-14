@@ -5,6 +5,7 @@
 #include "Core/TWGameState.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWUnitTableRowBase.h"
+#include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Subsystems/TWUnitSubsystem.h"
 
@@ -32,8 +33,9 @@ void UTWPlayerUnitContainer::SetOwnerSlot(int32 InOwnerSlot)
 
 FMassEntityHandle UTWPlayerUnitContainer::GetEntityHandle(int32 Idx) const
 {
-	UMassReplicationSubsystem* MassReplicationSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-	return MassReplicationSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
+	return Units[Idx];
+	// UMassReplicationSubsystem* MassReplicationSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
+	// return MassReplicationSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
 }
 
 void UTWPlayerUnitContainer::SyncCachedValuesToPlayerState()
@@ -52,6 +54,39 @@ void UTWPlayerUnitContainer::SyncCachedValuesToPlayerState()
 
 	PlayerState->SetCurrentPopulationFromContainer(CurrentPopulation);
 	PlayerState->SetTotalTroopUpkeepCost(Upkeep);
+}
+
+void UTWPlayerUnitContainer::ApplyStatus(FName UnitID, const FTWUnitStatus& UnitStatus)
+{
+	FMassEntityManager* MassEntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!MassEntityManager)
+	{
+		return;
+	}
+	for (const FMassEntityHandle& Unit : Units)
+	{
+		FTWUnitFragment* UnitFragment = MassEntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit);
+		if (UnitFragment)
+		{
+			if (UnitFragment->GetUnitID() == UnitID)
+			{
+				FTWStatusFragment* StatusFragment = MassEntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit);
+				if (StatusFragment)
+				{
+					StatusFragment->SetStatus(UnitStatus);
+					for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
+					{
+						if ((ETWStatusType)i != ETWStatusType::Health)
+						{
+							StatusFragment->GetMutableStatus().SetStatus(
+								static_cast<ETWStatusType>(i),UnitStatus.GetStatus(static_cast<ETWStatusType>(i)));
+						}
+					}
+					//TODO Applay Move Speed
+				}
+			}
+		}
+	}
 }
 
 void UTWPlayerUnitContainer::IncreaseUpkeep(TMap<EResourceType, int32> Amount)
@@ -108,8 +143,8 @@ void UTWPlayerUnitContainer::DecreasePopulation(const int32 Amount)
 void UTWPlayerUnitContainer::AddUnit(FMassEntityHandle& Unit)
 {
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetOuter());
-	Units.Add(EntityManager->GetFragmentDataPtr<FMassNetworkIDFragment>(Unit)->NetID);
-
+	// Units.Add(EntityManager->GetFragmentDataPtr<FMassNetworkIDFragment>(Unit)->NetID);
+	Units.Add(Unit);
 	if (FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit))
 	{
 		UnitFragment->SetIdx(Units.Num() - 1);
@@ -132,8 +167,7 @@ void UTWPlayerUnitContainer::RemoveUnit(int32 Idx)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
-	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-	FMassEntityHandle EntityHandle = RepSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
+	FMassEntityHandle EntityHandle = GetEntityHandle(Idx);
 	if (FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle))
 	{
 		UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
@@ -155,7 +189,8 @@ void UTWPlayerUnitContainer::RemoveUnit(int32 Idx)
 	}
 
 	Units.RemoveAtSwap(Idx);
-	FMassEntityHandle SwapedEntityHandle = RepSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
+	// FMassEntityHandle SwapedEntityHandle = RepSubsystem->GetEntityInfoMap()[Units[Idx]].Entity;
+	FMassEntityHandle SwapedEntityHandle = GetEntityHandle(Idx);
 	if (EntityManager.IsEntityActive(SwapedEntityHandle))
 	{
 		if (FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(SwapedEntityHandle))
