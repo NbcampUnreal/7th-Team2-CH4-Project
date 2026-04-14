@@ -7,21 +7,29 @@
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
 #include "Mass/Fragments/TWCommandFragment.h"
+#include "Data/TWUnitStatus.h"
+#include "UI/Data/TWUIDataTypes.h"
 #include "TWPlayerController.generated.h"
 
 struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
+class UDataTable;
 class ATWPopulationBuilding;
 class ATWBlockingBuilding;
 class ATWBaseBuilding;
+class ATWTroopSpawnBuilding;
+class ATWResourceBuilding;
+class ATWNexusBuilding;
 class AGhostBuilding;
-class ATWBaseBuilding;
+class UTWPlayerUIBridge;
+class UTWHUDRootWidget;
+
 /**
  * 
  */
 UENUM()
-enum class ETWCommand:uint8
+enum class ETWCommand : uint8
 {
 	None,
 	Move,
@@ -29,68 +37,89 @@ enum class ETWCommand:uint8
 	Hold
 };
 
-
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
 public:
 	ATWPlayerController();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+
 #pragma region Input
 protected:
 	virtual void SetupInputComponent() override;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LeftMouseAction;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> RightMouseAction;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> MoveCommandAction;//m
+	TObjectPtr<UInputAction> MoveCommandAction; // m
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> AttackCommandAction;//a
+	TObjectPtr<UInputAction> AttackCommandAction; // a
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> HoldCommandAction;//h
+	TObjectPtr<UInputAction> HoldCommandAction; // h
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> BuildCommandAction;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	float ScreenEdgeMargin = 10.0f; 
+	float ScreenEdgeMargin = 10.0f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	float ScrollSpeed = 1500.0f; 
+	float ScrollSpeed = 1500.0f;
+
 	UFUNCTION()
 	void OnStartLeftMouseAction(const FInputActionValue& InputActionValue);
+
+	UFUNCTION()
 	void OnEndLeftMouseAction(const FInputActionValue& InputActionValue);
-	void OnRightMouseAction(const FInputActionValue& InputActionValue);//명령 있을 시 취소, 없으면 이동명령
+
+	UFUNCTION()
+	void OnRightMouseAction(const FInputActionValue& InputActionValue); // 명령 있을 시 취소, 없으면 이동명령
+
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
 	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
 	void OnBuildCommandAction(const FInputActionValue& InputActionValue);
-	
-	UFUNCTION(Server,Reliable)
+
+	UFUNCTION(Server, Reliable)
 	void ServerHandleMoveCommand(const FVector& CommandLocation);
-	UFUNCTION(Server,Reliable)
+
+	UFUNCTION(Server, Reliable)
 	void ServerHandleAttackCommand(const FVector& CommandLocation);
-	UFUNCTION(Server,Reliable)
+
+	UFUNCTION(Server, Reliable)
 	void ServerHandleHoldCommand();
-	UFUNCTION(Server,Reliable)
+
+	UFUNCTION(Server, Reliable)
 	void ServerHandleSingleSelect(const FVector& CommandLocation);
-	UFUNCTION(Server,Reliable)
+
+	UFUNCTION(Server, Reliable)
 	void ServerHandleMultipleSelect(const FVector& StartLocation, const FVector& EndLocation);
-	
+
+	UFUNCTION(Server, Reliable)
+	void ServerHandleBuildingSelect(ATWBaseBuilding* TargetBuilding);
+
 private:
 	void HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
-	
+
 #pragma region 병력 스폰 대기열
+protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestSpawnTroop;
+	TObjectPtr<UInputAction> IA_TestSpawnTroop;
 
 	UFUNCTION()
 	void HandleTestSpawnTroop(const FInputActionValue& Value);
@@ -99,20 +128,22 @@ private:
 	void ServerTestSpawnTroop();
 #pragma endregion
 
-#pragma region 인구 수 대기열	
+#pragma region 인구 수 대기열
+protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestIncreasePopulation;
-	
+	TObjectPtr<UInputAction> IA_TestIncreasePopulation;
+
 	UFUNCTION()
 	void HandleTestIncreasePopulation(const FInputActionValue& Value);
 
 	UFUNCTION(Server, Reliable)
 	void ServerTestIncreasePopulation();
 #pragma endregion
-	
+
 #pragma region 넥서스 데미지
+protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestDamageBlockingBuilding;
+	TObjectPtr<UInputAction> IA_TestDamageBlockingBuilding;
 
 	UFUNCTION()
 	void HandleTestDamageBlockingBuilding(const FInputActionValue& Value);
@@ -122,41 +153,132 @@ private:
 #pragma endregion
 
 #pragma region 건설
-	
 protected:
-	UFUNCTION(Server,Reliable, Category = "Build")
+	UFUNCTION(Server, Reliable, Category = "Build")
 	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn);
-	
+
 public:
-	
 	UFUNCTION(BlueprintCallable, Category = "Build")
 	void ToggleBuildMode();
+
 	UFUNCTION(BlueprintCallable, Category = "Build")
 	void RequestBuild();
 
 	void EndBuildMode();
-	
+
 private:
 	uint8 bIsBuildMode : 1;
-	FIntPoint CurrentAnchor;
-	
+	FIntPoint CurrentAnchor = FIntPoint::ZeroValue;
+
 	UPROPERTY()
-	TObjectPtr<AGhostBuilding> CurrentGhost;
-	
+	TObjectPtr<AGhostBuilding> CurrentGhost = nullptr;
+
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<AGhostBuilding> BuildClass;
+
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
-	
 #pragma endregion
-	
+
+#pragma region UI
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UTWHUDRootWidget> HUDRootWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TObjectPtr<UDataTable> CommandMetaTable = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TObjectPtr<UDataTable> SelectionPresentationTable = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	bool bUseUIDebugFallback = false;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	FName DefaultSelectedUnitId = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	FName DefaultSelectedBuildingId = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	FName DefaultMultiSelectedUnitId = NAME_None;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTWPlayerUIBridge> PlayerUIBridge = nullptr;
+
+private:
+	void InitializeUIBridge();
+	void RefreshUIBridge();
+
+	void ClearLocalSelectionCache();
+	void RebuildLocalSelectionSummary(const TArray<FName>& InUnitIds);
+	void BuildSelectionPayloadFromEntities(
+		const TArray<FMassEntityHandle>& InSelectedEntities,
+		TArray<FName>& OutUnitIds,
+		float& OutPrimaryHealth,
+		bool& bOutHasPrimaryHealth);
+
+	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
+
+	UFUNCTION(Client, Reliable)
+	void ClientApplyUnitSelection(const TArray<FName>& InUnitIds, float InPrimaryHealth, bool bInHasPrimaryHealth);
+
+	UFUNCTION(Client, Reliable)
+	void ClientApplyBuildingSelection(ATWBaseBuilding* InBuilding);
+
+	UFUNCTION(Client, Reliable)
+	void ClientClearSelection();
+
+	UFUNCTION()
+	void HandleUICommandRequested(FName CommandId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerHandleUICommandRequested(FName CommandId);
+
+	bool TryInvokeBuildingProduceById(ATWBaseBuilding* TargetBuilding, FName UnitId) const;
+	bool TryInvokeBuildingProduceFallback(ATWBaseBuilding* TargetBuilding) const;
+#pragma endregion
+
+public:
+	int32 GetLocalSelectedUnitCount() const { return LocalSelectedUnitCount; }
+	FName GetLocalPrimarySelectedUnitId() const { return LocalPrimarySelectedUnitId; }
+	const TArray<FSelectionSummaryItemViewModel>& GetLocalSelectionSummaryItems() const { return LocalSelectionSummaryItems; }
+	bool HasLocalPrimarySelectedUnitStatus() const { return bHasLocalPrimarySelectedUnitStatus; }
+	const FTWUnitStatus& GetLocalPrimarySelectedUnitStatus() const { return LocalPrimarySelectedUnitStatus; }
+	ATWBaseBuilding* GetSelectedBuilding() const { return SelectedBuilding; }
+
+	FName ResolveBuildingSelectionId(const ATWBaseBuilding* InBuilding) const;
+	void NotifyResourceStateChanged();
+
+	UFUNCTION(Client, Reliable)
+	void ClientForceRefreshSelectionBridge();
+
 private:
 	void ChangeCurrentCommandType(ETWCommand CommandType);
+
 private:
-	ETWCommand CurrentCommandType;
+	ETWCommand CurrentCommandType = ETWCommand::None;
+
+	UPROPERTY(Transient)
 	TArray<FMassEntityHandle> SelectedEntities;
-	FVector ClickStartLocation;
-	
-	
-	
+
+	UPROPERTY(Transient)
+	TObjectPtr<ATWBaseBuilding> SelectedBuilding = nullptr;
+
+	UPROPERTY(Transient)
+	int32 LocalSelectedUnitCount = 0;
+
+	UPROPERTY(Transient)
+	FName LocalPrimarySelectedUnitId = NAME_None;
+
+	UPROPERTY(Transient)
+	FTWUnitStatus LocalPrimarySelectedUnitStatus;
+
+	UPROPERTY(Transient)
+	bool bHasLocalPrimarySelectedUnitStatus = false;
+
+	UPROPERTY(Transient)
+	TArray<FSelectionSummaryItemViewModel> LocalSelectionSummaryItems;
+
+	FVector ClickStartLocation = FVector::ZeroVector;
 };

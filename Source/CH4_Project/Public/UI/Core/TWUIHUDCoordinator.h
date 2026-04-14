@@ -8,7 +8,7 @@
 class UDataTable;
 class UTWHUDRootWidget;
 
-
+DECLARE_MULTICAST_DELEGATE_OneParam(FTWOnCommandRequested, FName);
 
 UCLASS()
 class CH4_PROJECT_API UTWUIHUDCoordinator : public UObject
@@ -21,7 +21,8 @@ public:
 		UObject* InSelectionProvider,
 		UObject* InResourceProvider,
 		UDataTable* InCommandMetaTable,
-		UDataTable* InSelectionPresentationTable);
+		UDataTable* InSelectionPresentationTable
+	);
 
 	void Shutdown();
 
@@ -53,13 +54,22 @@ public:
 
 	const FUICommandMetaRow* FindCommandMetaRow(const FName& InCommandId) const;
 
+	FORCEINLINE FTWOnCommandRequested& GetOnCommandRequestedDelegate()
+	{
+		return OnCommandRequested;
+	}
+
 protected:
 	void BindProviderDelegates();
 	void UnbindProviderDelegates();
 
+	void BindHUDDelegates();
+	void UnbindHUDDelegates();
+
 	void HandleSelectionChanged();
 	void HandleResourceChanged();
 	void HandleCommandContextChanged();
+	void HandleHUDCommandClicked(FName InCommandId);
 
 	FTopBarViewModel BuildTopBarViewModel() const;
 	FSelectionViewModel BuildSelectionViewModel() const;
@@ -67,7 +77,6 @@ protected:
 	FCommandSlotViewModel BuildCommandSlotViewModel(const FName& CommandId, int32 FallbackSlotIndex) const;
 	TArray<FName> BuildCommonCommandIds() const;
 	FString FormatGameTime(int32 InElapsedSeconds) const;
-	
 
 	const FUISelectionPresentationRow* FindSelectionPresentationRow(const FName& InSelectionId) const;
 	void HydrateSummaryItemFromPresentation(FSelectionSummaryItemViewModel& InOutItem) const;
@@ -96,5 +105,7 @@ protected:
 
 	UPROPERTY()
 	TArray<FCommandSlotViewModel> LastBuiltCommandViewModels;
-	
+
+private:
+	FTWOnCommandRequested OnCommandRequested;
 };

@@ -17,15 +17,18 @@ public:
 	void SetTopBarData(const FTopBarViewModel& InData);
 
 protected:
+	FString ResolvePopulationDisplayText(const FTopBarViewModel& InData) const;
+
+protected:
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextWood;
+	TObjectPtr<UTextBlock> TextWood = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextOre;
+	TObjectPtr<UTextBlock> TextOre = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextPopulation;
+	TObjectPtr<UTextBlock> TextPopulation = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextGameTime;
+	TObjectPtr<UTextBlock> TextGameTime = nullptr;
 };

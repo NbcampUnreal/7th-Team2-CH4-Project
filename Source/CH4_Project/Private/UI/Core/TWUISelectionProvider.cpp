@@ -286,3 +286,34 @@ void UTWUISelectionProvider::RefreshFromSourceIfNeeded() const
 		// TODO: 실제 SelectionSystem 연동은 다음 단계에서 구현
 	}
 }
+
+void UTWUISelectionProvider::ClearRuntimeCommandData()
+{
+	RuntimeCommandQueueCounts.Empty();
+}
+
+void UTWUISelectionProvider::SetRuntimeCommandQueueCount(FName CommandId, int32 QueueCount)
+{
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	if (QueueCount <= 0)
+	{
+		RuntimeCommandQueueCounts.Remove(CommandId);
+		return;
+	}
+
+	RuntimeCommandQueueCounts.Add(CommandId, QueueCount);
+}
+
+int32 UTWUISelectionProvider::GetRuntimeCommandQueueCount(FName CommandId) const
+{
+	if (const int32* Found = RuntimeCommandQueueCounts.Find(CommandId))
+	{
+		return *Found;
+	}
+
+	return 0;
+}

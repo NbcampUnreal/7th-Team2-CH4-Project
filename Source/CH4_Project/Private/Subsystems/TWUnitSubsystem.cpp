@@ -1,8 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Subsystems/TWUnitSubsystem.h"
-
+#include "Core/TWPlayerUnitContainer.h"
 #include "EngineUtils.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
@@ -13,6 +12,7 @@
 #include "MassSpawner.h"
 #include "Core/TWGameState.h"
 #include "Core/TWPlayerState.h"
+#include "Core/TWPlayerController.h" 
 #include "Data/TWUnitTableRowBase.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
@@ -22,31 +22,40 @@
 
 UTWUnitSubsystem::UTWUnitSubsystem()
 {
-
 }
 
 void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+
 	FString Path = TEXT("/Game/CH4_Project/Datas/Tables/DT_UnitTableRowBase.DT_UnitTableRowBase");
 	UnitTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *Path));
+
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (IsValid(EntitySubsystem))
 	{
 		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 		FindNearestEntityQuery.Initialize(EntityManager.AsShared());
 		FindNearestEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+		FindNearestEntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly); 
 	}
+
 	TArray<FTWUnitTableRowBase*> UnitTableRowBases;
 	if (UnitTable)
 	{
 		UnitTable->GetAllRows<FTWUnitTableRowBase>(TEXT("UnitSubsystem::OnWorldBeginPlay"), UnitTableRowBases);
 		for (FTWUnitTableRowBase* UnitTableRowBase : UnitTableRowBases)
 		{
+			if (!UnitTableRowBase)
+			{
+				continue;
+			}
+
 			if (UnitTableRowBase->MassEntityConfigAsset)
 			{
 				UnitTableRowBase->MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
 			}
+
 			CachedUnitTableRows.Add(UnitTableRowBase->UnitID, UnitTableRowBase);
 		}
 	}
@@ -55,9 +64,14 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 void UTWUnitSubsystem::PostInitialize()
 {
 	Super::PostInitialize();
+
 	const UWorld* World = GetWorld();
 	UMassReplicationSubsystem* ReplicationSubsystem = UWorld::GetSubsystem<UMassReplicationSubsystem>(World);
-	if (!ReplicationSubsystem) return;
+	if (!ReplicationSubsystem)
+	{
+		return;
+	}
+
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
 	ReplicationSubsystem->RegisterBubbleInfoClass(ATWStatusMassClientBubbleInfo::StaticClass());
@@ -73,22 +87,30 @@ void UTWUnitSubsystem::Deinitialize()
 void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
 	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
 	check(GameState);
+
 	UnitContainers.Add(PlayerSlot, NewObject<UTWPlayerUnitContainer>(this));
 	UnitContainers[PlayerSlot]->Init(PlayerSlot);
 }
 
 #ifdef WITH_SERVER_CODE
 
-//TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
-//현재는 단순히 월드에 존재하는 모든 엔티티를 조회함.
-bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle, float MaxDistance)
+// TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
+bool UTWUnitSubsystem::FindNearestEntity(
+	const FVector& Location,
+	FMassEntityHandle& OutEntityHandle,
+	int32 OwnerPlayerSlot,
+	float MaxDistance)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
-	if (!EntitySubsystem) return false;
+	if (!EntitySubsystem)
+	{
+		return false;
+	}
 
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 
@@ -98,24 +120,34 @@ bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHan
 	float MinSquaredDistance = FMath::Square(MaxDistance);
 	FMassEntityHandle NearestEntity;
 
-	TArray<FMassEntityHandle> EntityHandles;
 	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
 	{
+		TArray<FMassEntityHandle> EntityHandles;
 		FMassArchetypeEntityCollection Collection(Archetype);
 		Collection.ExportEntityHandles(EntityHandles);
 
 		for (const FMassEntityHandle& Entity : EntityHandles)
 		{
-			if (const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
+			const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity);
+			const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+			if (!TransformFrag || !UnitFrag)
 			{
-				const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
-				const float DistSq = FVector::DistSquared(Location, EntityPos);
+				continue;
+			}
 
-				if (DistSq < MinSquaredDistance)
-				{
-					MinSquaredDistance = DistSq;
-					NearestEntity = Entity;
-				}
+			// 내 유닛만 선택 대상으로 제한
+			if (UnitFrag->GetOwner() != OwnerPlayerSlot)
+			{
+				continue;
+			}
+
+			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+			const float DistSq = FVector::DistSquared(Location, EntityPos);
+
+			if (DistSq < MinSquaredDistance)
+			{
+				MinSquaredDistance = DistSq;
+				NearestEntity = Entity;
 			}
 		}
 	}
@@ -129,126 +161,157 @@ bool UTWUnitSubsystem::FindNearestEntity(const FVector& Location, FMassEntityHan
 	return false;
 }
 
-bool UTWUnitSubsystem::GetEntitiesInRectangle(const FVector& StartLocation, const FVector& EndLocation,
-                                              TArray<FMassEntityHandle>& OutEntityHandles)
+bool UTWUnitSubsystem::GetEntitiesInRectangle(
+	const FVector& StartLocation,
+	const FVector& EndLocation,
+	TArray<FMassEntityHandle>& OutEntityHandles,
+	int32 OwnerPlayerSlot)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
-	if (!EntitySubsystem) return false;
+	if (!EntitySubsystem)
+	{
+		return false;
+	}
 
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 
 	TArray<FMassArchetypeHandle> MatchingArchetypes;
 	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
 
-	FMassEntityHandle NearestEntity;
-
-	TArray<FMassEntityHandle> EntityHandles;
 	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
 	{
+		TArray<FMassEntityHandle> EntityHandles;
 		FMassArchetypeEntityCollection Collection(Archetype);
 		Collection.ExportEntityHandles(EntityHandles);
 
 		for (const FMassEntityHandle& Entity : EntityHandles)
 		{
-			if (const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
+			const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity);
+			const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+			if (!TransformFrag || !UnitFrag)
 			{
-				const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
-				//둔각이면 ok 예각이면 no
-				double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
-				if (DotResult < 0)
-				{
-					OutEntityHandles.Add(Entity);
-				}
+				continue;
+			}
+			
+			if (UnitFrag->GetOwner() != OwnerPlayerSlot)
+			{
+				continue;
+			}
+
+			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+
+			const double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
+			if (DotResult < 0.0)
+			{
+				OutEntityHandles.Add(Entity);
 			}
 		}
 	}
 
-	if (OutEntityHandles.IsEmpty())
-	{
-		return false;
-	}
-	return true;
+	return !OutEntityHandles.IsEmpty();
 }
 
-
-void UTWUnitSubsystem::SpawnUnit(const FVector& Location, const FTWUnitTableRowBase& UnitTableRowBase,
-                                 ATWPlayerController* PlayerController)
+void UTWUnitSubsystem::SpawnUnit(
+	const FVector& Location,
+	const FTWUnitTableRowBase& UnitTableRowBase,
+	ATWPlayerController* PlayerController)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
 	UWorld* World = GetWorld();
-	if (!IsValid(World) || !UnitTableRowBase.MassEntityConfigAsset) return;
+	if (!IsValid(World) || !UnitTableRowBase.MassEntityConfigAsset)
+	{
+		return;
+	}
 
 	UMassEntitySubsystem* MassSubsystem = World->GetSubsystem<UMassEntitySubsystem>();
-	if (!MassSubsystem) return;
+	if (!MassSubsystem)
+	{
+		return;
+	}
 
 	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
 
-	const FMassEntityTemplate& EntityTemplate = UnitTableRowBase.MassEntityConfigAsset->
-	                                                             GetOrCreateEntityTemplate(*GetWorld());
+	const FMassEntityTemplate& EntityTemplate =
+		UnitTableRowBase.MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
 
 	TWeakObjectPtr<ATWPlayerController> WeakPlayerController = PlayerController;
 	TWeakObjectPtr<ThisClass> WeakThis = this;
+
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
 		[Location, EntityTemplate, WeakPlayerController, WeakThis, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
 		{
-			if (false == WeakPlayerController.IsValid())
+			if (!WeakPlayerController.IsValid())
 			{
 				return;
 			}
-			if (false == WeakThis.IsValid())
+
+			if (!WeakThis.IsValid())
 			{
 				return;
 			}
+
 			UWorld* World = InOutEntityManager.GetWorld();
+			if (!World)
+			{
+				return;
+			}
+
 			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
+			if (!MassSpawnerSubsystem)
+			{
+				return;
+			}
 
 			ATWPlayerState* PlayerState = WeakPlayerController->GetPlayerState<ATWPlayerState>();
-			if (false == IsValid(PlayerState))
+			if (!IsValid(PlayerState))
 			{
 				return;
 			}
+
 			TArray<FMassEntityHandle> SpawnedEntities;
 			MassSpawnerSubsystem->SpawnEntities(EntityTemplate, 1, SpawnedEntities);
 
-			if (SpawnedEntities.Num() > 0)
+			if (SpawnedEntities.Num() <= 0)
 			{
-				FMassEntityHandle SpawnedUnit = SpawnedEntities[0];
-
-
-				if (FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
-				{
-					UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
-				}
-
-				if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(
-					SpawnedUnit))
-				{
-					TransformFragment->GetMutableTransform().SetLocation(Location);
-				}
-				if (FMassMoveTargetFragment* MoveTargetFragment =
-					InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
-				{
-					MoveTargetFragment->Center = Location;
-				}
-				
-				//TODO Stat HardCoded
-				//TODO 유닛 아이디 fragment에 주입
-				//TODO 업그레이드 현황에 따른 스탯 설정
-				if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(
-					SpawnedUnit))
-				{
-					StatusFragment->SetStatus(UnitTableRowBase.BaseStatus);
-				}
-
-				//TODO 유닛 PlayerState에 추가
-				// PlayerState->AddUnit(SpawnedUnit);
-				WeakThis->AddUnit(WeakPlayerController->GetPlayerState<ATWPlayerState>()->PlayerSlot, SpawnedUnit);
-				
-				PlayerState->RemovePendingPopulation(UnitTableRowBase.Population);
+				return;
 			}
+
+			FMassEntityHandle SpawnedUnit = SpawnedEntities[0];
+
+			if (FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
+			{
+				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
+				UnitFragment->SetOwner(PlayerState->PlayerSlot); 
+			}
+
+			if (FTransformFragment* TransformFragment =
+				InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+			{
+				TransformFragment->GetMutableTransform().SetLocation(Location);
+			}
+
+			if (FMassMoveTargetFragment* MoveTargetFragment =
+				InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
+			{
+				MoveTargetFragment->Center = Location;
+			}
+
+			// TODO Stat HardCoded
+			// TODO 유닛 아이디 fragment에 주입
+			// TODO 업그레이드 현황에 따른 스탯 설정
+			if (FTWStatusFragment* StatusFragment =
+				InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+			{
+				StatusFragment->SetStatus(UnitTableRowBase.BaseStatus);
+			}
+
+			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
+
+			// PendingPopulation 차감은 호출부(생산 완료 처리)에서만 하도록 유지
+			// PlayerState->RemovePendingPopulation(UnitTableRowBase.Population);
 		});
 }
 
@@ -265,17 +328,40 @@ int32 UTWUnitSubsystem::GetCurrentPopulation(int32 PlayerSlot) const
 void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	if (!Unit.IsValid())
+	{
+		return;
+	}
+
+	// [MOD] 컨테이너 누락 방어
+	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
+	{
+		return;
+	}
+
 	UnitContainers[PlayerSlot]->AddUnit(Unit);
 }
 
 void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
+	{
+		return;
+	}
+
 	UnitContainers[PlayerSlot]->RemoveUnit(Idx);
 }
 
 FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
 {
-	return CachedUnitTableRows[UnitID];
+	if (FTWUnitTableRowBase* const* FoundRow = CachedUnitTableRows.Find(UnitID))
+	{
+		return *FoundRow;
+	}
+
+	return nullptr;
 }
 #endif

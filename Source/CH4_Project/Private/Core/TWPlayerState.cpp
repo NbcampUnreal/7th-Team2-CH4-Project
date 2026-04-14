@@ -1,57 +1,38 @@
 ﻿#include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
-#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
-#include "MassReplicationFragments.h"
-#include "MassReplicationSubsystem.h"
 #include "TimerManager.h"
-#include "Mass/Fragments/TWUnitFragment.h"
 #include "Subsystems/TWUnitSubsystem.h"
+#include "Core/TWPlayerController.h"
 
 ATWPlayerState::ATWPlayerState()
 {
 	bReplicates = true;
 
 	PlayerSlot = -1;
+
 	Resources.SetNum(static_cast<int32>(EResourceType::Count));
 	for (int32& Resource : Resources)
 	{
 		Resource = 0;
 	}
+
 	PendingPopulation = 0;
 	MaxPopulation = 200;
 	PopulationLimit = 1;
 	CurrentPopulation = 0;
 }
 
-
-void ATWPlayerState::SetPlayerSlot(const int32 NewSlot)
+void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
 {
-	PlayerSlot = NewSlot;
+	PlayerSlot = InPlayerSlot;
+
 	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
 	if (IsValid(UnitSubsystem))
 	{
 		UnitSubsystem->AddPlayer(PlayerSlot);
-	}
-	if (HasAuthority())
-	{
-		PlayerSlot = NewSlot;
-		OnRep_PlayerSlot();
-	}
-}
-
-void ATWPlayerState::OnRep_PlayerSlot()
-{
-	APawn* MyPawn = GetPawn();
-	if (!MyPawn) {
-		return;
-	}
-	
-	if (ITWPlayerSlotInterface* Interface = Cast<ITWPlayerSlotInterface>(MyPawn))
-	{
-		Interface->UpdatePlayerSlot(PlayerSlot);
 	}
 }
 
@@ -62,31 +43,47 @@ void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 A
 		return;
 	}
 
-	if (Amount <= 0)
+	if (Amount <= 0 || ResourceType == EResourceType::Count)
 	{
 		return;
 	}
-	if (ResourceType == EResourceType::Count)
-	{
-		return;
-	}
-	Resources[static_cast<int32>(ResourceType)] += Amount;
 
-	UE_LOG(LogTemp, Warning, TEXT("Player %d | Wood: %d | Ore: %d"),
-	       PlayerSlot,
-	       Resources[(int32)EResourceType::Wood],
-	       Resources[(int32)EResourceType::Ore]);
+	const int32 Index = static_cast<int32>(ResourceType);
+	if (!Resources.IsValidIndex(Index))
+	{
+		return;
+	}
+
+	Resources[Index] += Amount;
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("Player %d | Wood: %d | Ore: %d"),
+		PlayerSlot,
+		GetResourceAmount(EResourceType::Wood),
+		GetResourceAmount(EResourceType::Ore)
+	);
+
+	NotifyUIResourceStateChanged();
 }
 
 int8 ATWPlayerState::CanAffordCost(const TMap<EResourceType, int32>& Cost) const
 {
 	for (const TPair<EResourceType, int32>& Pair : Cost)
 	{
-		if (Resources[static_cast<int32>(Pair.Key)] < Pair.Value)
+		const int32 Index = static_cast<int32>(Pair.Key);
+		if (!Resources.IsValidIndex(Index))
+		{
+			return 0;
+		}
+
+		if (Resources[Index] < Pair.Value)
 		{
 			return 0;
 		}
 	}
+
 	return 1;
 }
 
@@ -101,10 +98,20 @@ void ATWPlayerState::SpendCost(const TMap<EResourceType, int32>& Cost)
 	{
 		return;
 	}
+
 	for (const TPair<EResourceType, int32>& Pair : Cost)
 	{
-		Resources[static_cast<int32>(Pair.Key)] -= Pair.Value;
+		const int32 Index = static_cast<int32>(Pair.Key);
+		if (!Resources.IsValidIndex(Index))
+		{
+			continue;
+		}
+
+		Resources[Index] -= Pair.Value;
+		Resources[Index] = FMath::Max(0, Resources[Index]);
 	}
+
+	NotifyUIResourceStateChanged();
 }
 
 int8 ATWPlayerState::CanQueueTroop(const int32 RequiredPopulation) const
@@ -114,12 +121,7 @@ int8 ATWPlayerState::CanQueueTroop(const int32 RequiredPopulation) const
 		return 0;
 	}
 
-	if ((CurrentPopulation + PendingPopulation + RequiredPopulation) <= PopulationLimit)
-	{
-		return 1;
-	}
-
-	return 0;
+	return ((CurrentPopulation + PendingPopulation + RequiredPopulation) <= PopulationLimit) ? 1 : 0;
 }
 
 void ATWPlayerState::SetCurrentPopulationFromContainer(const int32 InAmount)
@@ -141,47 +143,37 @@ void ATWPlayerState::SetCurrentPopulationFromContainer(const int32 InAmount)
 		PopulationLimit,
 		MaxPopulation
 	);
+
+	NotifyUIResourceStateChanged();
 }
 
 void ATWPlayerState::AddPendingPopulation(const int32 InAmount)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
+	if (!HasAuthority() || InAmount <= 0)
 	{
 		return;
 	}
 
 	PendingPopulation += InAmount;
+	NotifyUIResourceStateChanged();
 }
 
 void ATWPlayerState::RemovePendingPopulation(const int32 InAmount)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
+	if (!HasAuthority() || InAmount <= 0)
 	{
 		return;
 	}
 
 	PendingPopulation -= InAmount;
 	PendingPopulation = FMath::Max(0, PendingPopulation);
+
+	NotifyUIResourceStateChanged();
 }
 
 void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	if (InAmount <= 0)
+	if (!HasAuthority() || InAmount <= 0)
 	{
 		return;
 	}
@@ -198,6 +190,8 @@ void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
 		PopulationLimit,
 		MaxPopulation
 	);
+
+	NotifyUIResourceStateChanged();
 }
 
 void ATWPlayerState::RefreshTroopUpkeepTimer()
@@ -224,7 +218,7 @@ void ATWPlayerState::RefreshTroopUpkeepTimer()
 				continue;
 			}
 
-			TroopBuilding->SetQueuePausedByUpkeep(0);
+			TroopBuilding->SetQueuePausedByUpkeep(false);
 		}
 
 		return;
@@ -251,7 +245,6 @@ void ATWPlayerState::HandleTroopUpkeep()
 		return;
 	}
 
-	const TMap<EResourceType, int32>& TotalCost = GetTotalTroopUpkeepCost();
 	const int8 bPaidUpkeep = TrySpendTroopUpkeep();
 
 	for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
@@ -267,7 +260,7 @@ void ATWPlayerState::HandleTroopUpkeep()
 			continue;
 		}
 
-		TroopBuilding->SetQueuePausedByUpkeep(bPaidUpkeep == 1 ? 0 : 1);
+		TroopBuilding->SetQueuePausedByUpkeep(bPaidUpkeep == 0);
 	}
 
 	if (bPaidUpkeep == 1)
@@ -313,4 +306,38 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
 	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
 	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
+}
+
+void ATWPlayerState::NotifyUIResourceStateChanged()
+{
+	AController* OwningController = GetOwningController();
+	if (!OwningController)
+	{
+		return;
+	}
+
+	if (ATWPlayerController* TWPC = Cast<ATWPlayerController>(OwningController))
+	{
+		TWPC->NotifyResourceStateChanged();
+	}
+}
+
+void ATWPlayerState::OnRep_Resources()
+{
+	NotifyUIResourceStateChanged();
+}
+
+void ATWPlayerState::OnRep_PendingPopulation()
+{
+	NotifyUIResourceStateChanged();
+}
+
+void ATWPlayerState::OnRep_PopulationLimit()
+{
+	NotifyUIResourceStateChanged();
+}
+
+void ATWPlayerState::OnRep_CurrentPopulation()
+{
+	NotifyUIResourceStateChanged();
 }

@@ -31,6 +31,30 @@ enum class ENotificationType : uint8
 	Error
 };
 
+UENUM(BlueprintType)
+enum class ETWCommandType : uint8
+{
+	None,
+	Move,
+	Attack,
+	Hold,
+	OpenContext,
+	Back,
+	ProduceUnit,
+	BuildStructure,
+	Research
+};
+
+UENUM(BlueprintType)
+enum class ETWCommandRoute : uint8
+{
+	None,
+	System,
+	Gameplay,
+	Context,
+	Building
+};
+
 USTRUCT(BlueprintType)
 struct CH4_PROJECT_API FTopBarViewModel
 {
@@ -44,6 +68,9 @@ struct CH4_PROJECT_API FTopBarViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int32 Population = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString PopulationText = TEXT("0 / 0");
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString GameTimeText = TEXT("00:00");
@@ -68,6 +95,48 @@ struct CH4_PROJECT_API FSelectionSummaryItemViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TSoftObjectPtr<UTexture2D> Icon;
+};
+
+USTRUCT(BlueprintType)
+struct CH4_PROJECT_API FProductionQueueItemViewModel
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FName PayloadId = NAME_None;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString DisplayName = TEXT("");
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TSoftObjectPtr<UTexture2D> Icon;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bIsActive = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 StackCount = 1;
+};
+
+USTRUCT(BlueprintType)
+struct CH4_PROJECT_API FBuildingProductionViewModel
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bVisible = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString Title = TEXT("생산 중");
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ProgressRatio = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FString ProgressText = TEXT("");
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FProductionQueueItemViewModel> QueueItems;
 };
 
 USTRUCT(BlueprintType)
@@ -122,6 +191,12 @@ struct CH4_PROJECT_API FSelectionViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TArray<FSelectionSummaryItemViewModel> SummaryItems;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bShowProductionPanel = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FBuildingProductionViewModel Production;
 };
 
 USTRUCT(BlueprintType)
@@ -197,6 +272,15 @@ struct CH4_PROJECT_API FUICommandMetaRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName CommandId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	ETWCommandType CommandType = ETWCommandType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	ETWCommandRoute CommandRoute = ETWCommandRoute::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName PayloadId = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText DisplayName;
