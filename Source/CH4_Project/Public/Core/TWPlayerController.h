@@ -23,6 +23,8 @@ class ATWTroopSpawnBuilding;
 class ATWResourceBuilding;
 class ATWNexusBuilding;
 class AGhostBuilding;
+class ATWBaseBuilding;
+class UTWBuildComponent;
 class UTWPlayerUIBridge;
 class UTWHUDRootWidget;
 
@@ -73,8 +75,10 @@ protected:
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> BuildCommandAction;
-
+	TObjectPtr<UInputAction> SelectResourceCommandAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectPopulationCommandAction;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScreenEdgeEnterMargin = 10.0f;
 
@@ -158,31 +162,22 @@ protected:
 
 #pragma region 건설
 protected:
-	UFUNCTION(Server, Reliable, Category = "Build")
-	void Server_SpawnBuilding(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn);
-
+	void OnRequestBuildCommandAction();
+	void OnCancelBuildCommandAction();
+	void OnSelectWoodBuildingCommandAction();
+	void OnSelectStoneBuildingCommandAction();
+	void OnSelectPopulationBuildingCommandAction();
+	void OnSelectTroopBuildingCommandAction();
+	void OnSelectUpgradeBuildingCommandAction();
+	void OnSelectBlockingBuildingCommandAction();
+	
 public:
-	UFUNCTION(BlueprintCallable, Category = "Build")
-	void ToggleBuildMode();
-
-	UFUNCTION(BlueprintCallable, Category = "Build")
-	void RequestBuild();
-
-	void EndBuildMode();
-
-private:
-	uint8 bIsBuildMode : 1;
-	FIntPoint CurrentAnchor = FIntPoint::ZeroValue;
-
-	UPROPERTY()
-	TObjectPtr<AGhostBuilding> CurrentGhost = nullptr;
-
-	UPROPERTY(EditAnywhere, Category = "Build|Classes")
-	TSubclassOf<AGhostBuilding> BuildClass;
-
-	UPROPERTY(EditAnywhere, Category = "Build|Classes")
-	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
-#pragma endregion
+	UFUNCTION(BlueprintCallable, Category = "Component")
+	UTWBuildComponent* GetBuildComponent() const { return BuildComponent; }
+protected:
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UTWBuildComponent> BuildComponent;
 	
 #pragma region 업그레이드
 	UPROPERTY(EditDefaultsOnly, Category="Input")

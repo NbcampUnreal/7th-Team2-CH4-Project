@@ -31,6 +31,7 @@
 #include "MassReplicationSubsystem.h"
 #include "NavigationSystem.h"
 #include "Building/GhostBuilding.h"
+#include "Component/TWBuildComponent.h"
 #include "Data/TWBuildingDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -49,6 +50,9 @@ ATWPlayerController::ATWPlayerController()
 	ServerSelectedEntities.Empty();
 	ClientSelectedEntities.Empty();
 	bIsBuildMode = false;
+	SelectedEntities.Empty();
+
+	BuildComponent = CreateDefaultSubobject<UTWBuildComponent>(TEXT("BuildComponent"));
 }
 
 void ATWPlayerController::BeginPlay()
@@ -140,8 +144,9 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-	check(IsValid(BuildCommandAction));
 
+	check(IsValid(SelectResourceCommandAction));
+	check(IsValid(SelectPopulationCommandAction));
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
 	{
@@ -156,8 +161,8 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
-	EnhancedInputComponent->BindAction(BuildCommandAction, ETriggerEvent::Started, this, &ThisClass::OnBuildCommandAction);
-
+	EnhancedInputComponent->BindAction(SelectResourceCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
 	if (IA_TestSpawnTroop)
 	{
 		EnhancedInputComponent->BindAction(
@@ -202,49 +207,68 @@ void ATWPlayerController::SetupInputComponent()
 
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	FHitResult HitResult;
-	FVector ClickLocation;
-	bIsLeftMousePressed = true;
-
-	// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
-	FVector2D ScaledMousePos = FVector2D::ZeroVector;
-	if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
+	if (!BuildComponent->GetBuildMode())
 	{
-		DragStartScreenPosition = ScaledMousePos;
-	}
-	else
-	{
-		DragStartScreenPosition = LastValidMouseScreenPosition;
-	}
-	
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-	{
-		ClickLocation = HitResult.Location;
-	}
-	else
-	{
-		return;
-	}
-
-	if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
-	{
-		switch (CurrentCommandType)
+		FHitResult HitResult;
+		FVector ClickLocation;
+		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 		{
-		case ETWCommand::Move:
-			ServerHandleMoveCommand(ClickLocation);
-			break;
-		case ETWCommand::Attack:
-			ServerHandleAttackCommand(ClickLocation);
-			break;
-		default:
-			check(false);
-			break;
+			ClickLocation = HitResult.Location;
 		}
-		ChangeCurrentCommandType(ETWCommand::None);
-		return;
+		else
+		{
+			return;
+		}
+		FHitResult HitResult;
+		FVector ClickLocation;
+		bIsLeftMousePressed = true;
+
+		// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
+		FVector2D ScaledMousePos = FVector2D::ZeroVector;
+		if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
+		{
+			DragStartScreenPosition = ScaledMousePos;
+		}
+		else
+		{
+			DragStartScreenPosition = LastValidMouseScreenPosition;
+		}
+	
+		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+		{
+			ClickLocation = HitResult.Location;
+		}
+		else
+		{
+			return;
+		}
+
+		if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
+		{
+			switch (CurrentCommandType)
+			{
+			case ETWCommand::Move:
+				ServerHandleMoveCommand(ClickLocation);
+				break;
+			case ETWCommand::Attack:
+				ServerHandleAttackCommand(ClickLocation);
+				break;
+			default:
+				check(false);
+				break;
+			}
+			ChangeCurrentCommandType(ETWCommand::None);
+			return;
+		}
+		ClickStartLocation = ClickLocation;
 	}
-	ClickStartLocation = ClickLocation;
-	//RequestBuild();
+	else
+	{
+		if (BuildComponent)
+		{
+			BuildComponent->RequestBuild();
+		}
+	}
 }
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
@@ -286,19 +310,29 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 
 void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActionValue)
 {
-	// Cancle Command
-	if (CurrentCommandType != ETWCommand::None)
+	if (!BuildComponent->GetBuildMode())
 	{
-		ChangeCurrentCommandType(ETWCommand::None);
-		return;
-	}
+		// Cancle Command
+		if (CurrentCommandType != ETWCommand::None)
+		{
+			ChangeCurrentCommandType(ETWCommand::None);
+			return;
+		}
 
-	// Move Command Execute
-	FHitResult HitResult;
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+		// Move Command Execute
+		FHitResult HitResult;
+		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+		{
+			FVector ClickLocation = HitResult.Location;
+			ServerHandleMoveCommand(ClickLocation);
+		}
+	}
+	else
 	{
-		FVector ClickLocation = HitResult.Location;
-		ServerHandleMoveCommand(ClickLocation);
+		if (BuildComponent)
+		{
+			BuildComponent->EndBuildMode();
+		}
 	}
 }
 
@@ -319,7 +353,7 @@ void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActi
 
 void ATWPlayerController::OnBuildCommandAction(const FInputActionValue& InputActionValue)
 {
-	ToggleBuildMode();
+	
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
@@ -1318,97 +1352,53 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 #pragma endregion
 
 #pragma region 건설
-
-void ATWPlayerController::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FIntPoint BuildSize, TSubclassOf<ATWBaseBuilding> ClassToSpawn)
+void ATWPlayerController::OnRequestBuildCommandAction()
 {
-	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
-
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
+	if (BuildComponent)
 	{
-		return;
-	}
-
-	if (GridSub && GridSub->CanBuildArea(Anchor, BuildSize))
-	{
-		FVector SpawnPos = GridSub->GetBuildingCenterPosition(Anchor, BuildSize);
-		ATWBaseBuilding* NewBuilding = GetWorld()->SpawnActor<ATWBaseBuilding>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
-		if (!NewBuilding)
-		{
-			return;
-		}
-
-		NewBuilding->OwnerPlayerSlot = TWPS->PlayerSlot;
-
-		if (ATWGameMode* TWGM = GetWorld()->GetAuthGameMode<ATWGameMode>())
-		{
-			TWGM->TryBindBuilding(NewBuilding);
-		}
-
-		GridSub->OccupyArea(Anchor, BuildSize, NewBuilding);
+		BuildComponent->RequestBuild();
 	}
 }
 
-void ATWPlayerController::ToggleBuildMode()
+void ATWPlayerController::OnCancelBuildCommandAction()
 {
-	if (bIsBuildMode)
+	if (BuildComponent)
 	{
-		EndBuildMode();
-	}
-	else
-	{
-		if (!BuildClass || !SelectedBuildingClass)
-		{
-			UE_LOG(LogTemp, Error, TEXT("BuildingClass가 설정안됨"));
-			return;
-		}
-
-		ATWBaseBuilding* DefaultBuilding = SelectedBuildingClass->GetDefaultObject<ATWBaseBuilding>();
-
-		if (!DefaultBuilding || !DefaultBuilding->BuildingData)
-		{
-			UE_LOG(LogTemp, Error, TEXT("DA BuildingData이 없음"));
-			return;
-		}
-		bIsBuildMode = true;
-
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-		CurrentGhost = GetWorld()->SpawnActor<AGhostBuilding>(BuildClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-
-		if (CurrentGhost)
-		{
-			CurrentGhost->BuildingSize = DefaultBuilding->BuildingData->GridSize.BuildingSize;
-		}
+		BuildComponent->EndBuildMode();
 	}
 }
 
-void ATWPlayerController::RequestBuild()
+void ATWPlayerController::OnSelectWoodBuildingCommandAction()
 {
-	if (bIsBuildMode && CurrentGhost)
+	if (BuildComponent)
 	{
-		Server_SpawnBuilding(CurrentAnchor, CurrentGhost->BuildingSize, SelectedBuildingClass);
-
-		auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
-		if (GridSub)
-		{
-			GridSub->OccupyArea(CurrentAnchor, CurrentGhost->BuildingSize, nullptr);
-		}
-
-		EndBuildMode();
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::ResourceProduction);
 	}
 }
 
-void ATWPlayerController::EndBuildMode()
+void ATWPlayerController::OnSelectStoneBuildingCommandAction()
 {
-	bIsBuildMode = false;
+	
+}
 
-	if (CurrentGhost != nullptr)
+void ATWPlayerController::OnSelectPopulationBuildingCommandAction()
+{
+	if (BuildComponent)
 	{
-		CurrentGhost->Destroy();
-		CurrentGhost = nullptr;
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::PopulationProduction);
 	}
+}
+
+void ATWPlayerController::OnSelectTroopBuildingCommandAction()
+{
+}
+
+void ATWPlayerController::OnSelectUpgradeBuildingCommandAction()
+{
+}
+
+void ATWPlayerController::OnSelectBlockingBuildingCommandAction()
+{
 }
 
 void ATWPlayerController::NotifyResourceStateChanged()
@@ -1556,3 +1546,4 @@ FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommand InCommandTyp
 }
 
 #pragma endregion
+

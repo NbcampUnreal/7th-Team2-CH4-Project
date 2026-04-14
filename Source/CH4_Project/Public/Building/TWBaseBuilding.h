@@ -60,7 +60,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Building|Construction")
 	float GetRemainingBuildTime() const;
-	
+
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;
