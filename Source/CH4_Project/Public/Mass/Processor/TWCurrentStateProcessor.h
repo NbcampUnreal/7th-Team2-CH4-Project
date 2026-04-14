@@ -16,10 +16,11 @@ public:
 	UTWCurrentStateProcessor();
 	
 protected:
+	FMassEntityQuery EntityQuery;
+	
 	TStateTreeExternalDataHandle<FTWCommandTypeFragment>StateTypeHandle;
 	TStateTreeExternalDataHandle<FTWCommandDataFragment>StateDataHandle;
 	
 	virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
-	virtual void Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 };

@@ -8,6 +8,7 @@
 struct FTransformFragment;
 struct FTWStandFragment;
 struct FMassMoveTargetFragment;
+struct FMassVelocityFragment;
 
 USTRUCT()
 struct CH4_PROJECT_API FTWMassStopInstanceData
@@ -44,4 +45,6 @@ protected:
 	TStateTreeExternalDataHandle<FTransformFragment> TransformHandle;
 	TStateTreeExternalDataHandle<FMassMoveTargetFragment> MoveTargetHandle;
 	TStateTreeExternalDataHandle<FTWStandFragment> StandHandle;
+	
+	TStateTreeExternalDataHandle<FMassVelocityFragment> VelocityHandle;
 };

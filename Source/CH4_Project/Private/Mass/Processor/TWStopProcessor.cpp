@@ -7,6 +7,7 @@
 #include "MassCommonTypes.h"
 #include "MassExecutionContext.h"
 #include "MassEntityManager.h"
+#include "MassEntityQuery.h"
 #include "GameFramework/Actor.h"
 #include "MassActorSubsystem.h"
 #include "Mass/Fragments/TWTransformOffsetFragment.h"
@@ -17,7 +18,7 @@ UTWStopProcessor::UTWStopProcessor()
 {
 	ExecutionFlags = (int32)EProcessorExecutionFlags::Client;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::UpdateWorldFromMass;
-	ExecutionOrder.ExecuteBefore.Add(UE::Mass::ProcessorGroupNames::Movement);
+	ExecutionOrder.ExecuteAfter.Add(UE::Mass::ProcessorGroupNames::Avoidance);
 	RequiredTags.Add<FFWStopMovementTag>();
 	bRequiresGameThreadExecution = true;
 }
@@ -27,11 +28,14 @@ void UTWStopProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& En
 	AddRequiredTagsToQuery(EntityQuery);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassActorFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FTWTransformOffsetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FTWTransformOffsetFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddTagRequirement<FFWStopMovementTag>(EMassFragmentPresence::All);
 }
 
 void UTWStopProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+	EntityQuery.ForEachEntityChunk(Context, [this](FMassExecutionContext& Context)
+	{
 	const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
 	const TConstArrayView<FTWTransformOffsetFragment> MeshOffsetList = Context.GetFragmentView<FTWTransformOffsetFragment>();
 	const TArrayView<FMassActorFragment> ActorList = Context.GetMutableFragmentView<FMassActorFragment>();
@@ -63,4 +67,5 @@ void UTWStopProcessor::Execute(FMassEntityManager& EntityManager, FMassExecution
 				ETeleportType::TeleportPhysics);
 		}
 	}
+	});
 }

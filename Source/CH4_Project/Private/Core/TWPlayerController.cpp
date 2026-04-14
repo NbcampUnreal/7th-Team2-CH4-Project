@@ -363,18 +363,20 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 {
 	// TODO Hold
+	UE_LOG(LogTemp, Log, TEXT("[UI Hold]!!!!!!!!!!!!!!!!"));
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 	if (SelectedEntities.IsEmpty())
 	{
 		return;
 	}
-
+    // 예외 처리
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem)
 	{
 		return;
 	}
-
+    
+	// 엔티티의 실제 메모리 구조와 생명 주기를 관리해주는 IntityManager 참조
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 	TSharedRef<FMassCommandBuffer> CommandBuffer = MakeShared<FMassCommandBuffer>();
 	TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
