@@ -8,6 +8,7 @@
 class UButton;
 class UTextBlock;
 class UImage;
+class UBorder;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnRTSCommandSlotClicked, FName);
 
@@ -49,6 +50,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> IconImage = nullptr;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> ArmedBorder = nullptr;
 
 protected:
 	UPROPERTY()

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "TimerManager.h"
 #include "UObject/Object.h"
+#include "UI/Data/TWUIInputStateTypes.h"
 #include "TWPlayerUIBridge.generated.h"
 
 class ATWPlayerController;
@@ -44,10 +45,18 @@ public:
 	bool PopContext();
 
 	void ForceRefreshSelectionFromGameplayEvent();
+	void SetArmedCommandState(FName InCommandId);
+	void ClearArmedCommandState();
+	void SetDragSelectionState(bool bInVisible, const FVector2D& InStart, const FVector2D& InEnd);
+	void SetCursorScreenPosition(const FVector2D& InScreenPosition);
+	void SetCursorOverlayVisible(bool bInVisible);
+	
+	FName GetArmedCommandId() const { return ArmedCommandId; }
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnUICommandRequested, FName);
 	FOnUICommandRequested& GetOnUICommandRequestedDelegate() { return OnUICommandRequested; }
 
+	void SetEdgeScrollingActive(bool bInActive);
 protected:
 	void HandleHUDCommandRequested(FName CommandId);
 
@@ -61,6 +70,8 @@ protected:
 
 	FString NormalizeHotkeyLabelFromKey(const FKey& InKey) const;
 	int32 ResolveBuildingQueueCount(FName CommandId) const;
+	void RefreshInputState();
+	void RefreshDragSelectionState();
 
 protected:
 	UPROPERTY()
@@ -116,4 +127,16 @@ protected:
 	float PostCommandSelectionRefreshRemaining = 0.f;
 
 	FOnUICommandRequested OnUICommandRequested;
+	
+	UPROPERTY()
+	FName ArmedCommandId = NAME_None;
+
+	UPROPERTY()
+	FVector2D CursorScreenPosition = FVector2D::ZeroVector;
+
+	UPROPERTY()
+	FUIDragSelectionStateViewModel CachedDragSelectionState;
+	
+	UPROPERTY()
+	bool bEdgeScrollingActive = false;
 };

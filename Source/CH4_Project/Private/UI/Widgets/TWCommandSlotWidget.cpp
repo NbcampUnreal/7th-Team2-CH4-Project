@@ -1,5 +1,6 @@
 #include "UI/Widgets/TWCommandSlotWidget.h"
 
+#include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
@@ -20,6 +21,14 @@ void UTWCommandSlotWidget::NativeConstruct()
 void UTWCommandSlotWidget::SetCommandData(const FCommandSlotViewModel& InViewModel)
 {
 	CachedViewModel = InViewModel;
+	if (ArmedBorder)
+	{
+		ArmedBorder->SetVisibility(
+			InViewModel.bArmed
+				? ESlateVisibility::HitTestInvisible
+				: ESlateVisibility::Collapsed
+		);
+	}
 	RefreshVisual();
 }
 

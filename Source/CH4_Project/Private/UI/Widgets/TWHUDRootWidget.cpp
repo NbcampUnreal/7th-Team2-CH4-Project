@@ -6,6 +6,8 @@
 #include "UI/Widgets/TWNotificationPanelWidget.h"
 #include "UI/Widgets/TWSelectionPanelWidget.h"
 #include "UI/Widgets/TWTopBarWidget.h"
+#include "UI/Widgets/TWCursorOverlayWidget.h"
+#include "UI/Widgets/TWDragSelectionOverlayWidget.h"
 
 void UTWHUDRootWidget::NativeConstruct()
 {
@@ -77,4 +79,36 @@ void UTWHUDRootWidget::HandleCommandPanelCommandClicked(FName InCommandId)
 	}
 
 	OnHUDCommandClicked.Broadcast(InCommandId);
+}
+
+void UTWHUDRootWidget::SetInputStateData(const FUICommandInputStateViewModel& InData)
+{
+	if (CursorOverlayWidget)
+	{
+		CursorOverlayWidget->SetInputState(InData);
+	}
+}
+
+void UTWHUDRootWidget::SetDragSelectionStateData(const FUIDragSelectionStateViewModel& InData)
+{
+	if (DragSelectionOverlayWidget)
+	{
+		DragSelectionOverlayWidget->SetDragState(InData);
+	}
+}
+
+void UTWHUDRootWidget::SetCursorScreenPosition(const FVector2D& InScreenPosition)
+{
+	if (CursorOverlayWidget)
+	{
+		CursorOverlayWidget->SetCursorScreenPosition(InScreenPosition);
+	}
+}
+
+void UTWHUDRootWidget::SetCursorOverlayVisible(bool bInVisible)
+{
+	if (CursorOverlayWidget)
+	{
+		CursorOverlayWidget->SetCursorVisible(bInVisible);
+	}
 }

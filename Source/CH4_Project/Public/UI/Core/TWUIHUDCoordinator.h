@@ -58,6 +58,7 @@ public:
 	{
 		return OnCommandRequested;
 	}
+	void SetArmedCommandId(FName InCommandId);
 
 protected:
 	void BindProviderDelegates();
@@ -105,7 +106,8 @@ protected:
 
 	UPROPERTY()
 	TArray<FCommandSlotViewModel> LastBuiltCommandViewModels;
-
+	
+	FName CurrentArmedCommandId = NAME_None;
 private:
 	FTWOnCommandRequested OnCommandRequested;
 };

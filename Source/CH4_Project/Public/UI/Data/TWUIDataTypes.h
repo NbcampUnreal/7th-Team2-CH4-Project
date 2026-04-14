@@ -248,6 +248,9 @@ struct CH4_PROJECT_API FCommandSlotViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TSoftObjectPtr<UTexture2D> Icon;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bArmed = false;
 };
 
 USTRUCT(BlueprintType)

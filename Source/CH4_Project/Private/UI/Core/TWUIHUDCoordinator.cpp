@@ -302,7 +302,7 @@ FCommandSlotViewModel UTWUIHUDCoordinator::BuildCommandSlotViewModel(
 	VM.bIsContextCommand = false;
 	VM.bReturnToPreviousContext = false;
 	VM.NextContext = NAME_None;
-
+	VM.bArmed = (CommandId == CurrentArmedCommandId);
 	if (CommandMetaTable)
 	{
 		static const FString Context = TEXT("CommandMetaLookup");
@@ -631,4 +631,10 @@ ITWResourceDataProvider* UTWUIHUDCoordinator::GetResourceProviderInterface() con
 	}
 
 	return Cast<ITWResourceDataProvider>(ResourceProvider);
+}
+
+void UTWUIHUDCoordinator::SetArmedCommandId(FName InCommandId)
+{
+	CurrentArmedCommandId = InCommandId;
+	RefreshCommandPanel();
 }

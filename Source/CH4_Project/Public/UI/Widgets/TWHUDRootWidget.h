@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Data/TWUIDataTypes.h"
+#include "UI/Data/TWUIInputStateTypes.h"
+#include "UI/Widgets/TWCursorOverlayWidget.h"
 #include "TWHUDRootWidget.generated.h"
 
 class UTWTopBarWidget;
@@ -11,6 +13,8 @@ class UTWCommandPanelWidget;
 class UTWNotificationPanelWidget;
 class UTWMenuPanelWidget;
 class UTWMinimapPanelWidget;
+class UTWCursorOverlayWidget;
+class UTWDragSelectionOverlayWidget;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnHUDCommandClicked, FName);
 
@@ -39,11 +43,22 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinimapData(const FMinimapPanelViewModel& InData);
+	
+	UFUNCTION(BlueprintCallable)
+	void SetInputStateData(const FUICommandInputStateViewModel& InData);
 
+	UFUNCTION(BlueprintCallable)
+	void SetDragSelectionStateData(const FUIDragSelectionStateViewModel& InData);
+
+	UFUNCTION(BlueprintCallable)
+	void SetCursorScreenPosition(const FVector2D& InScreenPosition);
 	FOnHUDCommandClicked& GetOnHUDCommandClickedDelegate()
 	{
 		return OnHUDCommandClicked;
 	}
+	
+	UFUNCTION(BlueprintCallable)
+	void SetCursorOverlayVisible(bool bInVisible);
 
 protected:
 	void HandleCommandPanelCommandClicked(FName InCommandId);
@@ -66,6 +81,12 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTWMinimapPanelWidget> MinimapPanel = nullptr;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTWCursorOverlayWidget> CursorOverlayWidget;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTWDragSelectionOverlayWidget> DragSelectionOverlayWidget;
 
 	FOnHUDCommandClicked OnHUDCommandClicked;
 };

@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Data/TWUIDataTypes.h"
+#include "UI/Widgets/TWCursorOverlayWidget.h"
+#include "UI/Widgets/TWDragSelectionOverlayWidget.h"
 #include "TWMinimapPanelWidget.generated.h"
 
 class UBorder;
@@ -30,4 +32,10 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> DisabledOverlay;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTWCursorOverlayWidget> CursorOverlayWidget = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTWDragSelectionOverlayWidget> DragSelectionOverlayWidget = nullptr;
 };

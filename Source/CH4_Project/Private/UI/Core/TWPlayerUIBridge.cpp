@@ -19,7 +19,8 @@
 #include "UObject/UnrealType.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
-
+#include "UI/Data/TWUIInputStateTypes.h"
+#include "UI/Widgets/TWHUDRootWidget.h"
 namespace TWCommandIds
 {
 	static const FName Move(TEXT("Move"));
@@ -371,6 +372,13 @@ void UTWPlayerUIBridge::RefreshAll()
 	if (HUDCoordinator)
 	{
 		HUDCoordinator->RefreshAll();
+	}
+	RefreshInputState();
+	RefreshDragSelectionState();
+
+	if (HUDRootWidget)
+	{
+		HUDRootWidget->SetCursorScreenPosition(CursorScreenPosition);
 	}
 }
 
@@ -1032,4 +1040,120 @@ FString UTWPlayerUIBridge::NormalizeHotkeyLabelFromKey(const FKey& InKey) const
 	}
 
 	return InKey.GetDisplayName().ToString().TrimStartAndEnd().ToUpper();
+}
+
+void UTWPlayerUIBridge::SetArmedCommandState(FName InCommandId)
+{
+	ArmedCommandId = InCommandId;
+
+	if (HUDCoordinator)
+	{
+		HUDCoordinator->SetArmedCommandId(ArmedCommandId);
+	}
+
+	RefreshInputState();
+}
+
+void UTWPlayerUIBridge::ClearArmedCommandState()
+{
+	ArmedCommandId = NAME_None;
+
+	if (HUDCoordinator)
+	{
+		HUDCoordinator->SetArmedCommandId(NAME_None);
+	}
+
+	RefreshInputState();
+}
+
+void UTWPlayerUIBridge::SetDragSelectionState(bool bInVisible, const FVector2D& InStart, const FVector2D& InEnd)
+{
+	CachedDragSelectionState.bVisible = bInVisible;
+	CachedDragSelectionState.StartScreenPosition = InStart;
+	CachedDragSelectionState.EndScreenPosition = InEnd;
+
+	RefreshDragSelectionState();
+}
+
+void UTWPlayerUIBridge::SetCursorScreenPosition(const FVector2D& InScreenPosition)
+{
+	CursorScreenPosition = InScreenPosition;
+
+	if (HUDRootWidget)
+	{
+		HUDRootWidget->SetCursorScreenPosition(CursorScreenPosition);
+	}
+}
+
+void UTWPlayerUIBridge::RefreshInputState()
+{
+	if (!HUDRootWidget)
+	{
+		return;
+	}
+
+	FUICommandInputStateViewModel VM;
+	VM.bVisible = true;
+	VM.ArmedCommandId = ArmedCommandId;
+	VM.HintText = TEXT("");
+	VM.CursorVisualType = ETWCursorVisualType::Default;
+
+	// 1순위: 엣지 스크롤
+	if (bEdgeScrollingActive)
+	{
+		VM.CursorVisualType = ETWCursorVisualType::EdgeScroll;
+	}
+	// 2순위: 명령 armed 상태
+	else if (ArmedCommandId == TEXT("Move"))
+	{
+		VM.CursorVisualType = ETWCursorVisualType::Move;
+		VM.HintText = TEXT("이동 위치를 클릭하세요. 우클릭으로 취소");
+	}
+	else if (ArmedCommandId == TEXT("Attack"))
+	{
+		VM.CursorVisualType = ETWCursorVisualType::Attack;
+		VM.HintText = TEXT("공격 대상 또는 지점을 클릭하세요. 우클릭으로 취소");
+	}
+	else if (ArmedCommandId == TEXT("Build"))
+	{
+		VM.CursorVisualType = ETWCursorVisualType::Build;
+		VM.HintText = TEXT("건설 위치를 지정하세요. 우클릭으로 취소");
+	}
+	else if (ArmedCommandId == TEXT("Forbidden"))
+	{
+		VM.CursorVisualType = ETWCursorVisualType::Forbidden;
+		VM.HintText = TEXT("이 위치에는 배치할 수 없습니다.");
+	}
+
+	HUDRootWidget->SetInputStateData(VM);
+	HUDRootWidget->SetCursorScreenPosition(CursorScreenPosition);
+}
+
+void UTWPlayerUIBridge::RefreshDragSelectionState()
+{
+	if (!HUDRootWidget)
+	{
+		return;
+	}
+
+	HUDRootWidget->SetDragSelectionStateData(CachedDragSelectionState);
+}
+
+void UTWPlayerUIBridge::SetCursorOverlayVisible(bool bInVisible)
+{
+	if (HUDRootWidget)
+	{
+		HUDRootWidget->SetCursorOverlayVisible(bInVisible);
+	}
+}
+
+void UTWPlayerUIBridge::SetEdgeScrollingActive(bool bInActive)
+{
+	if (bEdgeScrollingActive == bInActive)
+	{
+		return;
+	}
+
+	bEdgeScrollingActive = bInActive;
+	RefreshInputState();
 }
