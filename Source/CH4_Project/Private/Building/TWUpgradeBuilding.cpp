@@ -25,20 +25,20 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 
 	if (bIsUpgradeInProgress == 1)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("이미 업그레이드 진행 중"));
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 이미 업그레이드 진행 중"));
 		return 0;
 	}
 	
 	if (InUpgradeID.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("업그레이드 ID가 설정되지 않음"));
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 ID가 설정되지 않음"));
 		return 0;
 	}
 
 	FTWUpgradeTableRowBase* UpgradeRow = GetUpgradeRow(InUpgradeID);
 	if (!UpgradeRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("업그레이드 데이터 없음: %s"), *InUpgradeID.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 데이터 없음: %s"), *InUpgradeID.ToString());
 		return 0;
 	}
 
@@ -46,7 +46,7 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 
 	if (OwningPlayerState->CanAffordCost(FinalCost) == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("업그레이드 시작 실패: 자원 부족"));
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 시작 실패: 자원 부족"));
 		return 0;
 	}
 
@@ -68,7 +68,7 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("업그레이드 시작 | UpgradeID: %s | StatusType: %s | TargetUnitCount: %d"),
+		TEXT("[업그레이드 건물] 업그레이드 시작 | UpgradeID: %s | StatusType: %s | TargetUnitCount: %d"),
 		*CurrentUpgradeID.ToString(),
 		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow->TargetStatus)),
 		UpgradeRow->TargetUnits.Num()
@@ -94,7 +94,7 @@ void ATWUpgradeBuilding::FinishUpgrade()
 	FTWUpgradeTableRowBase* UpgradeRow = GetUpgradeRow(CurrentUpgradeID);
 	if (!UpgradeRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("업그레이드 완료 실패: 데이터 없음 | UpgradeID: %s"), *CurrentUpgradeID.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 완료 실패: 데이터 없음 | UpgradeID: %s"), *CurrentUpgradeID.ToString());
 
 		bIsUpgradeInProgress = 0;
 		CurrentUpgradeID = NAME_None;
@@ -106,7 +106,7 @@ void ATWUpgradeBuilding::FinishUpgrade()
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("업그레이드 완료 | UpgradeID: %s | StatusType: %s | Level: %d"),
+		TEXT("[업그레이드 건물] 업그레이드 완료 | UpgradeID: %s | StatusType: %s | Level: %d"),
 		*CurrentUpgradeID.ToString(),
 		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow->TargetStatus)),
 		OwningPlayerState->GetUpgradeLevelByID(CurrentUpgradeID)
@@ -156,6 +156,10 @@ void ATWUpgradeBuilding::ClearAllBuildingTimers()
 	}
 
 	GetWorldTimerManager().ClearTimer(UpgradeTimerHandle);
+	
+	bIsUpgradeInProgress = 0;
+	CurrentUpgradeID = NAME_None;
+	ForceNetUpdate();
 }
 
 void ATWUpgradeBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

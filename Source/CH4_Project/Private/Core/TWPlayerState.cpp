@@ -336,7 +336,7 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 		UE_LOG(
 			LogTemp,
 			Log,
-			TEXT("Upgrade Applied | UpgradeID: %s | UnitID: %s | StatusType: %s | AddedValue: %d"),
+			TEXT("[플레이어 상태] 업그레이드 적용 | UpgradeID: %s | UnitID: %s | StatusType: %s | 증가값: %d"),
 			*UpgradeRow.UpgradeID.ToString(),
 			*Pair.Key.ToString(),
 			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
@@ -347,7 +347,7 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("Upgrade Level | UpgradeID: %s | Level: %d"),
+		TEXT("[플레이어 상태] 업그레이드 레벨 | UpgradeID: %s | Level: %d"),
 		*UpgradeRow.UpgradeID.ToString(),
 		UpgradeLevel
 	);
