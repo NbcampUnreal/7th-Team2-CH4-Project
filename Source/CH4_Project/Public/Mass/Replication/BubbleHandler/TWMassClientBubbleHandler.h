@@ -5,20 +5,19 @@
 #include "CoreMinimal.h"
 #include "MassClientBubbleHandler.h"
 #include "MassCommonFragments.h"
-#include "Mass/Replication/Agent/TWTransformReplicatedAgent.h"
-#include "Mass/Replication/FastArrayItem/TWStatusMassFastArrayItem.h"
-#include "Mass/Replication/FastArrayItem/TWTransformMassFastArrayItem.h"
+#include "Mass/Replication/Agent/TWReplicatedAgent.h"
+#include "Mass/Replication/FastArrayItem/TWMassFastArrayItem.h"
 
 /**
  * 
  */
-class CH4_PROJECT_API FTWStatusMassClientBubbleHandler : public TClientBubbleHandlerBase<FTWStatusMassFastArrayItem>
+class CH4_PROJECT_API FTWMassClientBubbleHandler : public TClientBubbleHandlerBase<FTWMassFastArrayItem>
 {
 public:  
 #if UE_REPLICATION_COMPILE_SERVER_CODE  
  
 	/** Returns the item containing the agent with given handle */
-	FTWStatusMassFastArrayItem* GetMutableItem(FMassReplicatedAgentHandle Handle) 
+	FTWMassFastArrayItem* GetMutableItem(FMassReplicatedAgentHandle Handle) 
 	{
 		if (AgentHandleManager.IsValidHandle(Handle))
 		{
@@ -29,7 +28,7 @@ public:
 	}
  
 	/** Marks the given item as modified so it replicates its changes to th client */
-	void MarkItemDirty(FTWStatusMassFastArrayItem & Item) const 
+	void MarkItemDirty(FTWMassFastArrayItem & Item) const 
 	{
 		Serializer->MarkItemDirty(Item);
 	}
@@ -38,6 +37,6 @@ public:
 #if UE_REPLICATION_COMPILE_CLIENT_CODE	
 	virtual void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize) override;
 	virtual void PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize) override;
-	virtual void PostReplicatedChangeEntity(const FMassEntityView& EntityView, const FTWStatusReplicatedAgent& Item);  
+	virtual void PostReplicatedChangeEntity(const FMassEntityView& EntityView, const FTWReplicatedAgent& Item);  
 #endif // UE_REPLICATION_COMPILE_CLIENT_CODE
 };

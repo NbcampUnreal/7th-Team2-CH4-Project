@@ -4,24 +4,24 @@
 
 #include "CoreMinimal.h"
 #include "MassClientBubbleHandler.h"
-#include "Mass/Replication/Agent/TWUnitReplicatedAgent.h"
-#include "TWUnitMassFastArrayItem.generated.h"
+#include "Mass/Replication/Agent/TWReplicatedAgent.h"
+#include "TWMassFastArrayItem.generated.h"
 
 /**
  * 
  */
 USTRUCT()
-struct CH4_PROJECT_API FTWUnitMassFastArrayItem : public FMassFastArrayItemBase
+struct CH4_PROJECT_API FTWMassFastArrayItem : public FMassFastArrayItemBase
 {
 	GENERATED_BODY()
 	
-	FTWUnitMassFastArrayItem() = default;  
-	FTWUnitMassFastArrayItem(const FTWUnitReplicatedAgent& InAgent, const FMassReplicatedAgentHandle InHandle)  
+	FTWMassFastArrayItem() = default;  
+	FTWMassFastArrayItem(const FTWReplicatedAgent& InAgent, const FMassReplicatedAgentHandle InHandle)  
 		: FMassFastArrayItemBase(InHandle), Agent(InAgent) {}  
     
 	/** This typedef is required to be provided in FMassFastArrayItemBase derived classes (with the associated FReplicatedAgentBase derived class) */  
-	typedef FTWUnitReplicatedAgent FReplicatedAgentType;  
+	typedef FTWReplicatedAgent FReplicatedAgentType;  
     
 	UPROPERTY()  
-	FTWUnitReplicatedAgent Agent;  
+	FTWReplicatedAgent Agent;  
 };

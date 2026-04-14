@@ -1,10 +1,10 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
+#include "Mass/Replication/BubbleInfo/TWMassClientBubbleInfo.h"
 
 
-void ATWTransformMassClientBubbleInfo::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ATWMassClientBubbleInfo::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
@@ -12,5 +12,5 @@ void ATWTransformMassClientBubbleInfo::GetLifetimeReplicatedProps(TArray<FLifeti
 	SharedParams.bIsPushBased = true;
 	
 	// Technically, this doesn't need to be PushModel based because it's a FastArray and they ignore it.
-	DOREPLIFETIME_WITH_PARAMS_FAST(ATWTransformMassClientBubbleInfo, BubbleSerializer, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(ATWMassClientBubbleInfo, BubbleSerializer, SharedParams);
 }

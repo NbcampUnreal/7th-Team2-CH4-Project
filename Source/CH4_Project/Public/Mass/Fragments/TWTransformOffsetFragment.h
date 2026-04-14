@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "MassEntityElementTypes.h"
-#include "Mass/Replication/Agent/TWTransformReplicatedAgent.h"
+#include "MassReplicationTransformHandlers.h"
 #include "TWTransformOffsetFragment.generated.h"
 
 /**

@@ -3,6 +3,7 @@
 #include "Subsystems/TWUnitSubsystem.h"
 #include "Core/TWPlayerUnitContainer.h"
 #include "EngineUtils.h"
+#include "MassCommonFragments.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassNavigationSubsystem.h"
@@ -16,10 +17,7 @@
 #include "Data/TWUnitTableRowBase.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
-#include "Mass/Replication/BubbleInfo/TWStatusMassClientBubbleInfo.h"
-#include "Mass/Replication/BubbleInfo/TWTransformMassClientBubbleInfo.h"
-#include "Mass/Replication/BubbleInfo/TWTransformSmoothMassClientBubbleInfo.h"
-#include "Mass/Replication/BubbleInfo/TWUnitMassClientBubbleInfo.h"
+#include "Mass/Replication/BubbleInfo/TWMassClientBubbleInfo.h"
 
 UTWUnitSubsystem::UTWUnitSubsystem()
 {
@@ -73,10 +71,7 @@ void UTWUnitSubsystem::PostInitialize()
 		return;
 	}
 
-	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformMassClientBubbleInfo::StaticClass());
-	ReplicationSubsystem->RegisterBubbleInfoClass(ATWTransformSmoothMassClientBubbleInfo::StaticClass());
-	ReplicationSubsystem->RegisterBubbleInfoClass(ATWStatusMassClientBubbleInfo::StaticClass());
-	ReplicationSubsystem->RegisterBubbleInfoClass(ATWUnitMassClientBubbleInfo::StaticClass());
+	ReplicationSubsystem->RegisterBubbleInfoClass(ATWMassClientBubbleInfo::StaticClass());
 }
 
 void UTWUnitSubsystem::Deinitialize()
