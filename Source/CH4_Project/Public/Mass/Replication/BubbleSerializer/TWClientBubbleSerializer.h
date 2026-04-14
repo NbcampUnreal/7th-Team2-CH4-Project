@@ -4,18 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "MassClientBubbleSerializerBase.h"
-#include "Mass/Replication/BubbleHandler/TWTransformMassClientBubbleHandler.h"
-#include "TWTransformClientBubbleSerializer.generated.h"
+#include "Mass/Replication/BubbleHandler/TWMassClientBubbleHandler.h"
+#include "Mass/Replication/FastArrayItem/TWMassFastArrayItem.h"
+#include "TWClientBubbleSerializer.generated.h"
 
 /**
  * 
  */
 USTRUCT()
-struct CH4_PROJECT_API FTWTransformClientBubbleSerializer : public FMassClientBubbleSerializerBase
+struct CH4_PROJECT_API FTWClientBubbleSerializer : public FMassClientBubbleSerializerBase
 {
 	GENERATED_BODY()
 public:
-	FTWTransformClientBubbleSerializer()
+	FTWClientBubbleSerializer()
 	{
 		Bubble.Initialize(Entities, *this);
 	}
@@ -23,23 +24,23 @@ public:
 	/** Define a custom replication for this struct */
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
 	{
-		return FFastArraySerializer::FastArrayDeltaSerialize<FTWTransformMassFastArrayItem, FTWTransformClientBubbleSerializer>(Entities, DeltaParams, *this);
+		return FFastArraySerializer::FastArrayDeltaSerialize<FTWMassFastArrayItem, FTWClientBubbleSerializer>(Entities, DeltaParams, *this);
 	}
  
 	/** The one responsible for storing the server data in the client fragments */
-	FTWTransformMassClientBubbleHandler Bubble;
+	FTWMassClientBubbleHandler Bubble;
  
 protected:
 	/** Fast Array of Agents for efficient replication. Maintained as a freelist on the server, to keep index consistency as indexes are used as Handles into the Array 
 	 *  Note array order is not guaranteed between server and client so handles will not be consistent between them, FMassNetworkID will be.
 	 */
 	UPROPERTY(Transient)
-	TArray<FTWTransformMassFastArrayItem> Entities;
+	TArray<FTWMassFastArrayItem> Entities;
 	
 };
 
 template<>
-struct TStructOpsTypeTraits<FTWTransformClientBubbleSerializer> : public TStructOpsTypeTraitsBase2<FTWTransformClientBubbleSerializer>
+struct TStructOpsTypeTraits<FTWClientBubbleSerializer> : public TStructOpsTypeTraitsBase2<FTWClientBubbleSerializer>
 {
 	enum
 	{

@@ -6,13 +6,14 @@
 #include "MassCommonFragments.h"
 #include "MassReplicationProcessor.h"
 #include "Mass/Fragments/TWStatusFragment.h"
-#include "TWStatusMassReplicator.generated.h"
+#include "Mass/Fragments/TWUnitFragment.h"
+#include "TWMassReplicator.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class CH4_PROJECT_API UTWStatusMassReplicator : public UMassReplicatorBase
+class CH4_PROJECT_API UTWMassReplicator : public UMassReplicatorBase
 {
 	GENERATED_BODY()
 
@@ -21,6 +22,10 @@ public:
 	virtual void AddRequirements(FMassEntityQuery& EntityQuery) override
 	{
 		EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
+		EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+		EntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly);
+		
+		
 	}
 
 	virtual void ProcessClientReplication(FMassExecutionContext& Context, FMassReplicationContext& ReplicationContext) override;
