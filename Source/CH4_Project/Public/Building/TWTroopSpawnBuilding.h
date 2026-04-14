@@ -5,19 +5,8 @@
 #include "TWTroopSpawnBuilding.generated.h"
 
 class USceneComponent;
-class UTWTroopBuildingDataAsset;
 class ATWPlayerController;
 struct FTWUnitTableRowBase;
-
-USTRUCT(BlueprintType)
-struct FTWQueuedTroopData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Queue")
-	FName UnitID = NAME_None;
-};
 
 UCLASS()
 class CH4_PROJECT_API ATWTroopSpawnBuilding : public ATWBaseBuilding
@@ -27,7 +16,6 @@ class CH4_PROJECT_API ATWTroopSpawnBuilding : public ATWBaseBuilding
 public:
 	ATWTroopSpawnBuilding();
 
-	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
@@ -40,29 +28,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Production")
 	bool RequestEnqueueTroopById(FName UnitId);
-
-	int8 SpawnUnitNow();
-
-	void SetQueuePausedByUpkeep(const uint8 bInPaused);
+	
+	void SetQueuePausedByUpkeep(bool bInPaused);
 
 protected:
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Queue")
-	int32 CurrentQueueCount = 0;
-
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Upkeep")
-	uint8 QueuePausedByUpkeep = 0;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Spawn|Queue")
-	TArray<FTWQueuedTroopData> TroopQueue;
-
-	FTimerHandle SpawnQueueTimerHandle;
-
-protected:
-	const UTWTroopBuildingDataAsset* GetTroopBuildingData() const;
-
-	void StartSpawnQueueTimer();
-	void HandleSpawnQueue();
-
+	void CancelQueuedProductionAndRestorePendingPopulation();
 	virtual void ClearAllBuildingTimers() override;
 	virtual void OnOwnerPlayerStateAssigned() override;
 
@@ -78,7 +48,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Production")
 	bool IsQueuePausedByUpkeep() const { return bQueuePausedByUpkeep; }
-
+////
 	UFUNCTION(BlueprintCallable, Category="Production")
 	FName GetCurrentProducingUnitId() const { return CurrentProducingUnitId; }
 
@@ -90,7 +60,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Production")
 	FString GetCurrentProductionProgressText() const;
-
+///
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category="Production")
 	TArray<FName> ProductionQueue;
