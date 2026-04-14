@@ -12,6 +12,7 @@
 #include "UI/Core/TWPlayerUIBridge.h"
 #include "UI/Widgets/TWHUDRootWidget.h"
 #include "UI/Data/TWUIDataTypes.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
@@ -76,7 +77,7 @@ void ATWPlayerController::BeginPlay()
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
-	SetShowMouseCursor(true);
+	SetShowMouseCursor(false);
 
 	InitializeUIBridge();
 	RefreshUIBridge();
@@ -85,7 +86,24 @@ void ATWPlayerController::BeginPlay()
 void ATWPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	HandleScreenEdgeScrolling(DeltaSeconds);
+	UpdateCursorOverlayPosition();
+
+	const bool bIsEdgeScrollingNow = HandleScreenEdgeScrolling(DeltaSeconds);
+
+	if (bIsEdgeScrollingNow != bWasEdgeScrollingLastFrame)
+	{
+		if (PlayerUIBridge)
+		{
+			PlayerUIBridge->SetEdgeScrollingActive(bIsEdgeScrollingNow);
+		}
+
+		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
+	}
+
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommand::None && !bIsBuildMode)
+	{
+		UpdateDragSelectionOverlay();
+	}
 
 	if (bIsBuildMode && CurrentGhost)
 	{
@@ -186,6 +204,19 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 {
 	FHitResult HitResult;
 	FVector ClickLocation;
+	bIsLeftMousePressed = true;
+
+	// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
+	FVector2D ScaledMousePos = FVector2D::ZeroVector;
+	if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
+	{
+		DragStartScreenPosition = ScaledMousePos;
+	}
+	else
+	{
+		DragStartScreenPosition = LastValidMouseScreenPosition;
+	}
+	
 	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
 		ClickLocation = HitResult.Location;
@@ -219,6 +250,14 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
 {
 	ChangeCurrentCommandType(ETWCommand::None);
+	
+	bIsLeftMousePressed = false;
+	bIsDraggingSelectionVisual = false;
+
+	if (PlayerUIBridge)
+	{
+		PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+	}
 
 	FHitResult HitResult;
 	if (false == GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
@@ -522,53 +561,63 @@ void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuild
 	ClientApplyBuildingSelection(TargetBuilding);
 }
 
-void ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
+bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 {
-	if (false == IsLocalController())
+	if (!IsLocalController())
 	{
-		return;
+		return false;
 	}
-	FVector2D MousePosition;
-	if (false == GetMousePosition(MousePosition.X, MousePosition.Y))
+
+	if (!bHasValidRawMousePositionThisFrame)
 	{
-		return;
+		return false;
 	}
-	int32 ViewportSizeX, ViewportSizeY;
+
+	const FVector2D& MousePosition = CurrentFrameRawMousePosition;
+
+	int32 ViewportSizeX = 0;
+	int32 ViewportSizeY = 0;
 	GetViewportSize(ViewportSizeX, ViewportSizeY);
 
 	FVector MoveDirection = FVector::ZeroVector;
 
-	if (MousePosition.X < ScreenEdgeMargin)
+	// Left / Right
+	if (MousePosition.X <= ScreenEdgeEnterMargin)
 	{
-		MoveDirection.Y = -1;
+		MoveDirection.Y = -1.f;
 	}
-	else if (MousePosition.X > ViewportSizeX - ScreenEdgeMargin)
+	else if (MousePosition.X >= static_cast<float>(ViewportSizeX) - ScreenEdgeEnterMargin)
 	{
-		MoveDirection.Y = 1;
-	}
-	if (MousePosition.Y < ScreenEdgeMargin)
-	{
-		MoveDirection.X = 1;
-	}
-	else if (MousePosition.Y > ViewportSizeY - ScreenEdgeMargin)
-	{
-		MoveDirection.X = -1;
+		MoveDirection.Y = 1.f;
 	}
 
-	if (false == MoveDirection.IsNearlyZero())
+	// Top / Bottom
+	if (MousePosition.Y <= ScreenEdgeEnterMargin)
 	{
-		APawn* MyPawn = GetPawn();
-		if (MyPawn)
+		MoveDirection.X = 1.f;
+	}
+	else if (MousePosition.Y >= static_cast<float>(ViewportSizeY) - ScreenEdgeEnterMargin)
+	{
+		MoveDirection.X = -1.f;
+	}
+
+	const bool bIsEdgeScrollingNow = !MoveDirection.IsNearlyZero();
+
+	if (bIsEdgeScrollingNow)
+	{
+		if (APawn* MyPawn = GetPawn())
 		{
 			MyPawn->AddMovementInput(MoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
 		}
 	}
+
+	return bIsEdgeScrollingNow;
 }
 
 void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
 {
-	// TODO 마우스 커서 변경 등 처리
 	CurrentCommandType = CommandType;
+	UpdateInputOverlayState();
 }
 
 #pragma endregion
@@ -1407,4 +1456,103 @@ void ATWPlayerController::ServerTestUpgrade_Implementation()
 		return;
 	}
 }
+#pragma endregion
+
+#pragma region Input Overlay
+
+void ATWPlayerController::UpdateInputOverlayState()
+{
+	if (!PlayerUIBridge)
+	{
+		return;
+	}
+
+	const FName ArmedCommandId = ConvertCommandTypeToCommandId(CurrentCommandType);
+
+	if (ArmedCommandId.IsNone())
+	{
+		PlayerUIBridge->ClearArmedCommandState();
+	}
+	else
+	{
+		PlayerUIBridge->SetArmedCommandState(ArmedCommandId);
+	}
+}
+
+void ATWPlayerController::UpdateDragSelectionOverlay()
+{
+	if (!PlayerUIBridge)
+	{
+		return;
+	}
+
+	FVector2D ScaledMousePos = FVector2D::ZeroVector;
+	bool bHasScaledMouse =
+		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y);
+
+	if (bHasScaledMouse)
+	{
+		CurrentMouseScreenPosition = ScaledMousePos;
+	}
+	else
+	{
+		CurrentMouseScreenPosition = LastValidMouseScreenPosition;
+	}
+
+	const float Distance = FVector2D::Distance(DragStartScreenPosition, CurrentMouseScreenPosition);
+	bIsDraggingSelectionVisual = (Distance >= DragSelectionScreenThreshold);
+
+	PlayerUIBridge->SetDragSelectionState(
+		bIsDraggingSelectionVisual,
+		DragStartScreenPosition,
+		CurrentMouseScreenPosition
+	);
+}
+
+void ATWPlayerController::UpdateCursorOverlayPosition()
+{
+	if (!PlayerUIBridge)
+	{
+		return;
+	}
+
+	// 1) 커서 표시용 좌표 (DPI 보정)
+	FVector2D ScaledMousePos = FVector2D::ZeroVector;
+	bHasValidMousePositionThisFrame =
+		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y);
+
+	if (bHasValidMousePositionThisFrame)
+	{
+		CurrentFrameMouseScreenPosition = ScaledMousePos;
+		LastValidMouseScreenPosition = ScaledMousePos;
+	}
+
+	// 2) 엣지 스크롤 판정용 좌표 (raw viewport)
+	FVector2D RawMousePos = FVector2D::ZeroVector;
+	bHasValidRawMousePositionThisFrame = GetMousePosition(RawMousePos.X, RawMousePos.Y);
+
+	if (bHasValidRawMousePositionThisFrame)
+	{
+		CurrentFrameRawMousePosition = RawMousePos;
+	}
+
+	// 커서는 마지막 정상 위치 유지
+	PlayerUIBridge->SetCursorScreenPosition(LastValidMouseScreenPosition);
+}
+
+FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommand InCommandType) const
+{
+	switch (InCommandType)
+	{
+	case ETWCommand::Move:
+		return TEXT("Move");
+
+	case ETWCommand::Attack:
+		return TEXT("Attack");
+
+	default:
+		return NAME_None;
+	}
+}
+
 #pragma endregion

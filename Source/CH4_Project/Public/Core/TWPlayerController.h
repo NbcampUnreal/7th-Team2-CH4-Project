@@ -76,7 +76,10 @@ protected:
 	TObjectPtr<UInputAction> BuildCommandAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	float ScreenEdgeMargin = 10.0f;
+	float ScreenEdgeEnterMargin = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	float ScreenEdgeExitMargin = 20.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScrollSpeed = 1500.0f;
@@ -114,7 +117,7 @@ protected:
 	void ServerHandleBuildingSelect(ATWBaseBuilding* TargetBuilding);
 
 private:
-	void HandleScreenEdgeScrolling(float DeltaSeconds);
+	bool HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
 
 #pragma region 병력 스폰 대기열
@@ -267,6 +270,19 @@ public:
 	
 private:
 	void ChangeCurrentCommandType(ETWCommand CommandType);
+	
+	void UpdateInputOverlayState();
+	void UpdateDragSelectionOverlay();
+	void UpdateCursorOverlayPosition();
+	FName ConvertCommandTypeToCommandId(ETWCommand InCommandType) const;
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	float DragSelectionScreenThreshold = 8.f;
+
+	bool bIsLeftMousePressed = false;
+	bool bIsDraggingSelectionVisual = false;
+
+	FVector2D DragStartScreenPosition = FVector2D::ZeroVector;
+	FVector2D CurrentMouseScreenPosition = FVector2D::ZeroVector;
 
 private:
 	ETWCommand CurrentCommandType = ETWCommand::None;
@@ -296,4 +312,17 @@ private:
 	TArray<FSelectionSummaryItemViewModel> LocalSelectionSummaryItems;
 
 	FVector ClickStartLocation = FVector::ZeroVector;
+	
+	bool bHasValidMousePositionThisFrame = false;
+	FVector2D LastValidMouseScreenPosition = FVector2D::ZeroVector;      // 커서 표시용 (DPI 보정)
+	FVector2D CurrentFrameMouseScreenPosition = FVector2D::ZeroVector;   // 커서 표시용 (DPI 보정)
+
+	bool bHasValidRawMousePositionThisFrame = false;
+	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;      // 엣지 스크롤용 (raw)
+	bool bWasEdgeScrollingLastFrame = false;
+	
+	bool bEdgeScrollLeftActive = false;
+	bool bEdgeScrollRightActive = false;
+	bool bEdgeScrollTopActive = false;
+	bool bEdgeScrollBottomActive = false;
 };
