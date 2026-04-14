@@ -1,5 +1,7 @@
 ﻿#include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Data/TWUpgradeTableRowBase.h"
+#include "FOW/TWPlayerSlotInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
@@ -18,7 +20,7 @@ ATWPlayerState::ATWPlayerState()
 	{
 		Resource = 0;
 	}
-
+	
 	PendingPopulation = 0;
 	MaxPopulation = 200;
 	PopulationLimit = 1;
@@ -294,6 +296,72 @@ int8 ATWPlayerState::TrySpendTroopUpkeep()
 
 	SpendCost(TotalCost);
 	return 1;
+}
+
+int32 ATWPlayerState::GetUpgradeLevelByID(const FName UpgradeID) const
+{
+	if (const int32* FoundLevel = UpgradeLevelsByID.Find(UpgradeID))
+	{
+		return *FoundLevel;
+	}
+
+	return 0;
+}
+
+void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (UpgradeRow.UpgradeID.IsNone())
+	{
+		return;
+	}
+
+	int32& UpgradeLevel = UpgradeLevelsByID.FindOrAdd(UpgradeRow.UpgradeID);
+	UpgradeLevel += 1;
+
+	for (const TPair<FName, int32>& Pair : UpgradeRow.TargetUnits)
+	{
+		FTWUnitStatus& BonusStatus = UnitUpgradeBonusMap.FindOrAdd(Pair.Key);
+
+		const float CurrentValue = BonusStatus.GetStatus(UpgradeRow.TargetStatus);
+		BonusStatus.SetStatus(
+			UpgradeRow.TargetStatus,
+			CurrentValue + static_cast<float>(Pair.Value)
+		);
+
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("[플레이어 상태] 업그레이드 적용 | UpgradeID: %s | UnitID: %s | StatusType: %s | 증가값: %d"),
+			*UpgradeRow.UpgradeID.ToString(),
+			*Pair.Key.ToString(),
+			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
+			Pair.Value
+		);
+	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[플레이어 상태] 업그레이드 레벨 | UpgradeID: %s | Level: %d"),
+		*UpgradeRow.UpgradeID.ToString(),
+		UpgradeLevel
+	);
+}
+
+float ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const
+{
+	const FTWUnitStatus* FoundStatus = UnitUpgradeBonusMap.Find(UnitID);
+	if (!FoundStatus)
+	{
+		return 0.0f;
+	}
+
+	return FoundStatus->GetStatus(StatusType);
 }
 
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

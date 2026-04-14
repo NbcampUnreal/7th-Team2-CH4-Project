@@ -4,13 +4,13 @@
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingDataAsset.h"
-#include "Data/TWTroopBuildingDataAsset.h"
 #include "Data/TWUnitTableRowBase.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "TimerManager.h"
 #include "UObject/UnrealType.h"
+#include "GameFramework/GameStateBase.h"
 
 ATWTroopSpawnBuilding::ATWTroopSpawnBuilding()
 {
@@ -30,129 +30,121 @@ ATWTroopSpawnBuilding::ATWTroopSpawnBuilding()
 	}
 }
 
-void ATWTroopSpawnBuilding::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-const UTWTroopBuildingDataAsset* ATWTroopSpawnBuilding::GetTroopBuildingData() const
-{
-	return Cast<UTWTroopBuildingDataAsset>(BuildingData);
-}
-
-int8 ATWTroopSpawnBuilding::SpawnUnitNow()
-{
-	if (!HasAuthority())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: Not authority"));
-		return 0;
-	}
-
-	if (!OwningPlayerState)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: OwningPlayerState is null"));
-		return 0;
-	}
-
-	if (ProductionQueue.Num() <= 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: ProductionQueue empty"));
-		return 0;
-	}
-
-	const FName UnitId = ProductionQueue[0];
-	const FTWUnitTableRowBase* UnitRow = FindUnitRow(UnitId);
-	if (!UnitRow)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: Unit row not found (%s)"), *UnitId.ToString());
-		return 0;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: World is null"));
-		return 0;
-	}
-
-	UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
-	if (!UnitSubsystem)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] SpawnUnitNow failed: UnitSubsystem is null"));
-		return 0;
-	}
-
-	ATWPlayerController* OwnerPC = nullptr;
-	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
-	{
-		APlayerController* PC = It->Get();
-		if (!PC)
-		{
-			continue;
-		}
-
-		if (PC->GetPlayerState<ATWPlayerState>() == OwningPlayerState)
-		{
-			OwnerPC = Cast<ATWPlayerController>(PC);
-			break;
-		}
-	}
-
-	const FVector SpawnLocation = ResolveSpawnLocation();
-	UnitSubsystem->SpawnUnit(SpawnLocation, *UnitRow, OwnerPC);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[TroopSpawnBuilding] SpawnUnitNow success: UnitId=%s / SpawnLocation=%s"),
-		*UnitId.ToString(),
-		*SpawnLocation.ToString()
-	);
-
-	return 1;
-}
-
-void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(const uint8 bInPaused)
+void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(bool bInPaused)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	const uint8 NewPausedValue = (bInPaused != 0) ? 1 : 0;
-	const uint8 PrevPausedValue = (QueuePausedByUpkeep != 0) ? 1 : 0;
-
-	if (PrevPausedValue == NewPausedValue)
+	const bool bPrevPaused = bQueuePausedByUpkeep;
+	if (bPrevPaused == bInPaused)
 	{
 		return;
 	}
 
-	QueuePausedByUpkeep = NewPausedValue;
-	bQueuePausedByUpkeep = (NewPausedValue != 0);
+	bQueuePausedByUpkeep = bInPaused;
+	
+	if (bInPaused)
+	{
+		if (bIsProducing && CurrentProducingUnitId != NAME_None && CurrentProductionStartTime > 0.f)
+		{
+			const float Now = GetSyncedWorldTimeSeconds();
+			const float ElapsedSinceResume = FMath::Max(0.f, Now - CurrentProductionStartTime);
+
+			AccumulatedProductionTime = FMath::Clamp(
+				AccumulatedProductionTime + ElapsedSinceResume,
+				0.f,
+				CurrentProducingDuration
+			);
+
+			PausedRemainingProductionTime = FMath::Clamp(
+				CurrentProducingDuration - AccumulatedProductionTime,
+				0.f,
+				CurrentProducingDuration
+			);
+
+			GetWorldTimerManager().ClearTimer(ProductionTimerHandle);
+			CurrentProductionStartTime = 0.f;
+		}
+	}
+	else
+	{
+		if (bIsProducing && CurrentProducingUnitId != NAME_None && PausedRemainingProductionTime > 0.f)
+		{
+			CurrentProductionStartTime = GetSyncedWorldTimeSeconds();
+
+			GetWorldTimerManager().SetTimer(
+				ProductionTimerHandle,
+				this,
+				&ATWTroopSpawnBuilding::HandleProductionFinished,
+				PausedRemainingProductionTime,
+				false
+			);
+
+			PausedRemainingProductionTime = 0.f;
+		}
+		else
+		{
+			TryStartNextProduction();
+		}
+	}
+
+
 	ForceNetUpdate();
-
+	
 	UE_LOG(
 		LogTemp,
 		Log,
 		TEXT("[TroopSpawnBuilding] QueuePausedByUpkeep changed: %d -> %d"),
-		PrevPausedValue,
-		NewPausedValue
+		bPrevPaused ? 1 : 0,
+		bInPaused ? 1 : 0
 	);
+}
 
-	if (PrevPausedValue == 1 && NewPausedValue == 0)
+float ATWTroopSpawnBuilding::GetSyncedWorldTimeSeconds() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
 	{
-		TryStartNextProduction();
+		return 0.f;
 	}
+
+	const AGameStateBase* GS = World->GetGameState();
+	if (GS)
+	{
+		return GS->GetServerWorldTimeSeconds();
+	}
+
+	return World->GetTimeSeconds();
 }
 
-void ATWTroopSpawnBuilding::StartSpawnQueueTimer()
+void ATWTroopSpawnBuilding::CancelQueuedProductionAndRestorePendingPopulation()
 {
-	TryStartNextProduction();
-}
+	if (!HasAuthority())
+	{
+		return;
+	}
 
-void ATWTroopSpawnBuilding::HandleSpawnQueue()
-{
-	HandleProductionFinished();
+	int32 TotalPendingPopulationToRestore = 0;
+
+	for (const FName& UnitId : ProductionQueue)
+	{
+		const FTWUnitTableRowBase* UnitRow = FindUnitRow(UnitId);
+		if (!UnitRow)
+		{
+			continue;
+		}
+
+		TotalPendingPopulationToRestore += UnitRow->Population;
+	}
+
+	if (OwningPlayerState && TotalPendingPopulationToRestore > 0)
+	{
+		OwningPlayerState->RemovePendingPopulation(TotalPendingPopulationToRestore);
+	}
+
+	ProductionQueue.Empty();
 }
 
 void ATWTroopSpawnBuilding::ClearAllBuildingTimers()
@@ -162,22 +154,24 @@ void ATWTroopSpawnBuilding::ClearAllBuildingTimers()
 		return;
 	}
 
-	GetWorldTimerManager().ClearTimer(SpawnQueueTimerHandle);
 	GetWorldTimerManager().ClearTimer(ProductionTimerHandle);
 
+	CancelQueuedProductionAndRestorePendingPopulation();
+	
 	bIsProducing = false;
+	bQueuePausedByUpkeep = false;
 	CurrentProducingUnitId = NAME_None;
-	CurrentProducingDuration = 0.f;
-	CurrentProductionStartTime = 0.f;
+	CurrentProducingDuration = 0.f; // 총 생산 시간
+	CurrentProductionStartTime = 0.f; // 생산을 시작한 월드 시간
+	AccumulatedProductionTime = 0.f; // 진행된 생산 시간
+	PausedRemainingProductionTime = 0.f; // 남아 있는 생산 시간
 	ForceNetUpdate();
 }
 
 void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(ATWTroopSpawnBuilding, CurrentQueueCount);
-	DOREPLIFETIME(ATWTroopSpawnBuilding, QueuePausedByUpkeep);
+	DOREPLIFETIME(ATWTroopSpawnBuilding, AccumulatedProductionTime);
 
 	DOREPLIFETIME(ATWTroopSpawnBuilding, ProductionQueue);
 	DOREPLIFETIME(ATWTroopSpawnBuilding, bIsProducing);
@@ -336,7 +330,7 @@ bool ATWTroopSpawnBuilding::CanEnqueueUnitId(FName UnitId, FString* OutFailReaso
 		return false;
 	}
 
-	if (QueuePausedByUpkeep != 0)
+	if (bQueuePausedByUpkeep != 0)
 	{
 		if (OutFailReason) { *OutFailReason = TEXT("Queue paused by upkeep"); }
 		return false;
@@ -389,7 +383,7 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroop()
 	FName DefaultUnitId = NAME_None;
 	if (!ResolveDefaultUnitId(DefaultUnitId))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroop failed: DefaultUnitId not found"));
+		UE_LOG(LogTemp, Warning, TEXT("[병력 생산 건물] 대기열 추가 실패: 기본 유닛 ID를 찾을 수 없음"));
 		return false;
 	}
 
@@ -398,19 +392,13 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroop()
 
 bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 {
-	if (!HasAuthority())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: Not authority / UnitId=%s"), *UnitId.ToString());
-		return false;
-	}
-
 	FString FailReason;
 	if (!CanEnqueueUnitId(UnitId, &FailReason))
 	{
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: UnitId=%s / Reason=%s"),
+			TEXT("[병력 생산 건물] 대기열 추가 실패 | UnitID: %s | 사유: %s"),
 			*UnitId.ToString(),
 			*FailReason
 		);
@@ -418,15 +406,8 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 	}
 
 	const FTWUnitTableRowBase* UnitRow = FindUnitRow(UnitId);
-	if (!UnitRow)
+	if (!UnitRow || !OwningPlayerState)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: Unit row not found (%s)"), *UnitId.ToString());
-		return false;
-	}
-
-	if (!OwningPlayerState)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: OwningPlayerState is null"));
 		return false;
 	}
 
@@ -434,15 +415,14 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 	OwningPlayerState->AddPendingPopulation(UnitRow->Population);
 
 	ProductionQueue.Add(UnitId);
-	CurrentQueueCount = ProductionQueue.Num();
 	ForceNetUpdate();
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] Enqueue success: UnitId=%s / QueueCount=%d"),
+		TEXT("[병력 생산 건물] 대기열 추가 성공 | UnitID: %s | 현재 대기열 수: %d"),
 		*UnitId.ToString(),
-		CurrentQueueCount
+		ProductionQueue.Num()
 	);
 
 	TryStartNextProduction();
@@ -453,13 +433,11 @@ void ATWTroopSpawnBuilding::TryStartNextProduction()
 {
 	if (!HasAuthority())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] TryStartNextProduction skipped: Not authority"));
 		return;
 	}
 
-	if (bQueuePausedByUpkeep || QueuePausedByUpkeep != 0)
+	if (bQueuePausedByUpkeep)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] TryStartNextProduction skipped: Queue paused by upkeep"));
 		return;
 	}
 
@@ -479,7 +457,6 @@ void ATWTroopSpawnBuilding::TryStartNextProduction()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] TryStartNextProduction failed: Unit row not found (%s)"), *NextUnitId.ToString());
 		ProductionQueue.RemoveAt(0);
-		CurrentQueueCount = ProductionQueue.Num();
 		ForceNetUpdate();
 		TryStartNextProduction();
 		return;
@@ -495,7 +472,7 @@ void ATWTroopSpawnBuilding::StartProductionForUnit(FName UnitId, const FTWUnitTa
 		return;
 	}
 
-	if (bQueuePausedByUpkeep || QueuePausedByUpkeep != 0)
+	if (bQueuePausedByUpkeep)
 	{
 		return;
 	}
@@ -509,13 +486,15 @@ void ATWTroopSpawnBuilding::StartProductionForUnit(FName UnitId, const FTWUnitTa
 	bIsProducing = true;
 	CurrentProducingUnitId = UnitId;
 	CurrentProducingDuration = FMath::Max(0.01f, UnitRow.SpawnDuration);
-	CurrentProductionStartTime = World->GetTimeSeconds();
+	AccumulatedProductionTime = 0.f;
+	PausedRemainingProductionTime = 0.f;
+	CurrentProductionStartTime = GetSyncedWorldTimeSeconds();
 	ForceNetUpdate();
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] StartProductionForUnit: UnitId=%s / Duration=%.2f"),
+		TEXT("[병력 생산 건물] 생산 시작 | UnitID: %s | 생산 시간: %.2f초"),
 		*UnitId.ToString(),
 		CurrentProducingDuration
 	);
@@ -542,12 +521,13 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 		CurrentProducingUnitId = NAME_None;
 		CurrentProducingDuration = 0.f;
 		CurrentProductionStartTime = 0.f;
+		AccumulatedProductionTime = 0.f;
+		PausedRemainingProductionTime = 0.f;
 		ForceNetUpdate();
 	};
 
 	if (ProductionQueue.Num() <= 0)
 	{
-		CurrentQueueCount = 0;
 		ResetProductionState();
 		return;
 	}
@@ -556,9 +536,8 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 	const FTWUnitTableRowBase* UnitRow = FindUnitRow(FinishedUnitId);
 	if (!UnitRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] HandleProductionFinished failed: Unit row not found (%s)"), *FinishedUnitId.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("[병력 생산 건물] 생산 완료 처리 실패: 유닛 데이터 행을 찾을 수 없음 | UnitID: %s"), *FinishedUnitId.ToString());
 		ProductionQueue.RemoveAt(0);
-		CurrentQueueCount = ProductionQueue.Num();
 		ResetProductionState();
 		TryStartNextProduction();
 		return;
@@ -610,14 +589,13 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 	OwningPlayerState->RemovePendingPopulation(UnitRow->Population);
 
 	ProductionQueue.RemoveAt(0);
-	CurrentQueueCount = ProductionQueue.Num();
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] HandleProductionFinished success: UnitId=%s / RemainingQueue=%d"),
+		TEXT("[병력 생산 건물] 생산 완료 | UnitID: %s | 남은 대기열 수: %d"),
 		*FinishedUnitId.ToString(),
-		CurrentQueueCount
+		ProductionQueue.Num()
 	);
 
 	ResetProductionState();
@@ -631,20 +609,23 @@ float ATWTroopSpawnBuilding::GetCurrentProductionProgressRatio() const
 		return 0.f;
 	}
 
-	const UWorld* World = GetWorld();
-	if (!World)
+	float Elapsed = AccumulatedProductionTime;
+
+	if (!bQueuePausedByUpkeep && CurrentProductionStartTime > 0.f)
 	{
-		return 0.f;
+		const float Now = GetSyncedWorldTimeSeconds();
+		Elapsed += FMath::Max(0.f, Now - CurrentProductionStartTime);
 	}
 
-	const float Elapsed = World->GetTimeSeconds() - CurrentProductionStartTime;
+	Elapsed = FMath::Clamp(Elapsed, 0.f, CurrentProducingDuration);
+
 	return FMath::Clamp(Elapsed / CurrentProducingDuration, 0.f, 1.f);
 }
 
 FString ATWTroopSpawnBuilding::GetCurrentProductionProgressText() const
 {
 	const float Ratio = GetCurrentProductionProgressRatio();
-	return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Ratio * 100.f));
+	return FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Ratio * 100.f));
 }
 
 FVector ATWTroopSpawnBuilding::ResolveSpawnLocation() const

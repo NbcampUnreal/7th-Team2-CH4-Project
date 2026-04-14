@@ -6,8 +6,11 @@
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerState.h"
 #include "Data/TWBuildingTypes.h"
+#include "Data/TWUnitStatus.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "TWPlayerState.generated.h"
+
+struct FTWUpgradeTableRowBase;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
@@ -102,6 +105,21 @@ public:
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();
 #pragma endregion
+	
+#pragma region 업그레이드
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
+	TMap<FName, int32> UpgradeLevelsByID;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
+	TMap<FName, FTWUnitStatus> UnitUpgradeBonusMap;
+
+public:
+	int32 GetUpgradeLevelByID(const FName UpgradeID) const;
+	void ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow);
+	float GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const;
+#pragma endregion
+	
 
 private:
 	void NotifyUIResourceStateChanged();

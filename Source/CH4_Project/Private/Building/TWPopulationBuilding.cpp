@@ -35,13 +35,13 @@ int8 ATWPopulationBuilding::RequestEnqueuePopulation()
 
 	if (CurrentQueueCount >= PopulationData->MaxQueueCount)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("인구수 대기열 가득 참"));
+		UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 가득 참"));
 		return 0;
 	}
 
 	if (OwningPlayerState->CanAffordCost(PopulationData->ProductionCost) == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("인구수 대기열 추가 실패: 자원 부족"));
+		UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 추가 실패: 자원 부족"));
 		return 0;
 	}
 
@@ -49,7 +49,7 @@ int8 ATWPopulationBuilding::RequestEnqueuePopulation()
 
 	CurrentQueueCount += 1;
 	
-	UE_LOG(LogTemp, Warning, TEXT("인구수 대기열 추가: %d"), CurrentQueueCount);
+	UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 추가 | 현재 대기열 수: %d"), CurrentQueueCount);
 
 	StartPopulationQueueTimer();
 	return 1;
@@ -126,12 +126,22 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 
 	CurrentQueueCount = FMath::Max(0, CurrentQueueCount - 1);
 
-	UE_LOG(LogTemp, Log, TEXT("현재 인구수 대기열 수: %d"), CurrentQueueCount);
+	UE_LOG(LogTemp, Log, TEXT("[인구수 건물] 현재 대기열 수: %d"), CurrentQueueCount);
 
 	if (CurrentQueueCount <= 0)
 	{
 		ClearAllBuildingTimers();
 	}
+}
+
+void ATWPopulationBuilding::CancelQueuedPopulation()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CurrentQueueCount = 0;
 }
 
 void ATWPopulationBuilding::ClearAllBuildingTimers()
@@ -142,6 +152,8 @@ void ATWPopulationBuilding::ClearAllBuildingTimers()
 	}
 
 	GetWorldTimerManager().ClearTimer(PopulationQueueTimerHandle);
+	CancelQueuedPopulation();
+	ForceNetUpdate();
 }
 
 void ATWPopulationBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

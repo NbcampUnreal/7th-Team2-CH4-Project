@@ -4,6 +4,7 @@
 #include "Building/TWPopulationBuilding.h"
 #include "Building/TWNexusBuilding.h"
 #include "Building/TWBaseBuilding.h"
+#include "Building/TWUpgradeBuilding.h"
 #include "Building/TWBlockingBuilding.h"
 #include "Building/TWResourceBuilding.h"
 #include "Core/TWGameMode.h"
@@ -166,6 +167,16 @@ void ATWPlayerController::SetupInputComponent()
 			ETriggerEvent::Started,
 			this,
 			&ATWPlayerController::HandleTestDamageBlockingBuilding
+		);
+	}
+	
+	if (IA_TestUpgrade)
+	{
+		EnhancedInputComponent->BindAction(
+			IA_TestUpgrade,
+			ETriggerEvent::Started,
+			this,
+			&ATWPlayerController::HandleTestUpgrade
 		);
 	}
 }
@@ -1361,4 +1372,39 @@ void ATWPlayerController::NotifyResourceStateChanged()
 	RefreshUIBridge();
 }
 
+#pragma endregion
+
+#pragma region 업그레이드
+void ATWPlayerController::HandleTestUpgrade(const FInputActionValue& Value)
+{
+	ServerTestUpgrade();
+}
+
+void ATWPlayerController::ServerTestUpgrade_Implementation()
+{
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+
+	for (TActorIterator<ATWUpgradeBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWUpgradeBuilding* UpgradeBuilding = *It;
+		if (!UpgradeBuilding)
+		{
+			continue;
+		}
+
+		if (UpgradeBuilding->OwnerPlayerSlot != MyPlayerSlot)
+		{
+			continue;
+		}
+
+		UpgradeBuilding->RequestStartUpgrade(TEXT("Upgrade_Damage"));
+		return;
+	}
+}
 #pragma endregion

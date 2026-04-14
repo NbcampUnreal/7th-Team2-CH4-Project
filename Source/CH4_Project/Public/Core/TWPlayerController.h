@@ -180,7 +180,18 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Build|Classes")
 	TSubclassOf<ATWBaseBuilding> SelectedBuildingClass;
 #pragma endregion
+	
+#pragma region 업그레이드
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	UInputAction* IA_TestUpgrade;
 
+	UFUNCTION()
+	void HandleTestUpgrade(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTestUpgrade();
+#pragma endregion
+	
 #pragma region UI
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -253,7 +264,7 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void ClientForceRefreshSelectionBridge();
-
+	
 private:
 	void ChangeCurrentCommandType(ETWCommand CommandType);
 
