@@ -25,6 +25,8 @@
 #include "MassSignalSubsystem.h"
 #include "MassStateTreeFragments.h"
 #include "MassNavigationFragments.h"
+#include "MassReplicationFragments.h"
+#include "MassReplicationSubsystem.h"
 #include "NavigationSystem.h"
 #include "Building/GhostBuilding.h"
 #include "Data/TWBuildingDataAsset.h"
@@ -42,7 +44,8 @@ ATWPlayerController::ATWPlayerController()
 	: CurrentCommandType(ETWCommand::None)
 {
 	PrimaryActorTick.bCanEverTick = true;
-	SelectedEntities.Empty();
+	ServerSelectedEntities.Empty();
+	ClientSelectedEntities.Empty();
 	bIsBuildMode = false;
 }
 
@@ -272,7 +275,7 @@ void ATWPlayerController::OnBuildCommandAction(const FInputActionValue& InputAct
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
-	if (SelectedEntities.IsEmpty())
+	if (ServerSelectedEntities.IsEmpty())
 	{
 		return;
 	}
@@ -311,9 +314,9 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			}
 
 			TArray<FMassEntityHandle> ValidEntities;
-			ValidEntities.Reserve(ThisWeakPtr->SelectedEntities.Num());
+			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
 
-			for (const FMassEntityHandle& Entity : ThisWeakPtr->SelectedEntities)
+			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
 				{
@@ -351,7 +354,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 	EntityManager.AppendCommands(CommandBuffer);
 
 	UE_LOG(LogTemp, Log, TEXT("[Move] SelectedEntities=%d / Target=%s"),
-	       SelectedEntities.Num(),
+	       ServerSelectedEntities.Num(),
 	       *NavCommandLocation.ToString());
 }
 
@@ -364,7 +367,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 {
 	// TODO Hold
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
-	if (SelectedEntities.IsEmpty())
+	if (ServerSelectedEntities.IsEmpty())
 	{
 		return;
 	}
@@ -388,9 +391,9 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 			}
 
 			TArray<FMassEntityHandle> ValidEntities;
-			ValidEntities.Reserve(ThisWeakPtr->SelectedEntities.Num());
+			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
 
-			for (const FMassEntityHandle& Entity : ThisWeakPtr->SelectedEntities)
+			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
 				{
@@ -437,19 +440,19 @@ void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector&
 	if (UnitSubsystem->FindNearestEntity(CommandLocation, EntityHandle, TWPS->PlayerSlot))
 	{
 		SelectedBuilding = nullptr;
-		SelectedEntities.Empty();
-		SelectedEntities.Add(EntityHandle);
+		ServerSelectedEntities.Empty();
+		ServerSelectedEntities.Add(EntityHandle);
 
-		TArray<FName> UnitIds;
+		TArray<FMassNetworkID> NetworkIds;
 		float PrimaryHealth = 0.f;
 		bool bHasPrimaryHealth = false;
-		BuildSelectionPayloadFromEntities(SelectedEntities, UnitIds, PrimaryHealth, bHasPrimaryHealth);
+		BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
 
-		ClientApplyUnitSelection(UnitIds, PrimaryHealth, bHasPrimaryHealth);
+		ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth);
 	}
 	else
 	{
-		SelectedEntities.Empty();
+		ServerSelectedEntities.Empty();
 		SelectedBuilding = nullptr;
 		ClientClearSelection();
 	}
@@ -475,19 +478,19 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 	TArray<FMassEntityHandle> EntityHandles;
 	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, EntityHandles, TWPS->PlayerSlot))
 	{
-		SelectedEntities = EntityHandles;
+		ServerSelectedEntities = EntityHandles;
 		SelectedBuilding = nullptr;
 
-		TArray<FName> UnitIds;
+		TArray<FMassNetworkID> UnitIds;
 		float PrimaryHealth = 0.f;
 		bool bHasPrimaryHealth = false;
-		BuildSelectionPayloadFromEntities(SelectedEntities, UnitIds, PrimaryHealth, bHasPrimaryHealth);
+		BuildSelectionPayloadFromEntities(ServerSelectedEntities, UnitIds, PrimaryHealth, bHasPrimaryHealth);
 
 		ClientApplyUnitSelection(UnitIds, PrimaryHealth, bHasPrimaryHealth);
 		return;
 	}
 
-	SelectedEntities.Empty();
+	ServerSelectedEntities.Empty();
 	SelectedBuilding = nullptr;
 	ClientClearSelection();
 }
@@ -496,7 +499,7 @@ void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuild
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 
-	SelectedEntities.Empty();
+	ServerSelectedEntities.Empty();
 	SelectedBuilding = TargetBuilding;
 
 	if (!IsValid(TargetBuilding))
@@ -633,11 +636,11 @@ void ATWPlayerController::RebuildLocalSelectionSummary(const TArray<FName>& InUn
 
 void ATWPlayerController::BuildSelectionPayloadFromEntities(
 	const TArray<FMassEntityHandle>& InSelectedEntities,
-	TArray<FName>& OutUnitIds,
+	TArray<FMassNetworkID>& OutNetworkIds,
 	float& OutPrimaryHealth,
 	bool& bOutHasPrimaryHealth)
 {
-	OutUnitIds.Empty();
+	OutNetworkIds.Empty();
 	OutPrimaryHealth = 0.f;
 	bOutHasPrimaryHealth = false;
 
@@ -656,14 +659,14 @@ void ATWPlayerController::BuildSelectionPayloadFromEntities(
 		{
 			continue;
 		}
-
-		if (FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity))
+		
+		if (FMassNetworkIDFragment* NetworkIDFragmentFragment = EntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(Entity))
 		{
-			if (!UnitFragment->GetUnitID().IsNone())
-			{
-				OutUnitIds.Add(UnitFragment->GetUnitID());
-			}
+			OutNetworkIds.Add(NetworkIDFragmentFragment->NetID);
 		}
+		
+		
+		
 
 		if (Index == 0)
 		{
@@ -689,16 +692,42 @@ const FUICommandMetaRow* ATWPlayerController::FindCommandMetaRowFromTable(FName 
 }
 
 void ATWPlayerController::ClientApplyUnitSelection_Implementation(
-	const TArray<FName>& InUnitIds,
+	const TArray<FMassNetworkID>& InNetworkIds,
 	float InPrimaryHealth,
 	bool bInHasPrimaryHealth)
 {
 	ClearLocalSelectionCache();
 
-	LocalSelectedUnitCount = InUnitIds.Num();
+	LocalSelectedUnitCount = InNetworkIds.Num();
+	
+	ClientSelectedEntities = InNetworkIds;
+	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
+	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
+	TArray<FName> InUnitIds;
 
+	//우선 기존 코드 방식 유지해뒀어요
+	//리슨서버에서는 ServerSelectedUnits에서 정보를 얻어와야해요
+	for (const FMassNetworkID& NetID : InNetworkIds)
+	{
+					
+
+		UE_LOG(LogTemp, Warning, TEXT("%d"), NetID.GetValue());
+		
+		const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(NetID);
+		if (!EntityInfo)
+		{
+			continue;
+		}
+		FMassEntityHandle EntityHandle = EntityInfo->Entity;
+		FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
+		check(UnitFragment != nullptr);
+		
+		InUnitIds.Add(UnitFragment->GetUnitID());
+	}
+	
 	if (InUnitIds.Num() > 0)
 	{
+
 		LocalPrimarySelectedUnitId = InUnitIds[0];
 		RebuildLocalSelectionSummary(InUnitIds);
 	}

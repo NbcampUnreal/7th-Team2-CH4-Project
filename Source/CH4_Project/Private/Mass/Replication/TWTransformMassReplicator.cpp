@@ -12,6 +12,9 @@
 void UTWTransformMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
                                                           FMassReplicationContext& ReplicationContext)
 {
+	
+	
+	
 #if UE_REPLICATION_COMPILE_SERVER_CODE
 	FMassReplicationSharedFragment* RepSharedFrag = nullptr;  
 	TConstArrayView<FTransformFragment> TransformFragments;
