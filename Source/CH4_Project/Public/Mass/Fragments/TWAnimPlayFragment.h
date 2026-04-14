@@ -4,20 +4,34 @@
 #include "MassEntityElementTypes.h"
 #include "TWAnimPlayFragment.generated.h"
 
+UENUM()
+enum class ETWAnimPlayType : uint8
+{
+	None,
+	Attack,
+	Move,
+	Idle,
+	Dead,
+};
+
 USTRUCT()
 struct FTWAnimPlayFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	
-	UPROPERTY()
-	bool bIsAttackAnimPlay = false;
+	FTWAnimPlayFragment() : CurrentAnimType(ETWAnimPlayType::Idle){}
 	
-	UPROPERTY()
-	bool bIsMovingAnimPlay = false;
+	void SetAnimType(const ETWAnimPlayType NewType)
+	{
+		CurrentAnimType = NewType;
+	}
 	
-	UPROPERTY()
-	bool bIsIdleAnimPlay = false;
+	ETWAnimPlayType GetAnimType() const
+	{
+		return CurrentAnimType;
+	}
 	
+protected:
 	UPROPERTY()
-	bool bIsDeadAnimPlay = false;
+	ETWAnimPlayType CurrentAnimType = ETWAnimPlayType::Idle;
 };

@@ -3,16 +3,12 @@
 #include "StateTreeLinker.h"
 #include "MassCommonFragments.h"
 #include "MassNavigationFragments.h"
-#include "Mass/Fragments/TWStandFragment.h"
 #include "MassMovementFragments.h"
 
 bool FTWStateTreeStopTask::Link(FStateTreeLinker& Linker)
 {
 	Linker.LinkExternalData(TransformHandle);
 	Linker.LinkExternalData(MoveTargetHandle);
-	Linker.LinkExternalData(StandHandle);
-	// 기본 엔진에서 제공하는 속도
-	Linker.LinkExternalData(VelocityHandle);
 	return true;
 }
 
@@ -20,20 +16,14 @@ EStateTreeRunStatus FTWStateTreeStopTask::EnterState(
 	FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	UE_LOG(LogTemp, Warning, TEXT("Stop Task Entered!"));
-	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-	FMassVelocityFragment& Velocity = Context.GetExternalData(VelocityHandle);
+	const FVector MyCurrentLocation = Context.GetExternalData(TransformHandle).GetTransform().GetLocation();
 	
-	const FTransform& CurrentTransform = Context.GetExternalData(TransformHandle).GetTransform();
-	InstanceData.TargetLocation.EndOfPathPosition = CurrentTransform.GetLocation();
-	
-	FTWStandFragment& StandFragment = Context.GetExternalData(StandHandle);
 	FMassMoveTargetFragment& MoveTarget = Context.GetExternalData(MoveTargetHandle);
+	MoveTarget.Center = MyCurrentLocation;
 	
-	StandFragment.bIsStopping = true;
-	
+	MoveTarget.DistanceToGoal = 0.0f;
 	MoveTarget.DesiredSpeed.Set(0.0f);
-	Velocity.Value = FVector::ZeroVector;
-	MoveTarget.CreateNewAction(EMassMovementAction::Stand, *Context.GetWorld());
+	MoveTarget.IntentAtGoal = EMassMovementAction::Stand;
 	
 	return EStateTreeRunStatus::Running;
 }
@@ -46,7 +36,6 @@ EStateTreeRunStatus FTWStateTreeStopTask::Tick(FStateTreeExecutionContext& Conte
 void FTWStateTreeStopTask::ExitState(FStateTreeExecutionContext& Context,
 	const FStateTreeTransitionResult& Transition) const
 {
-	FTWStandFragment& StandFragment = Context.GetExternalData(StandHandle);
 	FMassMoveTargetFragment& MoveTarget = Context.GetExternalData(MoveTargetHandle);
 	
 	UE_LOG(LogMass, Log, TEXT("Exit Stop State  <<================"));

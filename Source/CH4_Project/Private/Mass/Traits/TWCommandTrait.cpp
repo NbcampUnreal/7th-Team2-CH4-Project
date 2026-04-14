@@ -25,4 +25,3 @@ void UTWCommandTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContex
 	const FConstSharedStruct OffsetConstSharedStruct = EntityManager.GetOrCreateConstSharedFragment(OffsetParamsFragment);
 	BuildContext.AddConstSharedFragment(OffsetConstSharedStruct);
 }
-

@@ -6,7 +6,6 @@
 #include "TWStateTreeStopTask.generated.h"
 
 struct FTransformFragment;
-struct FTWStandFragment;
 struct FMassMoveTargetFragment;
 struct FMassVelocityFragment;
 
@@ -15,8 +14,8 @@ struct CH4_PROJECT_API FTWMassStopInstanceData
 {
 	GENERATED_BODY()
 	
-	UPROPERTY(EditAnywhere, Category = Output)
-	FMassTargetLocation TargetLocation;
+	/*UPROPERTY(EditAnywhere, Category = Output)
+	FMassTargetLocation TargetLocation;*/
 };
 
 USTRUCT()
@@ -44,7 +43,6 @@ struct FTWStateTreeStopTask : public FMassStateTreeTaskBase
 protected:
 	TStateTreeExternalDataHandle<FTransformFragment> TransformHandle;
 	TStateTreeExternalDataHandle<FMassMoveTargetFragment> MoveTargetHandle;
-	TStateTreeExternalDataHandle<FTWStandFragment> StandHandle;
 	
 	TStateTreeExternalDataHandle<FMassVelocityFragment> VelocityHandle;
 };
