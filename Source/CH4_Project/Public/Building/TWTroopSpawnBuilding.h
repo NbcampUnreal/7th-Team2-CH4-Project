@@ -32,6 +32,12 @@ public:
 	void SetQueuePausedByUpkeep(bool bInPaused);
 
 protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category="Production")
+	float AccumulatedProductionTime = 0.f;
+
+	float PausedRemainingProductionTime = 0.f;
+	
+	float GetSyncedWorldTimeSeconds() const;
 	void CancelQueuedProductionAndRestorePendingPopulation();
 	virtual void ClearAllBuildingTimers() override;
 	virtual void OnOwnerPlayerStateAssigned() override;
