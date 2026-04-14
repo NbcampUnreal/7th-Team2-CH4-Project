@@ -4,7 +4,6 @@
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingDataAsset.h"
-#include "Data/TWTroopBuildingDataAsset.h"
 #include "Data/TWUnitTableRowBase.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
@@ -321,7 +320,7 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroop()
 	FName DefaultUnitId = NAME_None;
 	if (!ResolveDefaultUnitId(DefaultUnitId))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroop failed: DefaultUnitId not found"));
+		UE_LOG(LogTemp, Warning, TEXT("[병력 생산 건물] 대기열 추가 실패: 기본 유닛 ID를 찾을 수 없음"));
 		return false;
 	}
 
@@ -330,19 +329,13 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroop()
 
 bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 {
-	if (!HasAuthority())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: Not authority / UnitId=%s"), *UnitId.ToString());
-		return false;
-	}
-
 	FString FailReason;
 	if (!CanEnqueueUnitId(UnitId, &FailReason))
 	{
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: UnitId=%s / Reason=%s"),
+			TEXT("[병력 생산 건물] 대기열 추가 실패 | UnitID: %s | 사유: %s"),
 			*UnitId.ToString(),
 			*FailReason
 		);
@@ -350,15 +343,8 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 	}
 
 	const FTWUnitTableRowBase* UnitRow = FindUnitRow(UnitId);
-	if (!UnitRow)
+	if (!UnitRow || !OwningPlayerState)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: Unit row not found (%s)"), *UnitId.ToString());
-		return false;
-	}
-
-	if (!OwningPlayerState)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] RequestEnqueueTroopById failed: OwningPlayerState is null"));
 		return false;
 	}
 
@@ -371,7 +357,7 @@ bool ATWTroopSpawnBuilding::RequestEnqueueTroopById(FName UnitId)
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] Enqueue success: UnitId=%s / QueueCount=%d"),
+		TEXT("[병력 생산 건물] 대기열 추가 성공 | UnitID: %s | 현재 대기열 수: %d"),
 		*UnitId.ToString(),
 		ProductionQueue.Num()
 	);
@@ -384,13 +370,11 @@ void ATWTroopSpawnBuilding::TryStartNextProduction()
 {
 	if (!HasAuthority())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] TryStartNextProduction skipped: Not authority"));
 		return;
 	}
 
 	if (bQueuePausedByUpkeep)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] TryStartNextProduction skipped: Queue paused by upkeep"));
 		return;
 	}
 
@@ -445,7 +429,7 @@ void ATWTroopSpawnBuilding::StartProductionForUnit(FName UnitId, const FTWUnitTa
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] StartProductionForUnit: UnitId=%s / Duration=%.2f"),
+		TEXT("[병력 생산 건물] 생산 시작 | UnitID: %s | 생산 시간: %.2f초"),
 		*UnitId.ToString(),
 		CurrentProducingDuration
 	);
@@ -485,7 +469,7 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 	const FTWUnitTableRowBase* UnitRow = FindUnitRow(FinishedUnitId);
 	if (!UnitRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[TroopSpawnBuilding] HandleProductionFinished failed: Unit row not found (%s)"), *FinishedUnitId.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("[병력 생산 건물] 생산 완료 처리 실패: 유닛 데이터 행을 찾을 수 없음 | UnitID: %s"), *FinishedUnitId.ToString());
 		ProductionQueue.RemoveAt(0);
 		ResetProductionState();
 		TryStartNextProduction();
@@ -542,7 +526,7 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[TroopSpawnBuilding] HandleProductionFinished success: UnitId=%s / RemainingQueue=%d"),
+		TEXT("[병력 생산 건물] 생산 완료 | UnitID: %s | 남은 대기열 수: %d"),
 		*FinishedUnitId.ToString(),
 		ProductionQueue.Num()
 	);
