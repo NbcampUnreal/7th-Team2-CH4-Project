@@ -3,6 +3,7 @@
 #include "Data/TWBuildingDataAsset.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/TWGridSubSystem.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
 {
@@ -28,6 +29,17 @@ void ATWBaseBuilding::BeginPlay()
 	
 	CacheOriginalMaterial();
 	UpdatePlayerMaterial();
+	
+		
+	if (UWorld* World = GetWorld())
+	{
+		if (UTWGridSubSystem* GridSub = World->GetSubsystem<UTWGridSubSystem>())
+		{
+			FIntPoint Anchor = GridSub->WorldToGridPosition(GetActorLocation());
+			FIntPoint Size = BuildingData ? BuildingData->GridSize.BuildingSize : FIntPoint(1,1);
+			GridSub->OccupyArea(Anchor, Size, this);
+		}
+	}
 	
 	if (!HasAuthority())
 	{
@@ -57,14 +69,19 @@ void ATWBaseBuilding::BeginPlay()
 
 void ATWBaseBuilding::Destroyed()
 {
-	Super::Destroyed();
-
-	if (!HasAuthority())
-	{
-		return;
-	}
-
 	ClearAllBuildingTimers();
+	
+	if (UWorld* World = GetWorld())
+	{
+		if (UTWGridSubSystem* GridSub = World->GetSubsystem<UTWGridSubSystem>())
+		{
+			FIntPoint Anchor = GridSub->WorldToGridPosition(GetActorLocation());
+			FIntPoint Size = BuildingData ? BuildingData->GridSize.BuildingSize : FIntPoint(1,1);
+			
+			GridSub->FreeArea(Anchor, Size);
+		}
+	}
+	Super::Destroyed();
 }
 
 void ATWBaseBuilding::ApplyDamageToBuilding(const float InDamageAmount)

@@ -116,6 +116,19 @@ void UTWGridSubSystem::OccupyArea(FIntPoint AnchorLocation, FIntPoint BuildingSi
 	}
 }
 
+void UTWGridSubSystem::FreeArea(FIntPoint AnchorLocation, FIntPoint BuildingSize)
+{
+	for (int32 Y = 0; Y < BuildingSize.Y; ++Y)
+	{
+		for (int32 X = 0; X < BuildingSize.X; ++X)
+		{
+			FIntPoint TargetGrid(AnchorLocation.X + X, AnchorLocation.Y + Y);
+			
+			RemoveBuildingAt(TargetGrid);
+		}
+	}
+}
+
 FVector UTWGridSubSystem::GetBuildingCenterPosition(FIntPoint AnchorLocation, FIntPoint BuildingSize) const
 {
 	float WorldX = (AnchorLocation.X * CellSize) + (BuildingSize.X * CellSize *0.5f);// + GridOrigin.X;
@@ -156,6 +169,17 @@ void UTWGridSubSystem::PlaceBuildingAt(const FIntPoint& GridLocation, AActor* Bu
 		
 		GridData[Index].OccupyingBuilding = Building;
 		GridData[Index].bIsBuildable = false;
+	}
+}
+
+void UTWGridSubSystem::RemoveBuildingAt(const FIntPoint& GridLocation)
+{
+	if (IsValidGridLocation(GridLocation))
+	{
+		int32 Index = (GridLocation.Y * GridDimensions.X) + GridLocation.X;
+		
+		GridData[Index].OccupyingBuilding = nullptr;
+		GridData[Index].bIsBuildable = true;
 	}
 }
 

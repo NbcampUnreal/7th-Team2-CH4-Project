@@ -39,17 +39,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	void OccupyArea(FIntPoint AnchorLocation, FIntPoint BuildingSize, AActor* BuildingAnchor);
 	
+	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
+	void FreeArea(FIntPoint AnchorLocation, FIntPoint BuildingSize);
+	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Coordinate")
 	FVector GetBuildingCenterPosition(FIntPoint AnchorLocation, FIntPoint BuildingSize) const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	bool CanBuildAt(const FIntPoint& GridLocation) const;	// 좌표에 건물을 건설할 수 있는지 검사
+	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	void PlaceBuildingAt(const FIntPoint& GridLocation, AActor* Building);	// 좌표에 건물을 건설하고 데이터 업데이트
-	
-	// UFUNCTION(BlueprintCallable, Category = "Grid|FogOfWar")
-	// void UpdateVisionAroundLocation(const FIntPoint& CenterLocation, int32 VisionRadius);	// 건물 주변 반경 시야 Visible로 갱신
-	//
+	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
+	void RemoveBuildingAt(const FIntPoint& GridLocation);
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
