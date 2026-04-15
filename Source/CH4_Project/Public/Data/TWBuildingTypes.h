@@ -6,11 +6,13 @@
 UENUM(BlueprintType)
 enum class EBuildingCategory : uint8
 {
-	None                UMETA(DisplayName="None"),
-	ResourceProduction  UMETA(DisplayName="ResourceProduction"),
-	TroopProduction     UMETA(DisplayName="TroopProduction"),
-	PopulationProduction     UMETA(DisplayName="PopulationProduction"),
+	None					UMETA(DisplayName="None"),
+	StoneResourceProduction	UMETA(DisplayName="StoneResourceProduction"),
+	WoodResourceProduction	UMETA(DisplayName="WoodResourceProduction"),
+	TroopProduction			UMETA(DisplayName="TroopProduction"),
+	PopulationProduction	UMETA(DisplayName="PopulationProduction"),
 	Blocking                UMETA(DisplayName="Blocking"),
+	Upgrade					UMETA(DisplayName="Upgrade"),
 	Nexus                   UMETA(DisplayName="Nexus")
 };
 

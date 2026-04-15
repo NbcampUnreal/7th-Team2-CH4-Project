@@ -10,7 +10,7 @@ AGhostBuilding::AGhostBuilding()
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
 	RootComponent = StaticMesh;
 	
-	//StaticMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	StaticMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void AGhostBuilding::OnConstruction(const FTransform& Transform)

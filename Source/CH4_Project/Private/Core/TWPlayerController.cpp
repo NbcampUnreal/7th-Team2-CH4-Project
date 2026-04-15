@@ -1372,13 +1372,16 @@ void ATWPlayerController::OnSelectWoodBuildingCommandAction()
 {
 	if (BuildComponent)
 	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::ResourceProduction);
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::WoodResourceProduction);
 	}
 }
 
 void ATWPlayerController::OnSelectStoneBuildingCommandAction()
 {
-	
+	if (BuildComponent)
+	{
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::StoneResourceProduction);
+	}
 }
 
 void ATWPlayerController::OnSelectPopulationBuildingCommandAction()
@@ -1390,15 +1393,27 @@ void ATWPlayerController::OnSelectPopulationBuildingCommandAction()
 }
 
 void ATWPlayerController::OnSelectTroopBuildingCommandAction()
-{
+{	
+	if (BuildComponent)
+	{
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::TroopProduction);
+	}
 }
 
 void ATWPlayerController::OnSelectUpgradeBuildingCommandAction()
 {
+	if (BuildComponent)
+	{
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::Upgrade);
+	}
 }
 
 void ATWPlayerController::OnSelectBlockingBuildingCommandAction()
 {
+	if (BuildComponent)
+	{
+		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::Blocking);
+	}
 }
 
 void ATWPlayerController::NotifyResourceStateChanged()
