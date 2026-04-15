@@ -10,6 +10,7 @@ ATWBaseBuilding::ATWBaseBuilding()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	
 	bReplicates = true;
+	bHasCachedMaterials = false;
 	SetReplicateMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
@@ -25,14 +26,8 @@ void ATWBaseBuilding::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if (MeshComponent)
-	{
-		const int32 NumMats = MeshComponent->GetNumMaterials();
-		for (int32 i = 0 ; i < NumMats ; ++i)
-		{
-			OriginalMaterials.Add(MeshComponent->GetMaterial(i));
-		}
-	}
+	CacheOriginalMaterial();
+	UpdatePlayerMaterial();
 	
 	if (!HasAuthority())
 	{
@@ -124,6 +119,11 @@ void ATWBaseBuilding::HandleDestroyedByDamage()
 	Destroy();
 }
 
+void ATWBaseBuilding::OnRep_OwnerPlayerSlot()
+{
+	UpdatePlayerMaterial();
+}
+
 void ATWBaseBuilding::OnRep_BuildingState()
 {
 	if (!MeshComponent)
@@ -148,6 +148,42 @@ void ATWBaseBuilding::OnRep_BuildingState()
 			if (OriginalMaterials.IsValidIndex(i))
 			{
 				MeshComponent->SetMaterial(i, OriginalMaterials[i]);	
+			}
+		}
+	}
+}
+
+void ATWBaseBuilding::CacheOriginalMaterial()
+{
+	if (bHasCachedMaterials || !MeshComponent)
+	{
+		return;
+	}
+	
+	const int32 NumMats = MeshComponent->GetNumMaterials();
+	for (int32 i = 0; i < NumMats; ++i)
+	{
+		OriginalMaterials.Add(MeshComponent->GetMaterial(i));
+	}
+	
+	bHasCachedMaterials = true;
+}
+
+void ATWBaseBuilding::UpdatePlayerMaterial()
+{
+	CacheOriginalMaterial();
+	
+	if (PlayerMaterialMap.Contains(OwnerPlayerSlot))
+	{
+		UMaterialInterface* PlayerMat = PlayerMaterialMap[OwnerPlayerSlot];
+		
+		if (PlayerMat && OriginalMaterials.IsValidIndex(PlayerMaterialIndex))
+		{
+			OriginalMaterials[PlayerMaterialIndex] = PlayerMat;
+			
+			if (BuildingState == ETWBuildingState::Completed && MeshComponent)
+			{
+				MeshComponent->SetMaterial(PlayerMaterialIndex, PlayerMat);
 			}
 		}
 	}
@@ -193,6 +229,16 @@ void ATWBaseBuilding::FinishConstruction()
 	GetWorld()->GetTimerManager().ClearTimer(ConstructionTimerHandle);
 	UE_LOG(LogTemp, Warning, TEXT("BuildCompleted"));
 	OnRep_BuildingState();
+}
+
+void ATWBaseBuilding::SetOwnerPlayerSlot(int32 InSlot)
+{
+	if (HasAuthority())
+	{
+		OwnerPlayerSlot = InSlot;
+		
+		UpdatePlayerMaterial();
+	}
 }
 
 void ATWBaseBuilding::SetOwnerPlayerState(ATWPlayerState* InPlayerState)

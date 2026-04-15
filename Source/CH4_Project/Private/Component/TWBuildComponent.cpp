@@ -150,7 +150,7 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 		
 		if (NewBuilding)
 		{
-			NewBuilding->OwnerPlayerSlot = TWPS->PlayerSlot;
+			NewBuilding->SetOwnerPlayerSlot(TWPS->PlayerSlot);
 		
 			if (ATWGameMode* TWGM = GetWorld()->GetAuthGameMode<ATWGameMode>())
 			{
