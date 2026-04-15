@@ -11,14 +11,5 @@ struct FTWAttackFragment : public FMassFragment
 	
 	FTWAttackFragment() = default;
 	
-	UPROPERTY(EditAnywhere, Category = "Attack")
-	float AttackRange = 0.0f;
-	
-	UPROPERTY(EditAnywhere, Category="Attack")
-	float AttackDamage = 0.0f;
-	
-	UPROPERTY(EditAnywhere, Category="Attack")
-	float AttackInterval = 0.0f;
-	
 	float LastAttackTime = 0.0f;
 };
