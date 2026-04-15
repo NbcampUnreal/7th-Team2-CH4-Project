@@ -17,13 +17,14 @@ public:
 
 	// Replicated를 통해 동기화
 	UPROPERTY(ReplicatedUsing = OnRep_TeamID, EditAnywhere, BlueprintReadWrite, Category = "Team")
-	int32 TeamID = 0;
+	int32 TeamID = -1;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	UFUNCTION()
 	void OnRep_TeamID();
 
+	int32 GetTeamID() const {return TeamID;}
 	void SetTeamID(int32 NewTeamID);
 
 	UPROPERTY(BlueprintAssignable, Category = "Team")

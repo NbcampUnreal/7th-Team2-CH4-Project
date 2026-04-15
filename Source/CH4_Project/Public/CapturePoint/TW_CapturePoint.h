@@ -6,9 +6,11 @@
 #include "GameFramework/Actor.h"
 #include "TW_CapturePoint.generated.h"
 
+class UTWResourceBuildingDataAsset;
 class UBoxComponent;
 class UTWTeamComponent;
 class UTWVisionComponent;
+class ATWPlayerState;
 
 UCLASS()
 class CH4_PROJECT_API ATW_CapturePoint : public AActor
@@ -61,8 +63,8 @@ private:
 	void CheckCaptureStatus();
 	
 private:
-	
-	int32 CapturingTeamID = 0;
+	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	int32 CapturingTeamID = -1;
 
 	// 영역 내 액터 관리
 	TSet<AActor*> OverlappingActors;
@@ -73,4 +75,20 @@ private:
 
 	UFUNCTION()
 	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	
+#pragma region Resources
+protected:
+	FTimerHandle MithrilProductionTimerHandle;
+	
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Resource")
+	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Resource")
+	TObjectPtr<UTWResourceBuildingDataAsset> ResourceDataAsset;
+	
+	void SetOwningPlayer(ATWPlayerState* NewPlayerState);
+	void StartMithrilProduction(); // 자원 생산 시작
+	void HandleMithrilResource(); // 자원 지급
+	
+#pragma endregion
 };

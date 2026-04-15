@@ -19,6 +19,7 @@ enum class EResourceType : uint8
 {
 	Wood    UMETA(DisplayName="Wood"),
 	Ore     UMETA(DisplayName="Ore"),
+	Mithril	UMETA(DisplayName="Mithril"),
 	Count	UMETA(DisplayName="Count"),
 	None	UMETA(DisplayName="None"),
 };

@@ -50,6 +50,6 @@ void ATWMiniMap::UpdateCapture()
 		return;
 	}
 	
-	UE_LOG(LogTemp, Warning, TEXT("미니맵 캡처 실행중"));
+	// UE_LOG(LogTemp, Warning, TEXT("미니맵 캡처 실행중"));
 	CaptureComp->CaptureScene();
 }

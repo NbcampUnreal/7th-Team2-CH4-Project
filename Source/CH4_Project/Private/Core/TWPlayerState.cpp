@@ -61,10 +61,11 @@ void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 A
 	UE_LOG(
 		LogTemp,
 		Warning,
-		TEXT("Player %d | Wood: %d | Ore: %d"),
+		TEXT("Player %d | Wood: %d | Ore: %d | Mithril: %d"),
 		PlayerSlot,
 		GetResourceAmount(EResourceType::Wood),
-		GetResourceAmount(EResourceType::Ore)
+		GetResourceAmount(EResourceType::Ore),
+		GetResourceAmount(EResourceType::Mithril)
 	);
 
 	NotifyUIResourceStateChanged();
