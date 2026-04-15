@@ -40,7 +40,7 @@ public:
 	TObjectPtr<UTWBuildingDataAsset> BuildingData = nullptr;
 	
 	// 0 = Player1, 1 = Player2 ... [테스트]
-	UPROPERTY(Replicated, EditInstanceOnly, BlueprintReadOnly, Category="Building")
+	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
 	int32 OwnerPlayerSlot = 0;
 	
 	UFUNCTION(BlueprintCallable, Category="Building")
@@ -75,7 +75,16 @@ protected:
 	ETWBuildingState BuildingState = ETWBuildingState::None;
 	
 	UFUNCTION()
+	void OnRep_OwnerPlayerSlot();
+	
+	UFUNCTION()
 	void OnRep_BuildingState();
+	
+	UPROPERTY(EditAnywhere, Category="Building|Visual")
+	TMap<int32, TObjectPtr<UMaterialInterface>> PlayerMaterialMap;
+	
+	UPROPERTY(EditAnywhere, Category="Building|Visual")
+	int32 PlayerMaterialIndex = 0;
 	
 	UPROPERTY(EditAnywhere, Category="Building|Visual")
 	TObjectPtr<UMaterialInterface> ConstructionMaterial;
@@ -91,11 +100,19 @@ protected:
 	float CurrentBuildTime = 0.0f;
 	float MaxBuildTime = 0.0f;
 	
+	uint8 bHasCachedMaterials : 1;
+	
+	void CacheOriginalMaterial();
+	void UpdatePlayerMaterial();
+	
 	void StartConstruction();
 	void UpdateConstruction();
 	void FinishConstruction();
 	
 public:
+	UFUNCTION(BlueprintCallable, Category="Building")
+	void SetOwnerPlayerSlot(int32 InSlot);
+	
 	void SetOwnerPlayerState(ATWPlayerState* InPlayerState);
 	ATWPlayerState* GetOwnerPlayerState() const { return OwningPlayerState; }
 
