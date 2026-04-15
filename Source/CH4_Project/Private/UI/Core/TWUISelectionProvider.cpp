@@ -1,5 +1,10 @@
 ﻿#include "UI/Core/TWUISelectionProvider.h"
 
+#include "Core/TWPlayerController.h"
+#include "Core/TWPlayerState.h"
+#include "Building/TWBaseBuilding.h"
+#include "Subsystems/TWUnitSubsystem.h"
+
 UTWUISelectionProvider::UTWUISelectionProvider()
 {
 	SeedDefaultCommandMap();
@@ -281,9 +286,65 @@ void UTWUISelectionProvider::PopCommandContext()
 
 void UTWUISelectionProvider::RefreshFromSourceIfNeeded() const
 {
-	if (!bUseDebugFallback)
+	if (bUseDebugFallback)
 	{
-		// TODO: 실제 SelectionSystem 연동은 다음 단계에서 구현
+		return;
+	}
+
+	const ATWPlayerController* TWPC = Cast<ATWPlayerController>(SelectionSystemSource);
+	if (!TWPC)
+	{
+		return;
+	}
+
+	// 브리지에서 SetRuntimeSelection으로 밀어준 상태가 이미 있으면 그대로 사용
+	if (CachedSelectionViewModel.SelectionType != ESelectionViewType::None)
+	{
+		return;
+	}
+
+	// fallback: 단일 건물 선택만 간단 반영
+	if (ATWBaseBuilding* SelectedBuilding = TWPC->GetPrimarySelectedBuilding())
+	{
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel = FSelectionViewModel();
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionType = ESelectionViewType::Building;
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode = ESelectionViewMode::Single;
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId = TWPC->ResolveBuildingSelectionId(SelectedBuilding);
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.DisplayName = SelectedBuilding->GetName();
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TypeLabel = TEXT("Building");
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount = TWPC->GetLocalSelectedBuildingCount();
+
+		const_cast<UTWUISelectionProvider*>(this)->CachedViewMode = ESelectionViewMode::Single;
+		const_cast<UTWUISelectionProvider*>(this)->CachedPrimaryEntityId =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId;
+		const_cast<UTWUISelectionProvider*>(this)->CachedTotalSelectedCount =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount;
+		return;
+	}
+
+	// fallback: 유닛 선택
+	if (TWPC->GetLocalSelectedUnitCount() > 0)
+	{
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel = FSelectionViewModel();
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionType =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewType::Multi : ESelectionViewType::Unit;
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId =
+			TWPC->GetLocalPrimarySelectedUnitId();
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount =
+			TWPC->GetLocalSelectedUnitCount();
+		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SummaryItems =
+			TWPC->GetLocalSelectionSummaryItems();
+
+		const_cast<UTWUISelectionProvider*>(this)->CachedViewMode =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode;
+		const_cast<UTWUISelectionProvider*>(this)->CachedPrimaryEntityId =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId;
+		const_cast<UTWUISelectionProvider*>(this)->CachedTotalSelectedCount =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount;
+		const_cast<UTWUISelectionProvider*>(this)->CachedSummaryItems =
+			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SummaryItems;
 	}
 }
 

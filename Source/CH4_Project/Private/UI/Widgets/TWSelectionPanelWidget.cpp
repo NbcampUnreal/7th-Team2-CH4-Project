@@ -5,24 +5,57 @@
 #include "Components/TileView.h"
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/VerticalBox.h"
 #include "Engine/Texture2D.h"
 #include "UI/Data/TWSelectionQueueItemObject.h"
 #include "Components/ProgressBar.h"
 #include "UI/Data/TWSelectionSummaryItemObject.h"
+
+float UTWSelectionPanelWidget::ResolveSafeHPPercent(const FSelectionViewModel& InData) const
+{
+	if (InData.MaxHP <= 0.f)
+	{
+		return 0.f;
+	}
+
+	return FMath::Clamp(InData.CurrentHP / InData.MaxHP, 0.f, 1.f);
+}
+
+void UTWSelectionPanelWidget::ApplyHPColor(UProgressBar* InProgressBar, float InPercent) const
+{
+	if (!InProgressBar)
+	{
+		return;
+	}
+
+	if (InPercent <= 0.3f)
+	{
+		InProgressBar->SetFillColorAndOpacity(FLinearColor(0.9f, 0.2f, 0.2f, 1.f));
+	}
+	else if (InPercent <= 0.7f)
+	{
+		InProgressBar->SetFillColorAndOpacity(FLinearColor(0.9f, 0.8f, 0.2f, 1.f));
+	}
+	else
+	{
+		InProgressBar->SetFillColorAndOpacity(FLinearColor(0.2f, 0.85f, 0.3f, 1.f));
+	}
+}
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
 {
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[SelectionPanel] SetSelectionData - Name: %s / Type: %s / HP: %s / ViewMode: %d / SummaryCount: %d / ProductionVisible: %d / QueueCount: %d"),
+		TEXT("[SelectionPanel] SetSelectionData - Name: %s / Type: %s / HP: %s / ViewMode: %d / SummaryCount: %d / ProductionVisible: %d / QueueCount: %d / DetailStats: %d"),
 		*InData.DisplayName,
 		*InData.TypeLabel,
 		*InData.HPText,
 		static_cast<int32>(InData.ViewMode),
 		InData.SummaryItems.Num(),
 		InData.bShowProductionPanel ? 1 : 0,
-		InData.Production.QueueItems.Num()
+		InData.Production.QueueItems.Num(),
+		InData.bShowDetailStats ? 1 : 0
 	);
 
 	if (!StateSwitcher)
@@ -74,6 +107,31 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 		TextHP->SetText(FText::FromString(InData.HPText));
 	}
 
+	if (HPProgressBar)
+	{
+		const float SafePercent = ResolveSafeHPPercent(InData);
+		HPProgressBar->SetPercent(SafePercent);
+		ApplyHPColor(HPProgressBar, SafePercent);
+	}
+
+	if (HPBarBox)
+	{
+		const bool bShowHP = InData.MaxHP > 0.f;
+		HPBarBox->SetVisibility(bShowHP ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	else
+	{
+		if (HPProgressBar)
+		{
+			HPProgressBar->SetVisibility(InData.MaxHP > 0.f ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		}
+
+		if (TextHP)
+		{
+			TextHP->SetVisibility(InData.MaxHP > 0.f ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		}
+	}
+
 	if (TextCountLabel)
 	{
 		TextCountLabel->SetText(FText::GetEmpty());
@@ -103,6 +161,40 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 		}
 	}
 
+	if (StatsBox)
+	{
+		StatsBox->SetVisibility(
+			InData.bShowDetailStats
+				? ESlateVisibility::SelfHitTestInvisible
+				: ESlateVisibility::Collapsed
+		);
+	}
+
+	if (TextDamage)
+	{
+		TextDamage->SetText(FText::FromString(FString::Printf(TEXT("ATK: %.0f"), InData.Damage)));
+	}
+
+	if (TextArmor)
+	{
+		TextArmor->SetText(FText::FromString(FString::Printf(TEXT("DEF: %.0f"), InData.Armor)));
+	}
+
+	if (TextAttackSpeed)
+	{
+		TextAttackSpeed->SetText(FText::FromString(FString::Printf(TEXT("AS: %.2f"), InData.AttackSpeed)));
+	}
+
+	if (TextMoveSpeed)
+	{
+		TextMoveSpeed->SetText(FText::FromString(FString::Printf(TEXT("SPD: %.2f"), InData.MoveSpeed)));
+	}
+
+	if (TextRange)
+	{
+		TextRange->SetText(FText::FromString(FString::Printf(TEXT("RNG: %.0f"), InData.Range)));
+	}
+
 	RebuildMultiSummaryTiles({});
 
 	if (ProductionPanelBox)
@@ -123,6 +215,7 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 	{
 		TextProductionProgress->SetText(FText::FromString(InData.Production.ProgressText));
 	}
+
 	if (ProductionProgressBar)
 	{
 		const float SafeRatio = FMath::Clamp(InData.Production.ProgressRatio, 0.f, 1.f);
@@ -150,6 +243,28 @@ void UTWSelectionPanelWidget::RefreshMultiState(const FSelectionViewModel& InDat
 	{
 		ImagePortrait->SetBrushFromTexture(nullptr, true);
 		ImagePortrait->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	if (HPBarBox)
+	{
+		HPBarBox->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	else
+	{
+		if (HPProgressBar)
+		{
+			HPProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		if (TextHP)
+		{
+			TextHP->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+
+	if (StatsBox)
+	{
+		StatsBox->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
 	RebuildMultiSummaryTiles(InData.SummaryItems);
@@ -233,6 +348,16 @@ void UTWSelectionPanelWidget::ClearAllDynamicViews()
 		TextHP->SetText(FText::GetEmpty());
 	}
 
+	if (HPProgressBar)
+	{
+		HPProgressBar->SetPercent(0.f);
+	}
+
+	if (HPBarBox)
+	{
+		HPBarBox->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	if (TextCountLabel)
 	{
 		TextCountLabel->SetText(FText::GetEmpty());
@@ -242,6 +367,36 @@ void UTWSelectionPanelWidget::ClearAllDynamicViews()
 	{
 		ImagePortrait->SetBrushFromTexture(nullptr, true);
 		ImagePortrait->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	if (StatsBox)
+	{
+		StatsBox->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (TextDamage)
+	{
+		TextDamage->SetText(FText::GetEmpty());
+	}
+
+	if (TextArmor)
+	{
+		TextArmor->SetText(FText::GetEmpty());
+	}
+
+	if (TextAttackSpeed)
+	{
+		TextAttackSpeed->SetText(FText::GetEmpty());
+	}
+
+	if (TextMoveSpeed)
+	{
+		TextMoveSpeed->SetText(FText::GetEmpty());
+	}
+
+	if (TextRange)
+	{
+		TextRange->SetText(FText::GetEmpty());
 	}
 
 	if (ProductionPanelBox)
@@ -257,6 +412,11 @@ void UTWSelectionPanelWidget::ClearAllDynamicViews()
 	if (TextProductionProgress)
 	{
 		TextProductionProgress->SetText(FText::GetEmpty());
+	}
+
+	if (ProductionProgressBar)
+	{
+		ProductionProgressBar->SetPercent(0.f);
 	}
 
 	RebuildMultiSummaryTiles({});

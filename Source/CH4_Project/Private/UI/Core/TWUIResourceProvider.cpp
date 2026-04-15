@@ -2,6 +2,32 @@
 
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Core/TWPlayerController.h"
+#include "Core/TWPlayerState.h"
+#include "Data/TWBuildingTypes.h"
+
+namespace
+{
+	static const ATWPlayerState* ResolvePlayerStateFromSource(const UObject* InSource)
+	{
+		if (!InSource)
+		{
+			return nullptr;
+		}
+
+		if (const ATWPlayerState* TWPS = Cast<ATWPlayerState>(InSource))
+		{
+			return TWPS;
+		}
+
+		if (const ATWPlayerController* TWPC = Cast<ATWPlayerController>(InSource))
+		{
+			return TWPC->GetPlayerState<ATWPlayerState>();
+		}
+
+		return nullptr;
+	}
+}
 
 UTWUIResourceProvider::UTWUIResourceProvider()
 {
@@ -72,15 +98,38 @@ void UTWUIResourceProvider::SetAutoAdvanceInterval(float InSeconds)
 
 FTopBarViewModel UTWUIResourceProvider::GetTopBarViewModel_Implementation() const
 {
-	// 실제 시스템 연동 전까지는 debug fallback 우선
 	if (bUseDebugFallback || !ResourceSystemSource)
 	{
 		return DebugTopBarViewModel;
 	}
 
-	// TODO:
-	// 실제 ResourceSystemSource 인터페이스/클래스가 정해지면 여기서 실데이터를 읽어오면 됨.
-	return DebugTopBarViewModel;
+	const ATWPlayerState* TWPS = ResolvePlayerStateFromSource(ResourceSystemSource);
+	if (!TWPS)
+	{
+		return DebugTopBarViewModel;
+	}
+
+	FTopBarViewModel VM = DebugTopBarViewModel;
+
+	const int32 Wood = TWPS->GetResourceAmount(EResourceType::Wood);
+	const int32 Gas = TWPS->GetResourceAmount(EResourceType::Ore);
+	const int32 CurrentPopulation = TWPS->GetCurrentPopulation();
+	const int32 PendingPopulation = TWPS->GetPendingPopulation();
+	const int32 PopulationLimit = TWPS->GetPopulationLimit();
+	const int32 MaxPopulation = TWPS->GetMaxPopulation();
+	const int32 DisplayPopulation = CurrentPopulation + PendingPopulation;
+
+	VM.Wood = Wood;
+	VM.Gas = Gas;
+	VM.Population = DisplayPopulation;
+	VM.PopulationText = FString::Printf(TEXT("%d / %d"), DisplayPopulation, PopulationLimit);
+
+	VM.CurrentPopulation = CurrentPopulation;
+	VM.PendingPopulation = PendingPopulation;
+	VM.PopulationLimit = PopulationLimit;
+	VM.MaxPopulation = MaxPopulation;
+
+	return VM;
 }
 
 int32 UTWUIResourceProvider::GetElapsedSeconds() const
@@ -90,8 +139,22 @@ int32 UTWUIResourceProvider::GetElapsedSeconds() const
 		return DebugElapsedSeconds;
 	}
 
-	// TODO:
-	// 실제 ResourceSystemSource에서 게임 시간/경과 초를 제공하면 여기서 읽으면 됨.
+	if (const ATWPlayerController* TWPC = Cast<ATWPlayerController>(ResourceSystemSource))
+	{
+		if (const UWorld* World = TWPC->GetWorld())
+		{
+			return FMath::FloorToInt(World->GetTimeSeconds());
+		}
+	}
+
+	if (const ATWPlayerState* TWPS = Cast<ATWPlayerState>(ResourceSystemSource))
+	{
+		if (const UWorld* World = TWPS->GetWorld())
+		{
+			return FMath::FloorToInt(World->GetTimeSeconds());
+		}
+	}
+
 	return DebugElapsedSeconds;
 }
 
@@ -111,7 +174,6 @@ void UTWUIResourceProvider::ApplyAutoAdvanceState()
 	FTimerManager& TimerManager = World->GetTimerManager();
 	TimerManager.ClearTimer(AutoAdvanceTimerHandle);
 
-	// 실연동 전에는 debug fallback일 때만 자동 시간 증가
 	if (bUseDebugFallback && bAutoAdvanceTime)
 	{
 		TimerManager.SetTimer(
@@ -136,8 +198,16 @@ void UTWUIResourceProvider::HandleAutoAdvanceTick()
 
 void UTWUIResourceProvider::RefreshFromRealSourceIfAvailable()
 {
-	// TODO:
-	// 실제 리소스 시스템 인터페이스가 확정되면
-	// ResourceSystemSource -> Wood/Gas/Population/ElapsedSeconds 읽고
-	// OnResourceChanged.Broadcast() 하도록 연결
+	if (bUseDebugFallback || !ResourceSystemSource)
+	{
+		return;
+	}
+
+	const ATWPlayerState* TWPS = ResolvePlayerStateFromSource(ResourceSystemSource);
+	if (!TWPS)
+	{
+		return;
+	}
+
+	OnResourceChanged.Broadcast();
 }

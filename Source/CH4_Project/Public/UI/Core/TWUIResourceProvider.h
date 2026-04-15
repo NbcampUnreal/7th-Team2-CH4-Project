@@ -20,24 +20,21 @@ public:
 	void Initialize(UObject* InResourceSystemSource);
 	void Shutdown();
 
-	UFUNCTION(BlueprintCallable, Category = "RTS UI|Real")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetUseDebugFallback(bool bInUseDebugFallback);
 
-	UFUNCTION(BlueprintCallable, Category = "RTS UI|Real")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	bool IsUsingDebugFallback() const;
 
-	UFUNCTION(BlueprintCallable, Category = "RTS UI|Real")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void DebugSetResources(const FTopBarViewModel& InTopBarViewModel, int32 InElapsedSeconds);
 
-	UFUNCTION(BlueprintCallable, Category = "RTS UI|Real")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetAutoAdvanceTime(bool bInEnabled);
 
-	UFUNCTION(BlueprintCallable, Category = "RTS UI|Real")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetAutoAdvanceInterval(float InSeconds);
 
-	// =========================================================
-	// IUIResourceDataProvider
-	// =========================================================
 	virtual FTopBarViewModel GetTopBarViewModel_Implementation() const override;
 	virtual int32 GetElapsedSeconds() const override;
 	virtual FOnUIResourceChanged& GetOnResourceChangedDelegate() override;
@@ -57,13 +54,13 @@ protected:
 	UPROPERTY()
 	int32 DebugElapsedSeconds = 0;
 
-	UPROPERTY(EditAnywhere, Category = "RTS UI|Real")
+	UPROPERTY(EditAnywhere, Category = "UI")
 	bool bUseDebugFallback = false;
 
-	UPROPERTY(EditAnywhere, Category = "RTS UI|Real")
+	UPROPERTY(EditAnywhere, Category = "UI")
 	bool bAutoAdvanceTime = true;
 
-	UPROPERTY(EditAnywhere, Category = "RTS UI|Real", meta = (ClampMin = "0.05"))
+	UPROPERTY(EditAnywhere, Category = "UI", meta = (ClampMin = "0.05"))
 	float AutoAdvanceInterval = 1.0f;
 
 	FTimerHandle AutoAdvanceTimerHandle;

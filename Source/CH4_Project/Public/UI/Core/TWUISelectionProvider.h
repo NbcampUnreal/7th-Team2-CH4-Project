@@ -20,7 +20,7 @@ public:
 
 	void SetUseDebugFallback(bool bInUseDebugFallback);
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void DebugSetSelection(
 		const FSelectionViewModel& InSelectionViewModel,
 		const TArray<FName>& InCommandIds,
@@ -30,10 +30,10 @@ public:
 		const TArray<FSelectionSummaryItemViewModel>& InSummaryItems
 	);
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void DebugClearSelection();
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetRuntimeSelection(
 		const FSelectionViewModel& InSelectionViewModel,
 		const TArray<FName>& InCommandIds,
@@ -43,16 +43,16 @@ public:
 		const TArray<FSelectionSummaryItemViewModel>& InSummaryItems
 	);
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ClearRuntimeSelection();
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ClearRuntimeCommandData();
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetRuntimeCommandQueueCount(FName CommandId, int32 QueueCount);
 
-	UFUNCTION(BlueprintCallable, Category="UI")
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	int32 GetRuntimeCommandQueueCount(FName CommandId) const;
 
 	virtual FSelectionViewModel GetSelectionViewModel_Implementation() const override;
@@ -79,15 +79,6 @@ protected:
 	void PopCommandContext();
 
 	void RefreshFromSourceIfNeeded() const;
-	void ApplySelectionState(
-		const FSelectionViewModel& InSelectionViewModel,
-		const TArray<FName>& InCommandIds,
-		ESelectionViewMode InViewMode,
-		FName InPrimaryEntityId,
-		int32 InTotalSelectedCount,
-		const TArray<FSelectionSummaryItemViewModel>& InSummaryItems,
-		bool bBroadcastChanged
-	);
 
 protected:
 	UPROPERTY()
