@@ -65,6 +65,9 @@ struct CH4_PROJECT_API FTopBarViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int32 Gas = 0;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 Mithril = 0;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int32 Population = 0;

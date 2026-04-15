@@ -25,6 +25,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TextOre = nullptr;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> TextMithril = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TextPopulation = nullptr;

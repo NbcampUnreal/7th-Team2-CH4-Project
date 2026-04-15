@@ -19,6 +19,11 @@ void UTWTopBarWidget::SetTopBarData(const FTopBarViewModel& InData)
 		TextOre->SetText(FText::AsNumber(InData.Gas));
 	}
 
+	if (TextMithril)
+	{
+		TextMithril->SetText(FText::AsNumber(InData.Mithril));
+	}
+	
 	if (TextPopulation)
 	{
 		if (!InData.PopulationText.IsEmpty())

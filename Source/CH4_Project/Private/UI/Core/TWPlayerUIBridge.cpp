@@ -952,6 +952,7 @@ void UTWPlayerUIBridge::RefreshResources()
 
 	int32 Wood = 0;
 	int32 Gas = 0;
+	int32 Mithril = 0;
 	int32 CurrentPopulation = 0;
 	int32 PendingPopulation = 0;
 	int32 PopulationLimit = 0;
@@ -961,6 +962,7 @@ void UTWPlayerUIBridge::RefreshResources()
 	{
 		Wood = TWPS->GetResourceAmount(EResourceType::Wood);
 		Gas = TWPS->GetResourceAmount(EResourceType::Ore);
+		Mithril = TWPS->GetResourceAmount(EResourceType::Mithril);
 		CurrentPopulation = TWPS->GetCurrentPopulation();
 		PendingPopulation = TWPS->GetPendingPopulation();
 		PopulationLimit = TWPS->GetPopulationLimit();
@@ -971,6 +973,7 @@ void UTWPlayerUIBridge::RefreshResources()
 
 	VM.Wood = Wood;
 	VM.Gas = Gas;
+	VM.Mithril = Mithril;
 	VM.Population = DisplayPopulation;
 	VM.PopulationText = FString::Printf(TEXT("%d / %d"), DisplayPopulation, PopulationLimit);
 
