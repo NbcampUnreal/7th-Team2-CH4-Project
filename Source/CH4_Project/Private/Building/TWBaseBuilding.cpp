@@ -3,6 +3,7 @@
 #include "Data/TWBuildingDataAsset.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/TWBuildingManagerSubsystem.h"
 #include "Subsystems/TWGridSubSystem.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
@@ -38,6 +39,14 @@ void ATWBaseBuilding::BeginPlay()
 			FIntPoint Anchor = GridSub->WorldToGridPosition(GetActorLocation());
 			FIntPoint Size = BuildingData ? BuildingData->GridSize.BuildingSize : FIntPoint(1,1);
 			GridSub->OccupyArea(Anchor, Size, this);
+		}
+	}
+	
+	if (UWorld* World = GetWorld())
+	{
+		if (auto* BuildingManager = World->GetSubsystem<UTWBuildingManagerSubsystem>())
+		{
+			BuildingManager->RegisterBuilding(OwnerPlayerSlot, this);
 		}
 	}
 	
@@ -81,6 +90,14 @@ void ATWBaseBuilding::Destroyed()
 			GridSub->FreeArea(Anchor, Size);
 		}
 	}
+	
+	if (UWorld* World = GetWorld())
+	{
+		if (auto* BuildingManager = World->GetSubsystem<UTWBuildingManagerSubsystem>())
+		{
+			BuildingManager->UnregisterBuilding(OwnerPlayerSlot, this);
+		}
+	}
 	Super::Destroyed();
 }
 
@@ -103,9 +120,7 @@ void ATWBaseBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 
 	CurrentHP -= InDamageAmount;
 	CurrentHP = FMath::Max(0.0f, CurrentHP);
-
-	UE_LOG(LogTemp, Warning, TEXT("[%s] HP : %.1f / %.1f"), *GetName(), CurrentHP, MaxHP);
-
+	
 	if (CurrentHP <= 0.0f)
 	{
 		HandleDestroyedByDamage();
