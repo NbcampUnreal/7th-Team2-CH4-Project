@@ -31,14 +31,6 @@ class UTWHUDRootWidget;
 /**
  * 
  */
-UENUM()
-enum class ETWCommand : uint8
-{
-	None,
-	Move,
-	Attack,
-	Hold
-};
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -264,12 +256,12 @@ public:
 	void ClientForceRefreshSelectionBridge();
 	
 private:
-	void ChangeCurrentCommandType(ETWCommand CommandType);
+	void ChangeCurrentCommandType(ETWCommandType CommandType);
 	
 	void UpdateInputOverlayState();
 	void UpdateDragSelectionOverlay();
 	void UpdateCursorOverlayPosition();
-	FName ConvertCommandTypeToCommandId(ETWCommand InCommandType) const;
+	FName ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const;
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	float DragSelectionScreenThreshold = 8.f;
 
@@ -280,7 +272,7 @@ private:
 	FVector2D CurrentMouseScreenPosition = FVector2D::ZeroVector;
 
 private:
-	ETWCommand CurrentCommandType = ETWCommand::None;
+	ETWCommandType CurrentCommandType = ETWCommandType::None;
 
 	UPROPERTY(Transient)
 	TArray<FMassEntityHandle> ServerSelectedEntities;

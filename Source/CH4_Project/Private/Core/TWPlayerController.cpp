@@ -44,7 +44,7 @@
 #include "Mass/Fragments/TWCommandFragment.h"
 
 ATWPlayerController::ATWPlayerController()
-	: CurrentCommandType(ETWCommand::None)
+	: CurrentCommandType(ETWCommandType::None)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	ServerSelectedEntities.Empty();
@@ -102,7 +102,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommand::None && !BuildComponent->GetBuildMode())
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !BuildComponent->GetBuildMode())
 	{
 		UpdateDragSelectionOverlay();
 	}
@@ -216,23 +216,26 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 			return;
 		}
 
-		if (CurrentCommandType != ETWCommand::None && CurrentCommandType != ETWCommand::Hold)
+		
+		if (CurrentCommandType == ETWCommandType::Move)
 		{
-			switch (CurrentCommandType)
-			{
-			case ETWCommand::Move:
-				ServerHandleMoveCommand(ClickLocation);
-				break;
-			case ETWCommand::Attack:
-				ServerHandleAttackCommand(ClickLocation);
-				break;
-			default:
-				check(false);
-				break;
-			}
-			ChangeCurrentCommandType(ETWCommand::None);
+			ServerHandleMoveCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
 			return;
 		}
+		if (CurrentCommandType == ETWCommandType::Attack)
+		{
+			ServerHandleAttackCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
+		}
+		if (CurrentCommandType == ETWCommandType::Hold)
+		{
+			ServerHandleHoldCommand();
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
+		}
+		
 		ClickStartLocation = ClickLocation;
 	}
 	else
@@ -246,7 +249,7 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	ChangeCurrentCommandType(ETWCommand::None);
+	ChangeCurrentCommandType(ETWCommandType::None);
 	
 	bIsLeftMousePressed = false;
 	bIsDraggingSelectionVisual = false;
@@ -286,9 +289,9 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 	if (!BuildComponent->GetBuildMode())
 	{
 		// Cancle Command
-		if (CurrentCommandType != ETWCommand::None)
+		if (CurrentCommandType != ETWCommandType::None)
 		{
-			ChangeCurrentCommandType(ETWCommand::None);
+			ChangeCurrentCommandType(ETWCommandType::None);
 			return;
 		}
 
@@ -311,12 +314,12 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 
 inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
 {
-	ChangeCurrentCommandType(ETWCommand::Move);
+	ChangeCurrentCommandType(ETWCommandType::Move);
 }
 
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
-	ChangeCurrentCommandType(ETWCommand::Attack);
+	ChangeCurrentCommandType(ETWCommandType::Attack);
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
@@ -384,7 +387,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 
 				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandTypeFragment>(Entity))
 				{
-					TypeFragment->SetType(ETWState::MoveToLocation);
+					TypeFragment->SetType(ETWMassCommand::MoveToLocation);
 				}
 
 				if (FTWCommandDataFragment* CommandData = InOutEntityManager.GetSharedFragmentDataPtr<FTWCommandDataFragment>(Entity))
@@ -461,7 +464,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 
 				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandTypeFragment>(Entity))
 				{
-					TypeFragment->SetType(ETWState::Hold);
+					TypeFragment->SetType(ETWMassCommand::Hold);
 				}
 			}
 
@@ -621,7 +624,7 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	return bIsEdgeScrollingNow;
 }
 
-void ATWPlayerController::ChangeCurrentCommandType(ETWCommand CommandType)
+void ATWPlayerController::ChangeCurrentCommandType(ETWCommandType CommandType)
 {
 	CurrentCommandType = CommandType;
 	UpdateInputOverlayState();
@@ -881,12 +884,12 @@ void ATWPlayerController::HandleUICommandRequested(FName CommandId)
 	switch (CommandMeta->CommandType)
 	{
 	case ETWCommandType::Move:
-		ChangeCurrentCommandType(ETWCommand::Move);
+		ChangeCurrentCommandType(ETWCommandType::Move);
 		UE_LOG(LogTemp, Log, TEXT("[UI Click] Move command armed"));
 		return;
 
 	case ETWCommandType::Attack:
-		ChangeCurrentCommandType(ETWCommand::Attack);
+		ChangeCurrentCommandType(ETWCommandType::Attack);
 		UE_LOG(LogTemp, Log, TEXT("[UI Click] Attack command armed"));
 		return;
 
@@ -1518,14 +1521,14 @@ void ATWPlayerController::UpdateCursorOverlayPosition()
 	PlayerUIBridge->SetCursorScreenPosition(LastValidMouseScreenPosition);
 }
 
-FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommand InCommandType) const
+FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const
 {
 	switch (InCommandType)
 	{
-	case ETWCommand::Move:
+	case ETWCommandType::Move:
 		return TEXT("Move");
 
-	case ETWCommand::Attack:
+	case ETWCommandType::Attack:
 		return TEXT("Attack");
 
 	default:
