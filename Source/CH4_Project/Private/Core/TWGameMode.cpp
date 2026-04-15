@@ -46,6 +46,7 @@ void ATWGameMode::PostLogin(APlayerController* NewPlayer)
 	AssignedSlot = ExistingAssignedCount;
 
 	PS->SetPlayerSlot(AssignedSlot);
+	PS->SetTeamID(AssignedSlot);
 	
 	BindPlacedBuildingsForPlayer(PS);
 }

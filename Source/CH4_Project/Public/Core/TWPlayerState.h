@@ -11,6 +11,7 @@
 #include "TWPlayerState.generated.h"
 
 struct FTWUpgradeTableRowBase;
+class UTWTeamComponent;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
@@ -121,7 +122,17 @@ public:
 	FTWUnitStatus GetUnitUpgradeBonus(const FName UnitID) const;
 #pragma endregion
 	
+#pragma region 팀
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Team")
+	TObjectPtr<UTWTeamComponent> TeamComponent = nullptr;
 
+	UFUNCTION(BlueprintCallable, Category="Team")
+	int32 GetTeamID() const;
+
+	UFUNCTION(BlueprintCallable, Category="Team")
+	void SetTeamID(int32 InTeamID);
+#pragma endregion
+	
 private:
 	void NotifyUIResourceStateChanged();
 

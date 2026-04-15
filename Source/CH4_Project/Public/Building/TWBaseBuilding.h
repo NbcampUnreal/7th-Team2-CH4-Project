@@ -8,6 +8,7 @@ class UTWBuildingDataAsset;
 class ATWPlayerState;
 class USceneComponent;
 class UStaticMeshComponent;
+class UTWTeamComponent;
 
 UENUM(BlueprintType)
 enum class ETWBuildingState : uint8
@@ -61,6 +62,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Building|Construction")
 	float GetRemainingBuildTime() const;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Team")
+	TObjectPtr<UTWTeamComponent> TeamComponent = nullptr;
+
+	UFUNCTION(BlueprintCallable, Category="Team")
+	int32 GetTeamID() const;
+	
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;

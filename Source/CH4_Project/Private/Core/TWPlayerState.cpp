@@ -2,6 +2,7 @@
 #include "Data/TWBuildingTypes.h"
 #include "Data/TWUpgradeTableRowBase.h"
 #include "FOW/TWPlayerSlotInterface.h"
+#include "Component/TWTeamComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
 #include "EngineUtils.h"
@@ -14,6 +15,8 @@ ATWPlayerState::ATWPlayerState()
 	bReplicates = true;
 
 	PlayerSlot = -1;
+	
+	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
 
 	Resources.SetNum(static_cast<int32>(EResourceType::Count));
 	for (int32& Resource : Resources)
@@ -373,6 +376,21 @@ FTWUnitStatus ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID) const
 		return FTWUnitStatus();
 	}
 	return *FoundStatus;
+}
+
+int32 ATWPlayerState::GetTeamID() const
+{
+	return TeamComponent ? TeamComponent->TeamID : -1;
+}
+
+void ATWPlayerState::SetTeamID(int32 InTeamID)
+{
+	if (!HasAuthority() || !TeamComponent)
+	{
+		return;
+	}
+
+	TeamComponent->SetTeamID(InTeamID);
 }
 
 void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

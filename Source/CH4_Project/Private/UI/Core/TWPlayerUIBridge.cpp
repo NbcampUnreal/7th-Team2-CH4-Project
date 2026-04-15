@@ -716,24 +716,37 @@ void UTWPlayerUIBridge::RefreshSelection()
 	ATWBaseBuilding* SelectedBuilding = OwnerController->GetSelectedBuilding();
 
 	if (SelectedBuilding)
+{
+	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
+
+	const bool bIsOwnedByMe =
+		LocalPS &&
+		(SelectedBuilding->GetOwnerPlayerSlot() == LocalPS->PlayerSlot);
+
+	FSelectionViewModel VM;
+	VM.SelectionType = ESelectionViewType::Building;
+	VM.ViewMode = ESelectionViewMode::Single;
+	VM.SelectionId = TWUIBridgeBuildingHelpers::ResolveBuildingSelectionIdFromDataAssetOrFallback(
+		SelectedBuilding,
+		OwnerController->ResolveBuildingSelectionId(SelectedBuilding)
+	);
+	VM.DisplayName = TWUIBridgeBuildingHelpers::ResolveBuildingDisplayNameFromDataAssetOrFallback(SelectedBuilding);
+	VM.TypeLabel = TEXT("Building");
+	VM.TotalSelectedCount = 1;
+	VM.CountLabel = TEXT("");
+	VM.bShowProductionPanel = false;
+	VM.Production = FBuildingProductionViewModel();
+
+	// 건물 기본 정보
+	VM.CurrentHP = SelectedBuilding->GetCurrentHP();
+	VM.MaxHP = SelectedBuilding->GetMaxHP();
+	VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
+
+	TArray<FName> CommandIds;
+
+	if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
 	{
-		FSelectionViewModel VM;
-		VM.SelectionType = ESelectionViewType::Building;
-		VM.ViewMode = ESelectionViewMode::Single;
-		VM.SelectionId = TWUIBridgeBuildingHelpers::ResolveBuildingSelectionIdFromDataAssetOrFallback(
-			SelectedBuilding,
-			OwnerController->ResolveBuildingSelectionId(SelectedBuilding)
-		);
-		VM.DisplayName = TWUIBridgeBuildingHelpers::ResolveBuildingDisplayNameFromDataAssetOrFallback(SelectedBuilding);
-		VM.TypeLabel = TEXT("Building");
-		VM.TotalSelectedCount = 1;
-		VM.CountLabel = TEXT("");
-		VM.bShowProductionPanel = false;
-		VM.Production = FBuildingProductionViewModel();
-
-		TArray<FName> CommandIds;
-
-		if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
+		if (bIsOwnedByMe)
 		{
 			TArray<FName> TrainableUnitIds;
 			TWUIBridgeBuildingHelpers::ResolveTrainableUnitIds(TroopBuilding, TrainableUnitIds);
@@ -794,7 +807,7 @@ void UTWPlayerUIBridge::RefreshSelection()
 			UE_LOG(
 				LogTemp,
 				Warning,
-				TEXT("[UIBridge] Building=%s / ProgressRatio=%.3f / ProgressText=%s / QueueNum=%d"),
+				TEXT("[UIBridge] My Building=%s / ProgressRatio=%.3f / ProgressText=%s / QueueNum=%d"),
 				*SelectedBuilding->GetName(),
 				VM.Production.ProgressRatio,
 				*VM.Production.ProgressText,
@@ -803,20 +816,43 @@ void UTWPlayerUIBridge::RefreshSelection()
 		}
 		else
 		{
+			// 상대 병력 생산 건물: 정보만 표시
+			VM.bShowProductionPanel = false;
+			VM.Production = FBuildingProductionViewModel();
+			CommandIds.Reset();
+
 			StopProductionSelectionRefresh();
 			StopPostCommandSelectionRefreshWindow();
 
-			if (Cast<ATWPopulationBuilding>(SelectedBuilding))
-			{
-				CommandIds = {
-					TWCommandIds::BuildMenu
-				};
-			}
-			else if (Cast<ATWResourceBuilding>(SelectedBuilding) || Cast<ATWBlockingBuilding>(SelectedBuilding))
-			{
-				CommandIds = {};
-			}
+			UE_LOG(
+				LogTemp,
+				Log,
+				TEXT("[UIBridge] Enemy troop building selected -> info only / Building=%s"),
+				*SelectedBuilding->GetName()
+			);
 		}
+	}
+	else
+	{
+		StopProductionSelectionRefresh();
+		StopPostCommandSelectionRefreshWindow();
+
+		if (!bIsOwnedByMe)
+		{
+			// 상대 건물: 정보만 표시
+			CommandIds.Reset();
+		}
+		else if (Cast<ATWPopulationBuilding>(SelectedBuilding))
+		{
+			CommandIds = {
+				TWCommandIds::BuildMenu
+			};
+		}
+		else if (Cast<ATWResourceBuilding>(SelectedBuilding) || Cast<ATWBlockingBuilding>(SelectedBuilding))
+		{
+			CommandIds = {};
+		}
+	}
 
 		CurrentVisibleCommandIds = CommandIds;
 
@@ -829,16 +865,16 @@ void UTWPlayerUIBridge::RefreshSelection()
 			TArray<FSelectionSummaryItemViewModel>()
 		);
 
-		SelectionProvider->ClearRuntimeCommandData();
+	SelectionProvider->ClearRuntimeCommandData();
 
-		for (const FName& CommandId : CommandIds)
-		{
-			const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
-			SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
-		}
-
-		return;
+	for (const FName& CommandId : CommandIds)
+	{
+		const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
+		SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
 	}
+
+	return;
+}
 
 	StopProductionSelectionRefresh();
 	StopPostCommandSelectionRefreshWindow();

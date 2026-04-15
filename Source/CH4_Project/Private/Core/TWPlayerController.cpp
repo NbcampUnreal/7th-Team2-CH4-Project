@@ -931,7 +931,26 @@ void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName Co
 		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: SelectedBuilding is invalid / CommandId=%s"), *CommandId.ToString());
 		return;
 	}
-
+	
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: PlayerState is invalid"));
+		return;
+	}
+	
+	if (CurrentSelectedBuilding->OwnerPlayerSlot != TWPS->PlayerSlot)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[UI Produce] Rejected: enemy building selected / Building=%s / MySlot=%d / OwnerSlot=%d"),
+			*CurrentSelectedBuilding->GetName(),
+			TWPS->PlayerSlot,
+			CurrentSelectedBuilding->OwnerPlayerSlot
+		);
+		return;
+	}
 	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
 	if (!CommandMeta)
 	{
@@ -1306,7 +1325,7 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 		return;
 	}
 
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+	const int32 MyTeamID = TWPS->GetTeamID();
 
 	for (TActorIterator<ATWNexusBuilding> It(GetWorld()); It; ++It)
 	{
@@ -1316,7 +1335,7 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 			continue;
 		}
 
-		if (NexusBuilding->OwnerPlayerSlot == MyPlayerSlot)
+		if (NexusBuilding->GetTeamID() == MyTeamID)
 		{
 			continue;
 		}
