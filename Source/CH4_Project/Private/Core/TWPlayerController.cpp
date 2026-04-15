@@ -49,8 +49,6 @@ ATWPlayerController::ATWPlayerController()
 	PrimaryActorTick.bCanEverTick = true;
 	ServerSelectedEntities.Empty();
 	ClientSelectedEntities.Empty();
-	bIsBuildMode = false;
-	SelectedEntities.Empty();
 
 	BuildComponent = CreateDefaultSubobject<UTWBuildComponent>(TEXT("BuildComponent"));
 }
@@ -104,33 +102,9 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommand::None && !bIsBuildMode)
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommand::None && !BuildComponent->GetBuildMode())
 	{
 		UpdateDragSelectionOverlay();
-	}
-
-	if (bIsBuildMode && CurrentGhost)
-	{
-		FHitResult Hit;
-
-		GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_GameTraceChannel1), true, Hit);
-
-		if (Hit.bBlockingHit)
-		{
-			auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
-			if (!GridSub)
-			{
-				return;
-			}
-
-			CurrentAnchor = GridSub->WorldToGridPosition(Hit.Location);
-
-			bool bCanBuild = GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize);
-			CurrentGhost->UpdateBuildingVisual(bCanBuild);
-
-			FVector CenterPos = GridSub->GetBuildingCenterPosition(CurrentAnchor, CurrentGhost->BuildingSize);
-			CurrentGhost->SetActorLocation(CenterPos);
-		}
 	}
 }
 
@@ -219,8 +193,7 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 		{
 			return;
 		}
-		FHitResult HitResult;
-		FVector ClickLocation;
+
 		bIsLeftMousePressed = true;
 
 		// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
