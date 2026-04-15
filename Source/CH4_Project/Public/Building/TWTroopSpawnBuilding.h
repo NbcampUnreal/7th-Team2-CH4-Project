@@ -31,13 +31,7 @@ public:
 	
 	void SetQueuePausedByUpkeep(bool bInPaused);
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category="Production")
-	float AccumulatedProductionTime = 0.f;
-
-	float PausedRemainingProductionTime = 0.f;
-	
-	float GetSyncedWorldTimeSeconds() const;
+protected:	
 	void CancelQueuedProductionAndRestorePendingPopulation();
 	virtual void ClearAllBuildingTimers() override;
 	virtual void OnOwnerPlayerStateAssigned() override;
@@ -54,7 +48,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Production")
 	bool IsQueuePausedByUpkeep() const { return bQueuePausedByUpkeep; }
-////
+
 	UFUNCTION(BlueprintCallable, Category="Production")
 	FName GetCurrentProducingUnitId() const { return CurrentProducingUnitId; }
 
@@ -66,7 +60,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Production")
 	FString GetCurrentProductionProgressText() const;
-///
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category="Production")
 	TArray<FName> ProductionQueue;

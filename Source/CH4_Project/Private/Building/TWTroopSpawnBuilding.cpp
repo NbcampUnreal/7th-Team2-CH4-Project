@@ -49,53 +49,6 @@ void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(bool bInPaused)
 	}
 
 	bQueuePausedByUpkeep = bInPaused;
-	
-	if (bInPaused)
-	{
-		if (bIsProducing && CurrentProducingUnitId != NAME_None && CurrentProductionStartTime > 0.f)
-		{
-			const float Now = GetSyncedWorldTimeSeconds();
-			const float ElapsedSinceResume = FMath::Max(0.f, Now - CurrentProductionStartTime);
-
-			AccumulatedProductionTime = FMath::Clamp(
-				AccumulatedProductionTime + ElapsedSinceResume,
-				0.f,
-				CurrentProducingDuration
-			);
-
-			PausedRemainingProductionTime = FMath::Clamp(
-				CurrentProducingDuration - AccumulatedProductionTime,
-				0.f,
-				CurrentProducingDuration
-			);
-
-			GetWorldTimerManager().ClearTimer(ProductionTimerHandle);
-			CurrentProductionStartTime = 0.f;
-		}
-	}
-	else
-	{
-		if (bIsProducing && CurrentProducingUnitId != NAME_None && PausedRemainingProductionTime > 0.f)
-		{
-			CurrentProductionStartTime = GetSyncedWorldTimeSeconds();
-
-			GetWorldTimerManager().SetTimer(
-				ProductionTimerHandle,
-				this,
-				&ATWTroopSpawnBuilding::HandleProductionFinished,
-				PausedRemainingProductionTime,
-				false
-			);
-
-			PausedRemainingProductionTime = 0.f;
-		}
-		else
-		{
-			TryStartNextProduction();
-		}
-	}
-
-
 	ForceNetUpdate();
 	
 	UE_LOG(
@@ -105,23 +58,11 @@ void ATWTroopSpawnBuilding::SetQueuePausedByUpkeep(bool bInPaused)
 		bPrevPaused ? 1 : 0,
 		bInPaused ? 1 : 0
 	);
-}
-
-float ATWTroopSpawnBuilding::GetSyncedWorldTimeSeconds() const
-{
-	const UWorld* World = GetWorld();
-	if (!World)
+	
+	if (bPrevPaused && !bInPaused)
 	{
-		return 0.f;
+		TryStartNextProduction();
 	}
-
-	const AGameStateBase* GS = World->GetGameState();
-	if (GS)
-	{
-		return GS->GetServerWorldTimeSeconds();
-	}
-
-	return World->GetTimeSeconds();
 }
 
 void ATWTroopSpawnBuilding::CancelQueuedProductionAndRestorePendingPopulation()
@@ -166,18 +107,14 @@ void ATWTroopSpawnBuilding::ClearAllBuildingTimers()
 	bIsProducing = false;
 	bQueuePausedByUpkeep = false;
 	CurrentProducingUnitId = NAME_None;
-	CurrentProducingDuration = 0.f; // 총 생산 시간
-	CurrentProductionStartTime = 0.f; // 생산을 시작한 월드 시간
-	AccumulatedProductionTime = 0.f; // 진행된 생산 시간
-	PausedRemainingProductionTime = 0.f; // 남아 있는 생산 시간
+	CurrentProducingDuration = 0.f;
+	CurrentProductionStartTime = 0.f;
 	ForceNetUpdate();
 }
 
 void ATWTroopSpawnBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ATWTroopSpawnBuilding, AccumulatedProductionTime);
-
 	DOREPLIFETIME(ATWTroopSpawnBuilding, ProductionQueue);
 	DOREPLIFETIME(ATWTroopSpawnBuilding, bIsProducing);
 	DOREPLIFETIME(ATWTroopSpawnBuilding, bQueuePausedByUpkeep);
@@ -491,9 +428,8 @@ void ATWTroopSpawnBuilding::StartProductionForUnit(FName UnitId, const FTWUnitTa
 	bIsProducing = true;
 	CurrentProducingUnitId = UnitId;
 	CurrentProducingDuration = FMath::Max(0.01f, UnitRow.SpawnDuration);
-	AccumulatedProductionTime = 0.f;
-	PausedRemainingProductionTime = 0.f;
-	CurrentProductionStartTime = GetSyncedWorldTimeSeconds();
+	const AGameStateBase* GS = World->GetGameState();
+	CurrentProductionStartTime = GS ? GS->GetServerWorldTimeSeconds() : World->GetTimeSeconds();
 	ForceNetUpdate();
 
 	UE_LOG(
@@ -526,8 +462,6 @@ void ATWTroopSpawnBuilding::HandleProductionFinished()
 		CurrentProducingUnitId = NAME_None;
 		CurrentProducingDuration = 0.f;
 		CurrentProductionStartTime = 0.f;
-		AccumulatedProductionTime = 0.f;
-		PausedRemainingProductionTime = 0.f;
 		ForceNetUpdate();
 	};
 
@@ -614,16 +548,16 @@ float ATWTroopSpawnBuilding::GetCurrentProductionProgressRatio() const
 		return 0.f;
 	}
 
-	float Elapsed = AccumulatedProductionTime;
-
-	if (!bQueuePausedByUpkeep && CurrentProductionStartTime > 0.f)
+	const UWorld* World = GetWorld();
+	if (!World)
 	{
-		const float Now = GetSyncedWorldTimeSeconds();
-		Elapsed += FMath::Max(0.f, Now - CurrentProductionStartTime);
+		return 0.f;
 	}
 
-	Elapsed = FMath::Clamp(Elapsed, 0.f, CurrentProducingDuration);
-
+	const AGameStateBase* GS = World->GetGameState();
+	const float Now = GS ? GS->GetServerWorldTimeSeconds() : World->GetTimeSeconds();
+	
+	const float Elapsed = FMath::Max(0.f, Now - CurrentProductionStartTime);
 	return FMath::Clamp(Elapsed / CurrentProducingDuration, 0.f, 1.f);
 }
 
