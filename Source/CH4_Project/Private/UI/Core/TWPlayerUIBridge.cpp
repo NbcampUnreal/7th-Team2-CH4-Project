@@ -21,6 +21,7 @@
 #include "Engine/World.h"
 #include "UI/Data/TWUIInputStateTypes.h"
 #include "UI/Widgets/TWHUDRootWidget.h"
+
 namespace TWCommandIds
 {
 	static const FName Move(TEXT("Move"));
@@ -716,165 +717,148 @@ void UTWPlayerUIBridge::RefreshSelection()
 	ATWBaseBuilding* SelectedBuilding = OwnerController->GetSelectedBuilding();
 
 	if (SelectedBuilding)
-{
-	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
-
-	const bool bIsOwnedByMe =
-		LocalPS &&
-		(SelectedBuilding->GetOwnerPlayerSlot() == LocalPS->PlayerSlot);
-
-	FSelectionViewModel VM;
-	VM.SelectionType = ESelectionViewType::Building;
-	VM.ViewMode = ESelectionViewMode::Single;
-	VM.SelectionId = TWUIBridgeBuildingHelpers::ResolveBuildingSelectionIdFromDataAssetOrFallback(
-		SelectedBuilding,
-		OwnerController->ResolveBuildingSelectionId(SelectedBuilding)
-	);
-	VM.DisplayName = TWUIBridgeBuildingHelpers::ResolveBuildingDisplayNameFromDataAssetOrFallback(SelectedBuilding);
-	VM.TypeLabel = TEXT("Building");
-	VM.TotalSelectedCount = 1;
-	VM.CountLabel = TEXT("");
-	VM.bShowProductionPanel = false;
-	VM.Production = FBuildingProductionViewModel();
-
-	// 건물 기본 정보
-	VM.CurrentHP = SelectedBuilding->GetCurrentHP();
-	VM.MaxHP = SelectedBuilding->GetMaxHP();
-	VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
-
-	TArray<FName> CommandIds;
-
-	if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
 	{
-		if (bIsOwnedByMe)
+		const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
+
+		const bool bIsOwnedByMe =
+			LocalPS &&
+			(SelectedBuilding->GetOwnerPlayerSlot() == LocalPS->PlayerSlot);
+
+		FSelectionViewModel VM;
+		VM.SelectionType = ESelectionViewType::Building;
+		VM.ViewMode = ESelectionViewMode::Single;
+		VM.SelectionId = TWUIBridgeBuildingHelpers::ResolveBuildingSelectionIdFromDataAssetOrFallback(
+			SelectedBuilding,
+			OwnerController->ResolveBuildingSelectionId(SelectedBuilding)
+		);
+		VM.DisplayName = TWUIBridgeBuildingHelpers::ResolveBuildingDisplayNameFromDataAssetOrFallback(SelectedBuilding);
+		VM.TypeLabel = TEXT("Building");
+		VM.TotalSelectedCount = 1;
+		VM.CountLabel = TEXT("");
+		VM.bShowProductionPanel = false;
+		VM.Production = FBuildingProductionViewModel();
+
+		// 건물 기본 정보
+		VM.CurrentHP = SelectedBuilding->GetCurrentHP();
+		VM.MaxHP = SelectedBuilding->GetMaxHP();
+		VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
+
+		TArray<FName> CommandIds;
+
+		if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
 		{
-			TArray<FName> TrainableUnitIds;
-			TWUIBridgeBuildingHelpers::ResolveTrainableUnitIds(TroopBuilding, TrainableUnitIds);
-
-			for (const FName& UnitId : TrainableUnitIds)
+			if (bIsOwnedByMe)
 			{
-				if (const FUICommandMetaRow* CommandMeta =
-					TWUIBridgeBuildingHelpers::FindProduceUnitCommandMetaByPayload(CommandMetaTable, UnitId))
+				TArray<FName> TrainableUnitIds;
+				TWUIBridgeBuildingHelpers::ResolveTrainableUnitIds(TroopBuilding, TrainableUnitIds);
+
+				for (const FName& UnitId : TrainableUnitIds)
 				{
-					CommandIds.Add(CommandMeta->CommandId);
-				}
-			}
-
-			VM.bShowProductionPanel = true;
-			VM.Production.bVisible = true;
-			VM.Production.Title = TEXT("생산 중");
-			VM.Production.ProgressRatio = TroopBuilding->GetCurrentProductionProgressRatio();
-			VM.Production.ProgressText = TroopBuilding->GetCurrentProductionProgressText();
-
-			const TArray<FName>& QueuedUnitIds = TroopBuilding->GetQueuedUnitIds();
-
-			for (int32 Index = 0; Index < QueuedUnitIds.Num(); ++Index)
-			{
-				const FName QueuedUnitId = QueuedUnitIds[Index];
-
-				FProductionQueueItemViewModel QueueItem;
-				QueueItem.PayloadId = QueuedUnitId;
-				QueueItem.DisplayName = QueuedUnitId.IsNone() ? TEXT("Queued Unit") : QueuedUnitId.ToString();
-				QueueItem.bIsActive = (Index == 0 && TroopBuilding->IsProducing());
-				QueueItem.StackCount = 1;
-
-				if (!QueuedUnitId.IsNone())
-				{
-					if (const FUICommandMetaRow* QueueCommandMeta =
-						TWUIBridgeBuildingHelpers::FindProduceUnitCommandMetaByPayload(CommandMetaTable, QueuedUnitId))
+					if (const FUICommandMetaRow* CommandMeta =
+						TWUIBridgeBuildingHelpers::FindProduceUnitCommandMetaByPayload(CommandMetaTable, UnitId))
 					{
-						QueueItem.Icon = QueueCommandMeta->Icon;
-
-						if (!QueueCommandMeta->DisplayName.IsEmpty())
-						{
-							QueueItem.DisplayName = QueueCommandMeta->DisplayName.ToString();
-						}
+						CommandIds.Add(CommandMeta->CommandId);
 					}
 				}
 
-				VM.Production.QueueItems.Add(QueueItem);
-			}
+				VM.bShowProductionPanel = true;
+				VM.Production.bVisible = true;
+				VM.Production.Title = TEXT("생산 중");
+				VM.Production.ProgressRatio = TroopBuilding->GetCurrentProductionProgressRatio();
+				VM.Production.ProgressText = TroopBuilding->GetCurrentProductionProgressText();
 
-			if (TroopBuilding->IsProducing())
-			{
-				StartProductionSelectionRefresh();
+				const TArray<FName>& QueuedUnitIds = TroopBuilding->GetQueuedUnitIds();
+
+				for (int32 Index = 0; Index < QueuedUnitIds.Num(); ++Index)
+				{
+					const FName QueuedUnitId = QueuedUnitIds[Index];
+
+					FProductionQueueItemViewModel QueueItem;
+					QueueItem.PayloadId = QueuedUnitId;
+					QueueItem.DisplayName = QueuedUnitId.IsNone() ? TEXT("Queued Unit") : QueuedUnitId.ToString();
+					QueueItem.bIsActive = (Index == 0 && TroopBuilding->IsProducing());
+					QueueItem.StackCount = 1;
+
+					if (!QueuedUnitId.IsNone())
+					{
+						if (const FUICommandMetaRow* QueueCommandMeta =
+							TWUIBridgeBuildingHelpers::FindProduceUnitCommandMetaByPayload(CommandMetaTable, QueuedUnitId))
+						{
+							QueueItem.Icon = QueueCommandMeta->Icon;
+
+							if (!QueueCommandMeta->DisplayName.IsEmpty())
+							{
+								QueueItem.DisplayName = QueueCommandMeta->DisplayName.ToString();
+							}
+						}
+					}
+
+					VM.Production.QueueItems.Add(QueueItem);
+				}
+
+				if (TroopBuilding->IsProducing())
+				{
+					StartProductionSelectionRefresh();
+				}
+				else
+				{
+					StopProductionSelectionRefresh();
+				}
 			}
 			else
 			{
-				StopProductionSelectionRefresh();
-			}
+				// 상대 병력 생산 건물: 정보만 표시
+				VM.bShowProductionPanel = false;
+				VM.Production = FBuildingProductionViewModel();
+				CommandIds.Reset();
 
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[UIBridge] My Building=%s / ProgressRatio=%.3f / ProgressText=%s / QueueNum=%d"),
-				*SelectedBuilding->GetName(),
-				VM.Production.ProgressRatio,
-				*VM.Production.ProgressText,
-				VM.Production.QueueItems.Num()
-			);
+				StopProductionSelectionRefresh();
+				StopPostCommandSelectionRefreshWindow();
+			}
 		}
 		else
 		{
-			// 상대 병력 생산 건물: 정보만 표시
-			VM.bShowProductionPanel = false;
-			VM.Production = FBuildingProductionViewModel();
-			CommandIds.Reset();
-
 			StopProductionSelectionRefresh();
 			StopPostCommandSelectionRefreshWindow();
 
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("[UIBridge] Enemy troop building selected -> info only / Building=%s"),
-				*SelectedBuilding->GetName()
+			if (!bIsOwnedByMe)
+			{
+				// 상대 건물: 정보만 표시
+				CommandIds.Reset();
+			}
+			else if (Cast<ATWPopulationBuilding>(SelectedBuilding))
+			{
+				CommandIds = {
+					TWCommandIds::BuildMenu
+				};
+			}
+			else if (Cast<ATWResourceBuilding>(SelectedBuilding) || Cast<ATWBlockingBuilding>(SelectedBuilding))
+			{
+				CommandIds = {};
+			}
+		}
+
+			CurrentVisibleCommandIds = CommandIds;
+
+			SelectionProvider->SetRuntimeSelection(
+				VM,
+				CommandIds,
+				ESelectionViewMode::Single,
+				VM.SelectionId,
+				1,
+				TArray<FSelectionSummaryItemViewModel>()
 			);
-		}
-	}
-	else
-	{
-		StopProductionSelectionRefresh();
-		StopPostCommandSelectionRefreshWindow();
 
-		if (!bIsOwnedByMe)
+		SelectionProvider->ClearRuntimeCommandData();
+
+		for (const FName& CommandId : CommandIds)
 		{
-			// 상대 건물: 정보만 표시
-			CommandIds.Reset();
+			const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
+			SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
 		}
-		else if (Cast<ATWPopulationBuilding>(SelectedBuilding))
-		{
-			CommandIds = {
-				TWCommandIds::BuildMenu
-			};
-		}
-		else if (Cast<ATWResourceBuilding>(SelectedBuilding) || Cast<ATWBlockingBuilding>(SelectedBuilding))
-		{
-			CommandIds = {};
-		}
+
+		return;
 	}
-
-		CurrentVisibleCommandIds = CommandIds;
-
-		SelectionProvider->SetRuntimeSelection(
-			VM,
-			CommandIds,
-			ESelectionViewMode::Single,
-			VM.SelectionId,
-			1,
-			TArray<FSelectionSummaryItemViewModel>()
-		);
-
-	SelectionProvider->ClearRuntimeCommandData();
-
-	for (const FName& CommandId : CommandIds)
-	{
-		const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
-		SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
-	}
-
-	return;
-}
 
 	StopProductionSelectionRefresh();
 	StopPostCommandSelectionRefreshWindow();
@@ -892,7 +876,13 @@ void UTWPlayerUIBridge::RefreshSelection()
 	}
 
 	const bool bIsMultiSelection = LocalSelectedUnitCount > 1;
+	
+	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
 
+	const bool bLocalUnitSelectionOwnedByMe =
+		LocalPS &&
+		(OwnerController->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot);
+	
 	FSelectionViewModel VM;
 	VM.SelectionType = bIsMultiSelection ? ESelectionViewType::Multi : ESelectionViewType::Unit;
 	VM.ViewMode = bIsMultiSelection ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
@@ -958,9 +948,12 @@ void UTWPlayerUIBridge::RefreshSelection()
 	}
 
 	TArray<FName> CommandIds;
-	CommandIds.Add(TWCommandIds::Move);
-	CommandIds.Add(TWCommandIds::Attack);
-	CommandIds.Add(TWCommandIds::Hold);
+	if (bLocalUnitSelectionOwnedByMe)
+	{
+		CommandIds.Add(TWCommandIds::Move);
+		CommandIds.Add(TWCommandIds::Attack);
+		CommandIds.Add(TWCommandIds::Hold);
+	}
 
 	CurrentVisibleCommandIds = CommandIds;
 

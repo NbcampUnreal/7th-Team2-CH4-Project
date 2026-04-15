@@ -2,7 +2,6 @@
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingDataAsset.h"
 #include "Components/StaticMeshComponent.h"
-#include "Component/TWTeamComponent.h"
 #include "Net/UnrealNetwork.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
@@ -20,8 +19,6 @@ ATWBaseBuilding::ATWBaseBuilding()
 	MeshComponent->SetupAttachment(SceneRoot);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	MeshComponent->SetCollisionProfileName(TEXT("BlockAll"));
-	
-	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
 }
 
 void ATWBaseBuilding::BeginPlay()
@@ -101,11 +98,6 @@ void ATWBaseBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 	{
 		HandleDestroyedByDamage();
 	}
-}
-
-int32 ATWBaseBuilding::GetTeamID() const
-{
-	return TeamComponent ? TeamComponent->TeamID : -1;
 }
 
 float ATWBaseBuilding::GetBuildingProgress() const
@@ -211,10 +203,6 @@ void ATWBaseBuilding::SetOwnerPlayerState(ATWPlayerState* InPlayerState)
 	}
 	
 	OwningPlayerState = InPlayerState;
-	if (TeamComponent && InPlayerState)
-	{
-		TeamComponent->SetTeamID(InPlayerState->GetTeamID());
-	}
 	OnOwnerPlayerStateAssigned();
 }
 

@@ -8,7 +8,7 @@
 #include "Building/TWBlockingBuilding.h"
 #include "Building/TWResourceBuilding.h"
 #include "Core/TWGameMode.h"
-
+#include "MassCommonFragments.h"
 #include "UI/Core/TWPlayerUIBridge.h"
 #include "UI/Widgets/TWHUDRootWidget.h"
 #include "UI/Data/TWUIDataTypes.h"
@@ -42,6 +42,118 @@
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
+
+namespace
+{
+	constexpr float SingleSelectionHitRadius = 100.f;
+
+	static bool TryGetEntityWorldLocation(
+		UWorld* World,
+		const FMassEntityHandle& EntityHandle,
+		FVector& OutLocation)
+	{
+		OutLocation = FVector::ZeroVector;
+
+		if (!World)
+		{
+			return false;
+		}
+
+		UMassEntitySubsystem* EntitySubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+		if (!EntitySubsystem)
+		{
+			return false;
+		}
+
+		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+		if (!EntityManager.IsEntityActive(EntityHandle))
+		{
+			return false;
+		}
+
+		if (const FTransformFragment* TransformFragment = EntityManager.GetFragmentDataPtr<FTransformFragment>(EntityHandle))
+		{
+			OutLocation = TransformFragment->GetTransform().GetLocation();
+			return true;
+		}
+
+		return false;
+	}
+	
+	static bool CanControlCurrentUnitSelection(const ATWPlayerController* PC)
+	{
+		if (!PC)
+		{
+			return false;
+		}
+
+		// 건물 선택 상태면 유닛 명령 불가
+		if (PC->GetSelectedBuilding() != nullptr)
+		{
+			return false;
+		}
+
+		// 유닛이 하나도 안 선택되어 있으면 불가
+		if (PC->GetLocalSelectedUnitCount() <= 0)
+		{
+			return false;
+		}
+		
+		// 상대 유닛 선택 상태면 명령 불가
+		const ATWPlayerState* LocalPS = PC->GetPlayerState<ATWPlayerState>();
+		if (!LocalPS)
+		{
+			return false;
+		}
+
+		// 내 유닛 선택일 때만 허용
+		return PC->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot;
+	}
+
+	static void BuildSelectionRect2D(
+		const FVector& StartLocation,
+		const FVector& EndLocation,
+		FVector2D& OutMin,
+		FVector2D& OutMax)
+	{
+		OutMin.X = FMath::Min(StartLocation.X, EndLocation.X);
+		OutMin.Y = FMath::Min(StartLocation.Y, EndLocation.Y);
+		OutMax.X = FMath::Max(StartLocation.X, EndLocation.X);
+		OutMax.Y = FMath::Max(StartLocation.Y, EndLocation.Y);
+	}
+
+	static bool IsPointInsideSelectionRect2D(
+		const FVector& Point,
+		const FVector2D& RectMin,
+		const FVector2D& RectMax)
+	{
+		return
+			Point.X >= RectMin.X && Point.X <= RectMax.X &&
+			Point.Y >= RectMin.Y && Point.Y <= RectMax.Y;
+	}
+
+	static bool DoesBuildingOverlapSelectionRect2D(
+		const ATWBaseBuilding* Building,
+		const FVector2D& RectMin,
+		const FVector2D& RectMax)
+	{
+		if (!IsValid(Building))
+		{
+			return false;
+		}
+
+		FVector Origin = FVector::ZeroVector;
+		FVector Extent = FVector::ZeroVector;
+		Building->GetActorBounds(false, Origin, Extent);
+
+		const FVector2D BuildingMin(Origin.X - Extent.X, Origin.Y - Extent.Y);
+		const FVector2D BuildingMax(Origin.X + Extent.X, Origin.Y + Extent.Y);
+
+		const bool bOverlapX = (BuildingMin.X <= RectMax.X) && (BuildingMax.X >= RectMin.X);
+		const bool bOverlapY = (BuildingMin.Y <= RectMax.Y) && (BuildingMax.Y >= RectMin.Y);
+		return bOverlapX && bOverlapY;
+	}
+}
 
 ATWPlayerController::ATWPlayerController()
 	: CurrentCommandType(ETWCommandType::None)
@@ -216,24 +328,34 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 			return;
 		}
 
-		
-		if (CurrentCommandType == ETWCommandType::Move)
+		if (CurrentCommandType != ETWCommandType::None)
 		{
-			ServerHandleMoveCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-		if (CurrentCommandType == ETWCommandType::Attack)
-		{
-			ServerHandleAttackCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-		if (CurrentCommandType == ETWCommandType::Hold)
-		{
-			ServerHandleHoldCommand();
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
+			if (!CanControlCurrentUnitSelection(this))
+			{
+				ChangeCurrentCommandType(ETWCommandType::None);
+				return;
+			}
+
+			if (CurrentCommandType == ETWCommandType::Move)
+			{
+				ServerHandleMoveCommand(ClickLocation);
+				ChangeCurrentCommandType(ETWCommandType::None);
+				return;
+			}
+
+			if (CurrentCommandType == ETWCommandType::Attack)
+			{
+				ServerHandleAttackCommand(ClickLocation);
+				ChangeCurrentCommandType(ETWCommandType::None);
+				return;
+			}
+
+			if (CurrentCommandType == ETWCommandType::Hold)
+			{
+				ServerHandleHoldCommand();
+				ChangeCurrentCommandType(ETWCommandType::None);
+				return;
+			}
 		}
 		
 		ClickStartLocation = ClickLocation;
@@ -294,6 +416,11 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 			ChangeCurrentCommandType(ETWCommandType::None);
 			return;
 		}
+		
+		if (!CanControlCurrentUnitSelection(this))
+		{
+			return;
+		}
 
 		// Move Command Execute
 		FHitResult HitResult;
@@ -314,16 +441,28 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 
 inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
 {
+	if (!CanControlCurrentUnitSelection(this))
+	{
+		return;
+	}
 	ChangeCurrentCommandType(ETWCommandType::Move);
 }
 
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
+	if (!CanControlCurrentUnitSelection(this))
+	{
+		return;
+	}
 	ChangeCurrentCommandType(ETWCommandType::Attack);
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
 {
+	if (!CanControlCurrentUnitSelection(this))
+	{
+		return;
+	}
 	ServerHandleHoldCommand();
 }
 
@@ -339,6 +478,14 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 	{
 		return;
 	}
+	
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
 
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem)
@@ -366,7 +513,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 	TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
 
 	CommandBuffer->PushCommand<FMassDeferredSetCommand>(
-		[ThisWeakPtr, NavCommandLocation](FMassEntityManager& InOutEntityManager)
+		[ThisWeakPtr, NavCommandLocation, MyPlayerSlot](FMassEntityManager& InOutEntityManager)
 		{
 			if (false == ThisWeakPtr.IsValid())
 			{
@@ -379,6 +526,17 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
+				{
+					continue;
+				}
+				
+				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+				if (!UnitFragment)
+				{
+					continue;
+				}
+
+				if (UnitFragment->GetOwner() != MyPlayerSlot)
 				{
 					continue;
 				}
@@ -431,6 +589,14 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 	{
 		return;
 	}
+	
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
 
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem)
@@ -443,7 +609,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 	TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
 
 	CommandBuffer->PushCommand<FMassDeferredSetCommand>(
-		[ThisWeakPtr](FMassEntityManager& InOutEntityManager)
+	[ThisWeakPtr, MyPlayerSlot](FMassEntityManager& InOutEntityManager)
 		{
 			if (false == ThisWeakPtr.IsValid())
 			{
@@ -456,6 +622,17 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
+				{
+					continue;
+				}
+				
+				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+				if (!UnitFragment)
+				{
+					continue;
+				}
+
+				if (UnitFragment->GetOwner() != MyPlayerSlot)
 				{
 					continue;
 				}
@@ -484,38 +661,95 @@ void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector&
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 
-	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
-	if (false == IsValid(UnitSubsystem))
-	{
-		return;
-	}
-
+	UWorld* World = GetWorld();
+	UTWUnitSubsystem* UnitSubsystem = World ? World->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
+	if (!World || !TWPS || !UnitSubsystem)
 	{
 		return;
 	}
 
-	FMassEntityHandle EntityHandle;
-	if (UnitSubsystem->FindNearestEntity(CommandLocation, EntityHandle, TWPS->PlayerSlot))
-	{
-		SelectedBuilding = nullptr;
-		ServerSelectedEntities.Empty();
-		ServerSelectedEntities.Add(EntityHandle);
+	auto ApplyUnitSelection =
+		[this](const TArray<FMassEntityHandle>& InEntities, const int32 InSelectedOwnerPlayerSlot)
+		{
+			SelectedBuilding = nullptr;
+			ServerSelectedEntities = InEntities;
 
-		TArray<FMassNetworkID> NetworkIds;
-		float PrimaryHealth = 0.f;
-		bool bHasPrimaryHealth = false;
-		BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
+			TArray<FMassNetworkID> NetworkIds;
+			float PrimaryHealth = 0.f;
+			bool bHasPrimaryHealth = false;
+			BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
+			ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth, InSelectedOwnerPlayerSlot);
+		};
 
-		ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth);
-	}
-	else
+	const FVector AreaMin(
+		CommandLocation.X - SingleSelectionHitRadius,
+		CommandLocation.Y - SingleSelectionHitRadius,
+		CommandLocation.Z - 1000.f
+	);
+
+	const FVector AreaMax(
+		CommandLocation.X + SingleSelectionHitRadius,
+		CommandLocation.Y + SingleSelectionHitRadius,
+		CommandLocation.Z + 1000.f
+	);
+
+	FMassEntityHandle BestEntity;
+	float BestDistanceSq = TNumericLimits<float>::Max();
+	int32 BestOwnerSlot = INDEX_NONE;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
-		ServerSelectedEntities.Empty();
-		SelectedBuilding = nullptr;
-		ClientClearSelection();
+		APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		ATWPlayerState* OtherPS = PC->GetPlayerState<ATWPlayerState>();
+		if (!OtherPS)
+		{
+			continue;
+		}
+
+		TArray<FMassEntityHandle> CandidateEntities;
+		if (!UnitSubsystem->GetEntitiesInRectangle(AreaMin, AreaMax, CandidateEntities, OtherPS->PlayerSlot))
+		{
+			continue;
+		}
+
+		for (const FMassEntityHandle& CandidateEntity : CandidateEntities)
+		{
+			FVector EntityLocation = FVector::ZeroVector;
+			if (!TryGetEntityWorldLocation(World, CandidateEntity, EntityLocation))
+			{
+				continue;
+			}
+
+			const float DistanceSq = FVector::DistSquared2D(EntityLocation, CommandLocation);
+			if (DistanceSq > FMath::Square(SingleSelectionHitRadius))
+			{
+				continue;
+			}
+
+			if (DistanceSq < BestDistanceSq)
+			{
+				BestDistanceSq = DistanceSq;
+				BestEntity = CandidateEntity;
+				BestOwnerSlot = OtherPS->PlayerSlot;
+			}
+		}
 	}
+
+	if (BestEntity.IsSet())
+	{
+		ApplyUnitSelection({ BestEntity }, BestOwnerSlot);
+		return;
+	}
+
+	ServerSelectedEntities.Empty();
+	SelectedBuilding = nullptr;
+	ClientClearSelection();
 }
 
 void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVector& StartLocation,
@@ -523,30 +757,140 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 
-	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
-	if (false == IsValid(UnitSubsystem))
-	{
-		return;
-	}
-
+	UWorld* World = GetWorld();
+	UTWUnitSubsystem* UnitSubsystem = World ? World->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
+	if (!World || !TWPS || !UnitSubsystem)
 	{
 		return;
 	}
 
-	TArray<FMassEntityHandle> EntityHandles;
-	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, EntityHandles, TWPS->PlayerSlot))
+	const FVector RectCenter = (StartLocation + EndLocation) * 0.5f;
+	FVector2D RectMin = FVector2D::ZeroVector;
+	FVector2D RectMax = FVector2D::ZeroVector;
+	BuildSelectionRect2D(StartLocation, EndLocation, RectMin, RectMax);
+
+	auto ApplyUnitSelection =
+		[this](const TArray<FMassEntityHandle>& InEntities, const int32 InSelectedOwnerPlayerSlot)
+		{
+			SelectedBuilding = nullptr;
+			ServerSelectedEntities = InEntities;
+
+			TArray<FMassNetworkID> NetworkIds;
+			float PrimaryHealth = 0.f;
+			bool bHasPrimaryHealth = false;
+			BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
+			ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth, InSelectedOwnerPlayerSlot);
+		};
+
+	auto FindBestBuildingInRect =
+		[World, &RectMin, &RectMax, &RectCenter](const bool bRequireOwnedByMe, const int32 InMyPlayerSlot)
+		{
+			ATWBaseBuilding* BestBuilding = nullptr;
+			float BestDistanceSq = TNumericLimits<float>::Max();
+
+			for (TActorIterator<ATWBaseBuilding> It(World); It; ++It)
+			{
+				ATWBaseBuilding* Building = *It;
+				if (!IsValid(Building))
+				{
+					continue;
+				}
+
+				const bool bOwnedByMe = (Building->OwnerPlayerSlot == InMyPlayerSlot);
+				if (bOwnedByMe != bRequireOwnedByMe)
+				{
+					continue;
+				}
+
+				if (!DoesBuildingOverlapSelectionRect2D(Building, RectMin, RectMax))
+				{
+					continue;
+				}
+
+				const float DistanceSq = FVector::DistSquared2D(Building->GetActorLocation(), RectCenter);
+				if (DistanceSq < BestDistanceSq)
+				{
+					BestDistanceSq = DistanceSq;
+					BestBuilding = Building;
+				}
+			}
+
+			return BestBuilding;
+		};
+	// 내 유닛
+	TArray<FMassEntityHandle> OwnedEntities;
+	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, OwnedEntities, TWPS->PlayerSlot) && OwnedEntities.Num() > 0)
 	{
-		ServerSelectedEntities = EntityHandles;
-		SelectedBuilding = nullptr;
+		ApplyUnitSelection(OwnedEntities, TWPS->PlayerSlot);
+		return;
+	}
 
-		TArray<FMassNetworkID> UnitIds;
-		float PrimaryHealth = 0.f;
-		bool bHasPrimaryHealth = false;
-		BuildSelectionPayloadFromEntities(ServerSelectedEntities, UnitIds, PrimaryHealth, bHasPrimaryHealth);
+	// 내 건물 1개
+	if (ATWBaseBuilding* OwnedBuilding = FindBestBuildingInRect(true, TWPS->PlayerSlot))
+	{
+		ServerHandleBuildingSelect(OwnedBuilding);
+		return;
+	}
 
-		ClientApplyUnitSelection(UnitIds, PrimaryHealth, bHasPrimaryHealth);
+	// 적 유닛 1개
+	FMassEntityHandle BestEnemyEntity;
+	float BestEnemyDistanceSq = TNumericLimits<float>::Max();
+	int32 BestEnemyOwnerSlot = INDEX_NONE;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		ATWPlayerState* OtherPS = PC->GetPlayerState<ATWPlayerState>();
+		if (!OtherPS || OtherPS->PlayerSlot == TWPS->PlayerSlot)
+		{
+			continue;
+		}
+
+		TArray<FMassEntityHandle> EnemyEntities;
+		if (!UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, EnemyEntities, OtherPS->PlayerSlot))
+		{
+			continue;
+		}
+
+		for (const FMassEntityHandle& EnemyEntity : EnemyEntities)
+		{
+			FVector EnemyLocation = FVector::ZeroVector;
+			if (!TryGetEntityWorldLocation(World, EnemyEntity, EnemyLocation))
+			{
+				continue;
+			}
+
+			if (!IsPointInsideSelectionRect2D(EnemyLocation, RectMin, RectMax))
+			{
+				continue;
+			}
+
+			const float DistanceSq = FVector::DistSquared2D(EnemyLocation, RectCenter);
+			if (DistanceSq < BestEnemyDistanceSq)
+			{
+				BestEnemyDistanceSq = DistanceSq;
+				BestEnemyEntity = EnemyEntity;
+				BestEnemyOwnerSlot = OtherPS->PlayerSlot;
+			}
+		}
+	}
+
+	if (BestEnemyEntity.IsSet())
+	{
+		ApplyUnitSelection({ BestEnemyEntity }, BestEnemyOwnerSlot);
+		return;
+	}
+
+	// 적 건물 1개
+	if (ATWBaseBuilding* EnemyBuilding = FindBestBuildingInRect(false, TWPS->PlayerSlot))
+	{
+		ServerHandleBuildingSelect(EnemyBuilding);
 		return;
 	}
 
@@ -681,6 +1025,7 @@ void ATWPlayerController::ClearLocalSelectionCache()
 	LocalPrimarySelectedUnitId = NAME_None;
 	bHasLocalPrimarySelectedUnitStatus = false;
 	LocalSelectionSummaryItems.Empty();
+	LocalSelectedOwnerPlayerSlot = INDEX_NONE;
 }
 
 void ATWPlayerController::RebuildLocalSelectionSummary(const TArray<FName>& InUnitIds)
@@ -734,9 +1079,6 @@ void ATWPlayerController::BuildSelectionPayloadFromEntities(
 		{
 			OutNetworkIds.Add(NetworkIDFragmentFragment->NetID);
 		}
-		
-		
-		
 
 		if (Index == 0)
 		{
@@ -764,10 +1106,11 @@ const FUICommandMetaRow* ATWPlayerController::FindCommandMetaRowFromTable(FName 
 void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	const TArray<FMassNetworkID>& InNetworkIds,
 	float InPrimaryHealth,
-	bool bInHasPrimaryHealth)
+	bool bInHasPrimaryHealth, int32 InSelectedOwnerPlayerSlot)
 {
 	ClearLocalSelectionCache();
-
+	LocalSelectedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+	
 	LocalSelectedUnitCount = InNetworkIds.Num();
 	
 	ClientSelectedEntities = InNetworkIds;
@@ -779,8 +1122,6 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	//리슨서버에서는 ServerSelectedUnits에서 정보를 얻어와야해요
 	for (const FMassNetworkID& NetID : InNetworkIds)
 	{
-					
-
 		UE_LOG(LogTemp, Warning, TEXT("%d"), NetID.GetValue());
 		
 		const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(NetID);
@@ -836,6 +1177,7 @@ void ATWPlayerController::ClientForceRefreshSelectionBridge_Implementation()
 		RefreshUIBridge();
 	}
 }
+
 void ATWPlayerController::HandleUICommandRequested(FName CommandId)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UI Click] HandleUICommandRequested: %s"), *CommandId.ToString());
@@ -1325,7 +1667,7 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 		return;
 	}
 
-	const int32 MyTeamID = TWPS->GetTeamID();
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
 
 	for (TActorIterator<ATWNexusBuilding> It(GetWorld()); It; ++It)
 	{
@@ -1335,7 +1677,7 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 			continue;
 		}
 
-		if (NexusBuilding->GetTeamID() == MyTeamID)
+		if (NexusBuilding->OwnerPlayerSlot == MyPlayerSlot)
 		{
 			continue;
 		}

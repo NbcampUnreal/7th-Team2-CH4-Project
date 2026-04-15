@@ -207,6 +207,8 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTWPlayerUIBridge> PlayerUIBridge = nullptr;
+	
+	int32 LocalSelectedOwnerPlayerSlot = INDEX_NONE;
 
 private:
 	void InitializeUIBridge();
@@ -223,7 +225,7 @@ private:
 	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
 
 	UFUNCTION(Client, Reliable)
-	void ClientApplyUnitSelection(const TArray<FMassNetworkID>& InNetworkIds, float InPrimaryHealth, bool bInHasPrimaryHealth);
+	void ClientApplyUnitSelection(const TArray<FMassNetworkID>& InNetworkIds, float InPrimaryHealth, bool bInHasPrimaryHealth, int32 InSelectedOwnerPlayerSlot);
 
 	UFUNCTION(Client, Reliable)
 	void ClientApplyBuildingSelection(ATWBaseBuilding* InBuilding);
@@ -248,6 +250,7 @@ public:
 	bool HasLocalPrimarySelectedUnitStatus() const { return bHasLocalPrimarySelectedUnitStatus; }
 	const FTWUnitStatus& GetLocalPrimarySelectedUnitStatus() const { return LocalPrimarySelectedUnitStatus; }
 	ATWBaseBuilding* GetSelectedBuilding() const { return SelectedBuilding; }
+	int32 GetLocalSelectedOwnerPlayerSlot() const { return LocalSelectedOwnerPlayerSlot; }
 
 	FName ResolveBuildingSelectionId(const ATWBaseBuilding* InBuilding) const;
 	void NotifyResourceStateChanged();
