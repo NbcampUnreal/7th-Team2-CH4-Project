@@ -42,6 +42,7 @@
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
+#include "Selection/TWSelectionVisualManager.h"
 
 namespace
 {
@@ -193,6 +194,9 @@ void ATWPlayerController::BeginPlay()
 	SetInputMode(InputMode);
 	SetShowMouseCursor(false);
 
+	InitializeSelectionVisualManager();
+	RefreshSelectionVisualManager();
+
 	InitializeUIBridge();
 	RefreshUIBridge();
 }
@@ -217,6 +221,11 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !BuildComponent->GetBuildMode())
 	{
 		UpdateDragSelectionOverlay();
+	}
+	
+	if (SelectionVisualManager)
+	{
+		SelectionVisualManager->Tick(DeltaSeconds);
 	}
 }
 
@@ -1018,8 +1027,55 @@ void ATWPlayerController::RefreshUIBridge()
 	}
 }
 
+void ATWPlayerController::InitializeSelectionVisualManager()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!SelectionVisualManager)
+	{
+		SelectionVisualManager = NewObject<UTWSelectionVisualManager>(this);
+	}
+
+	if (SelectionVisualManager)
+	{
+		SelectionVisualManager->Initialize(this);
+	}
+}
+
+void ATWPlayerController::RefreshSelectionVisualManager()
+{
+	if (!SelectionVisualManager)
+	{
+		return;
+	}
+
+	if (ClientSelectedEntities.Num() > 0)
+	{
+		SelectionVisualManager->ApplyUnitSelection(ClientSelectedEntities);
+		return;
+	}
+
+	if (SelectedBuilding)
+	{
+		TArray<ATWBaseBuilding*> Buildings;
+		Buildings.Add(SelectedBuilding);
+		SelectionVisualManager->ApplyBuildingSelection(Buildings);
+		return;
+	}
+
+	SelectionVisualManager->ClearSelectionVisuals();
+}
+
 void ATWPlayerController::ClearLocalSelectionCache()
 {
+	if (SelectionVisualManager)
+	{
+		SelectionVisualManager->ClearSelectionVisuals();
+	}
+	
 	SelectedBuilding = nullptr;
 	LocalSelectedUnitCount = 0;
 	LocalPrimarySelectedUnitId = NAME_None;
@@ -1151,6 +1207,7 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	}
 
 	RefreshUIBridge();
+	RefreshSelectionVisualManager();
 }
 
 void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBuilding* InBuilding)
@@ -1158,12 +1215,14 @@ void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBui
 	ClearLocalSelectionCache();
 	SelectedBuilding = InBuilding;
 	RefreshUIBridge();
+	RefreshSelectionVisualManager();
 }
 
 void ATWPlayerController::ClientClearSelection_Implementation()
 {
 	ClearLocalSelectionCache();
 	RefreshUIBridge();
+	RefreshSelectionVisualManager();
 }
 
 void ATWPlayerController::ClientForceRefreshSelectionBridge_Implementation()

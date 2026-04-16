@@ -9,6 +9,7 @@ class ATWPlayerState;
 class USceneComponent;
 class UStaticMeshComponent;
 class UNavModifierComponent;
+class UMaterialInterface;
 
 UENUM(BlueprintType)
 enum class ETWBuildingState : uint8
@@ -61,6 +62,32 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Building|Construction")
 	float GetRemainingBuildTime() const;
+
+	// 최신 월드 표시용
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	virtual FVector GetSelectionAnchorWorldLocation() const;
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	virtual FVector GetHPBarAnchorWorldLocation() const;
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	virtual float GetSelectionVisualRadius() const;
+
+	// SelectionVisualManager 호환용
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	void SetSelectionVisualActive(bool bInActive);
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	bool IsSelectionVisualActive() const { return bSelectionVisualActive; }
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	FVector2D GetSelectionRectangleHalfExtentXY(float InPadding = 0.f) const;
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	float GetSelectionRectangleZOffset(float InBaseOffset = 0.f) const;
+
+	UFUNCTION(BlueprintCallable, Category="Building|Visual")
+	FVector GetSelectionHPBarWorldLocation() const;
 	
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
@@ -89,6 +116,15 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category="Building|Visual")
 	TObjectPtr<UMaterialInterface> ConstructionMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building|Visual")
+	FVector SelectionAnchorOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building|Visual")
+	FVector HPBarAnchorOffset = FVector(0.f, 0.f, 180.f);
+
+	UPROPERTY(Transient)
+	bool bSelectionVisualActive = false;
 	
 	UPROPERTY()
 	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;

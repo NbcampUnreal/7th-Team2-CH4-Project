@@ -27,7 +27,7 @@ class ATWBaseBuilding;
 class UTWBuildComponent;
 class UTWPlayerUIBridge;
 class UTWHUDRootWidget;
-
+class UTWSelectionVisualManager;
 /**
  * 
  */
@@ -208,11 +208,16 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UTWPlayerUIBridge> PlayerUIBridge = nullptr;
 	
+	UPROPERTY(Transient)
+	TObjectPtr<UTWSelectionVisualManager> SelectionVisualManager = nullptr;
+	
 	int32 LocalSelectedOwnerPlayerSlot = INDEX_NONE;
 
 private:
 	void InitializeUIBridge();
 	void RefreshUIBridge();
+	void InitializeSelectionVisualManager();
+	void RefreshSelectionVisualManager();
 
 	void ClearLocalSelectionCache();
 	void RebuildLocalSelectionSummary(const TArray<FName>& InUnitIds);

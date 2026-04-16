@@ -173,6 +173,8 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
+	OutEntityHandles.Empty();
+
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!EntitySubsystem)
 	{
@@ -183,6 +185,11 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 
 	TArray<FMassArchetypeHandle> MatchingArchetypes;
 	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
+
+	const float MinX = FMath::Min(StartLocation.X, EndLocation.X);
+	const float MaxX = FMath::Max(StartLocation.X, EndLocation.X);
+	const float MinY = FMath::Min(StartLocation.Y, EndLocation.Y);
+	const float MaxY = FMath::Max(StartLocation.Y, EndLocation.Y);
 
 	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
 	{
@@ -205,8 +212,9 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 			}
 
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
-			const double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
-			if (DotResult < 0.0)
+
+			if (EntityPos.X >= MinX && EntityPos.X <= MaxX &&
+				EntityPos.Y >= MinY && EntityPos.Y <= MaxY)
 			{
 				OutEntityHandles.Add(Entity);
 			}
@@ -284,20 +292,17 @@ void UTWUnitSubsystem::SpawnUnit(
 				UnitFragment->SetOwner(PlayerState->PlayerSlot);
 			}
 
-			if (FTransformFragment* TransformFragment =
-				InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
 			{
 				TransformFragment->GetMutableTransform().SetLocation(Location);
 			}
 
-			if (FMassMoveTargetFragment* MoveTargetFragment =
-				InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
+			if (FMassMoveTargetFragment* MoveTargetFragment = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
 			{
 				MoveTargetFragment->Center = Location;
 			}
 
-			if (FTWStatusFragment* StatusFragment =
-				InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+			if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 			{
 				const FTWUnitStatus UnitStatus =
 					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
@@ -397,7 +402,7 @@ FTWUnitStatus UTWUnitSubsystem::GetUnitDefaultStatus(FName UnitID, int32 PlayerS
 	return UnitStatus;
 }
 
-FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, int32 PlayerSlot)
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, int32 PlayerSlot) const
 {
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
 	if (!EntityManager || !Unit.IsValid())
@@ -428,8 +433,7 @@ FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
 
 bool UTWUnitSubsystem::TryGetReplicationEntityInfo(
 	const FMassNetworkID& UnitNetID,
-	const FMassReplicationEntityInfo*& OutEntityInfo
-) const
+	const FMassReplicationEntityInfo*& OutEntityInfo) const
 {
 	OutEntityInfo = nullptr;
 
@@ -455,7 +459,7 @@ bool UTWUnitSubsystem::TryGetReplicationEntityInfo(
 	return true;
 }
 
-FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot)
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot) const
 {
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
@@ -482,8 +486,7 @@ bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutU
 		return false;
 	}
 
-	const FTWUnitFragment* UnitFragment =
-		EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
+	const FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
 	if (!UnitFragment)
 	{
 		return false;
@@ -493,12 +496,11 @@ bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutU
 	return OutUnitID != NAME_None;
 }
 
-bool UTWUnitSubsystem::TryGetUnitTWUnit(
+bool UTWUnitSubsystem::TryGetUnitVisualActor(
 	const FMassNetworkID& UnitNetID,
-	const ATWUnit*& OutTWUnit
-) const
+	const ATWUnit*& OutVisualActor) const
 {
-	OutTWUnit = nullptr;
+	OutVisualActor = nullptr;
 
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
@@ -512,8 +514,7 @@ bool UTWUnitSubsystem::TryGetUnitTWUnit(
 		return false;
 	}
 
-	const FMassActorFragment* ActorFragment =
-		EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
+	const FMassActorFragment* ActorFragment = EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
 	if (!ActorFragment || !ActorFragment->IsValid())
 	{
 		return false;
@@ -531,14 +532,13 @@ bool UTWUnitSubsystem::TryGetUnitTWUnit(
 		return false;
 	}
 
-	OutTWUnit = TWUnit;
+	OutVisualActor = TWUnit;
 	return true;
 }
 
 bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 	const FMassNetworkID& UnitNetID,
-	FVector& OutLocation
-) const
+	FVector& OutLocation) const
 {
 	OutLocation = FVector::ZeroVector;
 
@@ -554,8 +554,7 @@ bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 		return false;
 	}
 
-	const FTransformFragment* TransformFragment =
-		EntityManager->GetFragmentDataPtr<FTransformFragment>(EntityInfo->Entity);
+	const FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(EntityInfo->Entity);
 	if (!TransformFragment)
 	{
 		return false;
@@ -568,8 +567,7 @@ bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 bool UTWUnitSubsystem::TryProjectWorldPointToGround(
 	const FVector& InWorldPoint,
 	FVector& OutGroundPoint,
-	const AActor* ActorToIgnore
-) const
+	const AActor* ActorToIgnore) const
 {
 	OutGroundPoint = InWorldPoint;
 
@@ -605,7 +603,7 @@ bool UTWUnitSubsystem::TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID,
 	OutLocation = FVector::ZeroVector;
 
 	const ATWUnit* TWUnit = nullptr;
-	if (TryGetUnitTWUnit(UnitNetID, TWUnit) && IsValid(TWUnit))
+	if (TryGetUnitVisualActor(UnitNetID, TWUnit) && IsValid(TWUnit))
 	{
 		const FVector AnchorWorldLocation = TWUnit->GetSelectionAnchorWorldLocation();
 
@@ -642,7 +640,7 @@ bool UTWUnitSubsystem::TryGetUnitHPBarWorldLocation(const FMassNetworkID& UnitNe
 	OutLocation = FVector::ZeroVector;
 
 	const ATWUnit* TWUnit = nullptr;
-	if (TryGetUnitTWUnit(UnitNetID, TWUnit) && IsValid(TWUnit))
+	if (TryGetUnitVisualActor(UnitNetID, TWUnit) && IsValid(TWUnit))
 	{
 		OutLocation = TWUnit->GetHPBarAnchorWorldLocation();
 		return true;
@@ -662,9 +660,7 @@ bool UTWUnitSubsystem::TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int3
 {
 	OutCurrentHP = 0.f;
 
-	const FTWUnitStatus Status =
-		const_cast<UTWUnitSubsystem*>(this)->GetUnitCurrentStatus(UnitNetID, PlayerSlot);
-
+	const FTWUnitStatus Status = GetUnitCurrentStatus(UnitNetID, PlayerSlot);
 	OutCurrentHP = Status.GetStatus(ETWStatusType::Health);
 	return OutCurrentHP > 0.f;
 }
@@ -679,19 +675,21 @@ bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 Pl
 		return false;
 	}
 
-	if (FTWUnitTableRowBase* UnitRow = const_cast<UTWUnitSubsystem*>(this)->GetUnitTableRowBase(UnitID))
+	const FTWUnitTableRowBase* UnitRow = GetUnitTableRowBase(UnitID);
+	if (!UnitRow)
 	{
-		OutMaxHP = UnitRow->BaseStatus.GetStatus(ETWStatusType::Health);
-		return OutMaxHP > 0.f;
+		return false;
 	}
 
-	return false;
+	// 현재 PlayerController/UI 흐름에서는 업그레이드가 반영된 최대 HP가 더 자연스러움
+	const FTWUnitStatus DefaultStatus = const_cast<UTWUnitSubsystem*>(this)->GetUnitDefaultStatus(UnitID, PlayerSlot);
+	OutMaxHP = DefaultStatus.GetStatus(ETWStatusType::Health);
+	return OutMaxHP > 0.f;
 }
 
 bool UTWUnitSubsystem::TryGetUnitSelectionVisualStyle(
 	const FMassNetworkID& UnitNetID,
-	FTWUnitSelectionVisualStyle& OutStyle
-) const
+	FTWUnitSelectionVisualStyle& OutStyle) const
 {
 	OutStyle = FTWUnitSelectionVisualStyle();
 
@@ -700,7 +698,7 @@ bool UTWUnitSubsystem::TryGetUnitSelectionVisualStyle(
 	{
 		return false;
 	}
-	
+
 	return true;
 }
 

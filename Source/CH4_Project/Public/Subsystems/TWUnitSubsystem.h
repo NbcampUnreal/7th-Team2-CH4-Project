@@ -13,6 +13,8 @@ struct FTWUnitTableRowBase;
 class ATWPlayerController;
 class ATWUnit;
 struct FMassEntityHandle;
+struct FMassReplicationEntityInfo;
+class UDataTable;
 
 USTRUCT(BlueprintType)
 struct CH4_PROJECT_API FTWUnitSelectionVisualStyle
@@ -44,14 +46,16 @@ UCLASS()
 class CH4_PROJECT_API UTWUnitSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
-	
+
 public:
 	UTWUnitSubsystem();
+
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	virtual void PostInitialize() override;
 	virtual void Deinitialize() override;
 
 #ifdef WITH_SERVER_CODE
+public:
 	void AddPlayer(int32 PlayerSlot);
 
 	bool FindNearestEntity(
@@ -84,19 +88,18 @@ private:
 
 public:
 #pragma region Status
-	//업그레이드까지 적용된 풀컨디션 스탯임 BaseStat아님
 	FTWUnitStatus GetUnitDefaultStatus(FName UnitID, int32 PlayerSlot);
-	FTWUnitStatus GetUnitCurrentStatus(const FMassEntityHandle& Unit, const int32 PlayerSlot);
-	
+	FTWUnitStatus GetUnitCurrentStatus(const FMassEntityHandle& Unit, int32 PlayerSlot) const;
+
 #ifdef WITH_CLIENT_CODE
-	FTWUnitStatus GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, const int32 PlayerSlot);
+	FTWUnitStatus GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot) const;
 #endif
 
 #ifdef WITH_SERVER_CODE
 	void ApplyStatus(FName UnitID, int32 PlayerSlot);
 #endif
-	
 #pragma endregion
+
 #ifdef WITH_CLIENT_CODE
 public:
 	/** 선택 링용 월드 위치 */
@@ -120,9 +123,6 @@ public:
 		FTWUnitSelectionVisualStyle& OutStyle
 	) const;
 
-	/** 클라 기준 현재 상태 */
-	FTWUnitStatus GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot);
-
 private:
 	bool TryGetReplicationEntityInfo(
 		const FMassNetworkID& UnitNetID,
@@ -145,7 +145,8 @@ private:
 		const AActor* ActorToIgnore = nullptr
 	) const;
 #endif
-	
+
+public:
 	FTWUnitTableRowBase* GetUnitTableRowBase(FName UnitID) const;
 
 protected:

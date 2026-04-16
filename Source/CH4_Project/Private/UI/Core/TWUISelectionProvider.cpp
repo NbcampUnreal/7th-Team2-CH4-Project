@@ -303,48 +303,45 @@ void UTWUISelectionProvider::RefreshFromSourceIfNeeded() const
 		return;
 	}
 
-	// fallback: 단일 건물 선택만 간단 반영
-	if (ATWBaseBuilding* SelectedBuilding = TWPC->GetPrimarySelectedBuilding())
+	// fallback: 최신 PlayerController 기준 단일 건물 선택만 간단 반영
+	if (ATWBaseBuilding* SelectedBuilding = TWPC->GetSelectedBuilding())
 	{
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel = FSelectionViewModel();
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionType = ESelectionViewType::Building;
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode = ESelectionViewMode::Single;
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId = TWPC->ResolveBuildingSelectionId(SelectedBuilding);
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.DisplayName = SelectedBuilding->GetName();
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TypeLabel = TEXT("Building");
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount = TWPC->GetLocalSelectedBuildingCount();
+		UTWUISelectionProvider* MutableThis = const_cast<UTWUISelectionProvider*>(this);
 
-		const_cast<UTWUISelectionProvider*>(this)->CachedViewMode = ESelectionViewMode::Single;
-		const_cast<UTWUISelectionProvider*>(this)->CachedPrimaryEntityId =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId;
-		const_cast<UTWUISelectionProvider*>(this)->CachedTotalSelectedCount =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount;
+		MutableThis->CachedSelectionViewModel = FSelectionViewModel();
+		MutableThis->CachedSelectionViewModel.SelectionType = ESelectionViewType::Building;
+		MutableThis->CachedSelectionViewModel.ViewMode = ESelectionViewMode::Single;
+		MutableThis->CachedSelectionViewModel.SelectionId = TWPC->ResolveBuildingSelectionId(SelectedBuilding);
+		MutableThis->CachedSelectionViewModel.DisplayName = SelectedBuilding->GetName();
+		MutableThis->CachedSelectionViewModel.TypeLabel = TEXT("Building");
+		MutableThis->CachedSelectionViewModel.TotalSelectedCount = 1;
+		MutableThis->CachedSelectionViewModel.SummaryItems.Reset();
+
+		MutableThis->CachedViewMode = ESelectionViewMode::Single;
+		MutableThis->CachedPrimaryEntityId = MutableThis->CachedSelectionViewModel.SelectionId;
+		MutableThis->CachedTotalSelectedCount = 1;
+		MutableThis->CachedSummaryItems.Reset();
 		return;
 	}
 
 	// fallback: 유닛 선택
 	if (TWPC->GetLocalSelectedUnitCount() > 0)
 	{
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel = FSelectionViewModel();
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionType =
-			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewType::Multi : ESelectionViewType::Unit;
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode =
-			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId =
-			TWPC->GetLocalPrimarySelectedUnitId();
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount =
-			TWPC->GetLocalSelectedUnitCount();
-		const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SummaryItems =
-			TWPC->GetLocalSelectionSummaryItems();
+		UTWUISelectionProvider* MutableThis = const_cast<UTWUISelectionProvider*>(this);
 
-		const_cast<UTWUISelectionProvider*>(this)->CachedViewMode =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.ViewMode;
-		const_cast<UTWUISelectionProvider*>(this)->CachedPrimaryEntityId =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SelectionId;
-		const_cast<UTWUISelectionProvider*>(this)->CachedTotalSelectedCount =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.TotalSelectedCount;
-		const_cast<UTWUISelectionProvider*>(this)->CachedSummaryItems =
-			const_cast<UTWUISelectionProvider*>(this)->CachedSelectionViewModel.SummaryItems;
+		MutableThis->CachedSelectionViewModel = FSelectionViewModel();
+		MutableThis->CachedSelectionViewModel.SelectionType =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewType::Multi : ESelectionViewType::Unit;
+		MutableThis->CachedSelectionViewModel.ViewMode =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
+		MutableThis->CachedSelectionViewModel.SelectionId = TWPC->GetLocalPrimarySelectedUnitId();
+		MutableThis->CachedSelectionViewModel.TotalSelectedCount = TWPC->GetLocalSelectedUnitCount();
+		MutableThis->CachedSelectionViewModel.SummaryItems = TWPC->GetLocalSelectionSummaryItems();
+
+		MutableThis->CachedViewMode = MutableThis->CachedSelectionViewModel.ViewMode;
+		MutableThis->CachedPrimaryEntityId = MutableThis->CachedSelectionViewModel.SelectionId;
+		MutableThis->CachedTotalSelectedCount = MutableThis->CachedSelectionViewModel.TotalSelectedCount;
+		MutableThis->CachedSummaryItems = MutableThis->CachedSelectionViewModel.SummaryItems;
 	}
 }
 

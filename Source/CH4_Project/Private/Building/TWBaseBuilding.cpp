@@ -29,7 +29,6 @@ ATWBaseBuilding::ATWBaseBuilding()
 	NavModifier->SetAreaClass(UNavArea_Null::StaticClass());
 	
 	MeshComponent->SetCanEverAffectNavigation(false);
-	
 }
 
 void ATWBaseBuilding::BeginPlay()
@@ -39,7 +38,6 @@ void ATWBaseBuilding::BeginPlay()
 	CacheOriginalMaterial();
 	UpdatePlayerMaterial();
 	
-		
 	if (UWorld* World = GetWorld())
 	{
 		if (UTWGridSubSystem* GridSub = World->GetSubsystem<UTWGridSubSystem>())
@@ -94,7 +92,6 @@ void ATWBaseBuilding::Destroyed()
 		{
 			FIntPoint Anchor = GridSub->WorldToGridPosition(GetActorLocation());
 			FIntPoint Size = BuildingData ? BuildingData->GridSize.BuildingSize : FIntPoint(1,1);
-			
 			GridSub->FreeArea(Anchor, Size);
 		}
 	}
@@ -106,6 +103,7 @@ void ATWBaseBuilding::Destroyed()
 			BuildingManager->UnregisterBuilding(OwnerPlayerSlot, this);
 		}
 	}
+
 	Super::Destroyed();
 }
 
@@ -141,12 +139,83 @@ float ATWBaseBuilding::GetBuildingProgress() const
 	{
 		return 1.0f;
 	}
+
 	return FMath::Clamp(CurrentBuildTime / MaxBuildTime, 0.0f, 1.0f);
 }
 
 float ATWBaseBuilding::GetRemainingBuildTime() const
 {
 	return FMath::Max(0.0f, MaxBuildTime - CurrentBuildTime);
+}
+
+void ATWBaseBuilding::SetSelectionVisualActive(bool bInActive)
+{
+	bSelectionVisualActive = bInActive;
+}
+
+FVector ATWBaseBuilding::GetSelectionAnchorWorldLocation() const
+{
+	FVector Origin = FVector::ZeroVector;
+	FVector Extent = FVector::ZeroVector;
+	GetActorBounds(false, Origin, Extent);
+
+	const FVector BaseLocation(
+		Origin.X,
+		Origin.Y,
+		Origin.Z - Extent.Z
+	);
+
+	return BaseLocation + SelectionAnchorOffset;
+}
+
+FVector ATWBaseBuilding::GetHPBarAnchorWorldLocation() const
+{
+	FVector Origin = FVector::ZeroVector;
+	FVector Extent = FVector::ZeroVector;
+	GetActorBounds(false, Origin, Extent);
+
+	const FVector TopLocation(
+		Origin.X,
+		Origin.Y,
+		Origin.Z + Extent.Z
+	);
+
+	return TopLocation + HPBarAnchorOffset;
+}
+
+float ATWBaseBuilding::GetSelectionVisualRadius() const
+{
+	FVector Origin = FVector::ZeroVector;
+	FVector Extent = FVector::ZeroVector;
+	GetActorBounds(false, Origin, Extent);
+
+	return FMath::Max(Extent.X, Extent.Y);
+}
+
+FVector2D ATWBaseBuilding::GetSelectionRectangleHalfExtentXY(float InPadding) const
+{
+	FVector Origin = FVector::ZeroVector;
+	FVector Extent = FVector::ZeroVector;
+	GetActorBounds(false, Origin, Extent);
+
+	return FVector2D(
+		FMath::Max(0.f, Extent.X + InPadding),
+		FMath::Max(0.f, Extent.Y + InPadding)
+	);
+}
+
+float ATWBaseBuilding::GetSelectionRectangleZOffset(float InBaseOffset) const
+{
+	FVector Origin = FVector::ZeroVector;
+	FVector Extent = FVector::ZeroVector;
+	GetActorBounds(false, Origin, Extent);
+
+	return Extent.Z + InBaseOffset;
+}
+
+FVector ATWBaseBuilding::GetSelectionHPBarWorldLocation() const
+{
+	return GetHPBarAnchorWorldLocation();
 }
 
 void ATWBaseBuilding::HandleDestroyedByDamage()
@@ -243,14 +312,14 @@ void ATWBaseBuilding::StartConstruction()
 		&ATWBaseBuilding::UpdateConstruction,
 		ConstructionTickInterval,
 		true
-		);
+	);
 }
 
 void ATWBaseBuilding::UpdateConstruction()
 {
 	CurrentBuildTime += ConstructionTickInterval;
 	
-	float HPGainPerTick = (MaxHP / MaxBuildTime) * ConstructionTickInterval;
+	const float HPGainPerTick = (MaxHP / MaxBuildTime) * ConstructionTickInterval;
 	CurrentHP = FMath::Clamp(CurrentHP + HPGainPerTick, 0.0f, MaxHP);
 	
 	UE_LOG(LogTemp, Warning, TEXT("RemainBuildTime : %.2f"), CurrentBuildTime);
@@ -276,7 +345,6 @@ void ATWBaseBuilding::SetOwnerPlayerSlot(int32 InSlot)
 	if (HasAuthority())
 	{
 		OwnerPlayerSlot = InSlot;
-		
 		UpdatePlayerMaterial();
 	}
 }

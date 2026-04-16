@@ -17,5 +17,131 @@ ATWUnit::ATWUnit()
 	
 	
 	MassAgentComponent = CreateDefaultSubobject<UMassAgentComponent>("MassAgentComponent");
+	SelectionAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("SelectionAnchor"));
+	SelectionAnchor->SetupAttachment(SkeletalMeshComponent);
+
+	HPBarAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("HPBarAnchor"));
+	HPBarAnchor->SetupAttachment(SkeletalMeshComponent);
+
+	// 기본값
+	SelectionAnchor->SetRelativeLocation(FVector(0.f, 0.f, 4.f));
+	HPBarAnchor->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
+}
+
+void ATWUnit::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	if (bAutoPlaceAnchorsFromMeshBounds)
+	{
+		AutoPlaceAnchors();
+	}
+}
+
+void ATWUnit::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if (bAutoPlaceAnchorsFromMeshBounds)
+	{
+		AutoPlaceAnchors();
+	}
+}
+
+FVector ATWUnit::GetSelectionAnchorWorldLocation() const
+{
+	if (IsValid(SelectionAnchor))
+	{
+		return SelectionAnchor->GetComponentLocation();
+	}
+
+	if (IsValid(SkeletalMeshComponent))
+	{
+		const FBoxSphereBounds Bounds = SkeletalMeshComponent->Bounds;
+		return FVector(Bounds.Origin.X, Bounds.Origin.Y, Bounds.Origin.Z - Bounds.BoxExtent.Z + AutoSelectionAnchorZOffset);
+	}
+
+	return GetActorLocation();
+}
+
+FVector ATWUnit::GetHPBarAnchorWorldLocation() const
+{
+	if (IsValid(HPBarAnchor))
+	{
+		return HPBarAnchor->GetComponentLocation();
+	}
+
+	if (IsValid(SkeletalMeshComponent))
+	{
+		const FBoxSphereBounds Bounds = SkeletalMeshComponent->Bounds;
+		return FVector(Bounds.Origin.X, Bounds.Origin.Y, Bounds.Origin.Z + Bounds.BoxExtent.Z + AutoHPBarExtraHeight);
+	}
+
+	return GetActorLocation() + FVector(0.f, 0.f, 120.f);
+}
+
+FTransform ATWUnit::GetSelectionAnchorWorldTransform() const
+{
+	if (IsValid(SelectionAnchor))
+	{
+		return SelectionAnchor->GetComponentTransform();
+	}
+
+	return FTransform(GetActorRotation(), GetSelectionAnchorWorldLocation(), FVector::OneVector);
+}
+
+FTransform ATWUnit::GetHPBarAnchorWorldTransform() const
+{
+	if (IsValid(HPBarAnchor))
+	{
+		return HPBarAnchor->GetComponentTransform();
+	}
+
+	return FTransform(GetActorRotation(), GetHPBarAnchorWorldLocation(), FVector::OneVector);
+}
+
+void ATWUnit::AutoPlaceAnchors()
+{
+	if (!IsValid(SkeletalMeshComponent))
+	{
+		return;
+	}
+
+	if (!SkeletalMeshComponent->GetSkeletalMeshAsset())
+	{
+		return;
+	}
+
+	const FBoxSphereBounds Bounds = SkeletalMeshComponent->CalcBounds(SkeletalMeshComponent->GetComponentTransform());
+
+	// MeshComponent 기준 상대 위치로 넣어야 해서 월드 기준 bounds를 다시 로컬 기준으로 변환
+	const FVector MeshWorldOrigin = Bounds.Origin;
+	const FVector MeshWorldBottom = MeshWorldOrigin - FVector(0.f, 0.f, Bounds.BoxExtent.Z);
+	const FVector MeshWorldTop = MeshWorldOrigin + FVector(0.f, 0.f, Bounds.BoxExtent.Z);
+
+	const FVector LocalBottom = SkeletalMeshComponent->GetComponentTransform().InverseTransformPosition(MeshWorldBottom);
+	const FVector LocalTop = SkeletalMeshComponent->GetComponentTransform().InverseTransformPosition(MeshWorldTop);
+
+	if (IsValid(SelectionAnchor))
+	{
+		SelectionAnchor->SetRelativeLocation(
+			FVector(
+				0.f,
+				0.f,
+				LocalBottom.Z + AutoSelectionAnchorZOffset
+			)
+		);
+	}
+
+	if (IsValid(HPBarAnchor))
+	{
+		HPBarAnchor->SetRelativeLocation(
+			FVector(
+				0.f,
+				0.f,
+				LocalTop.Z + AutoHPBarExtraHeight
+			)
+		);
+	}
 }
 
