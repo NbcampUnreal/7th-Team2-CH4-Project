@@ -27,6 +27,12 @@ struct FTWMassSearchingTag : public FMassTag
 };
 
 USTRUCT()
+struct FTWMassAttackingTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
 struct FTWMassHoldTag : public FMassTag
 {
 	GENERATED_BODY()

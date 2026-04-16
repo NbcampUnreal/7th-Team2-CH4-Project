@@ -7,8 +7,14 @@
 #include "MassEntityManager.h"
 #include "GameFramework/Actor.h"
 #include "MassActorSubsystem.h"
+#include "MassMovementFragments.h"
+#include "MassNavigationFragments.h"
+#include "MassNavigationTypes.h"
+#include "MassNavMeshNavigationUtils.h"
 #include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
+#include "MassNavMeshNavigationFragments.h"
+
 #include "Mass/Fragments/TWTransformOffsetFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Traits/TWCommandTrait.h"
@@ -20,7 +26,7 @@ UTWTargetSearchProcessor::UTWTargetSearchProcessor()
 	ExecutionFlags = (int32)EProcessorExecutionFlags::Server | (int32)EProcessorExecutionFlags::Standalone;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ExecutionOrder.ExecuteAfter.Add(UE::Mass::ProcessorGroupNames::SyncWorldToMass);
-	
+
 	bRequiresGameThreadExecution = true;
 }
 
@@ -29,7 +35,10 @@ void UTWTargetSearchProcessor::ConfigureQueries(const TSharedRef<FMassEntityMana
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FMassNavMeshShortPathFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddConstSharedRequirement<FMassMovementParameters>();
 	EntityQuery.AddTagRequirement<FTWMassSearchingTag>(EMassFragmentPresence::All);
 }
 
@@ -38,7 +47,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 	EntityQuery.ForEachEntityChunk(Context, [](FMassExecutionContext& Context)
 	{
 		constexpr float SearchingInterval = 0.1f;
-		
+
 		UTWUnitSubsystem* UnitSubsystem = Context.GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 		if (false == IsValid(UnitSubsystem))
 		{
@@ -49,9 +58,13 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 		const TConstArrayView<FTWStatusFragment> StatusList = Context.GetFragmentView<FTWStatusFragment>();
 		const TConstArrayView<FTWUnitFragment> UnitList = Context.GetFragmentView<FTWUnitFragment>();
 		const TArrayView<FTWAttackFragment> AttackList = Context.GetMutableFragmentView<FTWAttackFragment>();
-		
+		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+		const TArrayView<FMassNavMeshShortPathFragment> NavMeshShortPathFragments = Context.GetMutableFragmentView<
+	FMassNavMeshShortPathFragment>();
+		const FMassMovementParameters& MovementParameters = Context.GetConstSharedFragment<FMassMovementParameters>();
+
 		double TimeSeconds = Context.GetWorld()->GetTimeSeconds();
-		
+
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
 			if (AttackList[EntityIdx].bIsTargetSet)
@@ -62,24 +75,38 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 			{
 				continue;
 			}
-			UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Searching "), EntityIdx)	
 			FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
 			FMassEntityHandle Target;
 			if (UnitSubsystem->FindNearestEnemyEntity(
-				EntityLocation, 
+				EntityLocation,
 				Target,
 				UnitList[EntityIdx].GetOwner(),
 				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 			{
+				FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 				AttackList[EntityIdx].LastAttackTime = 0.0;
 				AttackList[EntityIdx].bIsTargetSet = true;
 				AttackList[EntityIdx].TargetEntity = Target;
-				
-			}else
+				Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
+				Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+				Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+#pragma region Stand
+				UWorld* World = Context.GetWorld();
+				MoveTargetList[EntityIdx].Center = EntityLocation;
+				MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
+
+				UE::MassNavigation::ActivateActionStand(
+					World,
+					Entity,
+					MovementParameters.DefaultDesiredSpeed,
+					MoveTargetList[EntityIdx],
+					NavMeshShortPathFragments[EntityIdx]);
+#pragma endregion
+			}
+			else
 			{
 				AttackList[EntityIdx].LastAttackTime = TimeSeconds;
 			}
-			
 		}
 	});
 }

@@ -4,14 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "MassProcessor.h"
-#include "TWTargetSearchProcessor.generated.h"
+#include "TWAttackProcessor.generated.h"
 
 UCLASS()
-class CH4_PROJECT_API UTWTargetSearchProcessor : public UMassProcessor
+class CH4_PROJECT_API UTWAttackProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:
-	UTWTargetSearchProcessor();
+	UTWAttackProcessor();
 
 protected:
 	FMassEntityQuery EntityQuery;
