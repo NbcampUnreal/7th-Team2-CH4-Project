@@ -200,6 +200,20 @@ void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
 	NotifyUIResourceStateChanged();
 }
 
+void ATWPlayerState::SetTotalTroopUpkeepCost(const TMap<EResourceType, int32>& Upkeep)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	UpkeepCost = Upkeep;
+	ReplicatedWoodUpkeep = Upkeep.FindRef(EResourceType::Wood);
+	ReplicatedOreUpkeep = Upkeep.FindRef(EResourceType::Ore);
+
+	NotifyUIResourceStateChanged();
+}
+
 void ATWPlayerState::RefreshTroopUpkeepTimer()
 {
 	if (!HasAuthority())
@@ -300,6 +314,16 @@ int8 ATWPlayerState::TrySpendTroopUpkeep()
 
 	SpendCost(TotalCost);
 	return 1;
+}
+
+void ATWPlayerState::OnRep_ReplicatedWoodUpkeep()
+{
+	NotifyUIResourceStateChanged();
+}
+
+void ATWPlayerState::OnRep_ReplicatedOreUpkeep()
+{
+	NotifyUIResourceStateChanged();
 }
 
 int32 ATWPlayerState::GetUpgradeLevelByID(const FName UpgradeID) const
@@ -403,6 +427,8 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, MaxPopulation);
 	DOREPLIFETIME(ATWPlayerState, PopulationLimit);
 	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
+	DOREPLIFETIME(ATWPlayerState, ReplicatedWoodUpkeep);
+	DOREPLIFETIME(ATWPlayerState, ReplicatedOreUpkeep);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()

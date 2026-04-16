@@ -94,14 +94,31 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Troop|Upkeep")
 	TMap<EResourceType, int32> UpkeepCost;
 
+	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedWoodUpkeep, VisibleAnywhere, BlueprintReadOnly, Category="Troop|Upkeep")
+	int32 ReplicatedWoodUpkeep = 0;
+
+	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedOreUpkeep, VisibleAnywhere, BlueprintReadOnly, Category="Troop|Upkeep")
+	int32 ReplicatedOreUpkeep = 0;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Troop|Upkeep", meta=(ClampMin="0.1"))
 	float UpkeepInterval = 60.0f;
 
 	FTimerHandle TroopUpkeepTimerHandle;
 
+	UFUNCTION()
+	void OnRep_ReplicatedWoodUpkeep();
+
+	UFUNCTION()
+	void OnRep_ReplicatedOreUpkeep();
+
 public:
 	FORCEINLINE const TMap<EResourceType, int32>& GetTotalTroopUpkeepCost() const { return UpkeepCost; }
-	void SetTotalTroopUpkeepCost(const TMap<EResourceType, int32>& Upkeep) { UpkeepCost = Upkeep; }
+
+	void SetTotalTroopUpkeepCost(const TMap<EResourceType, int32>& Upkeep);
+
+	FORCEINLINE int32 GetReplicatedWoodUpkeep() const { return ReplicatedWoodUpkeep; }
+	FORCEINLINE int32 GetReplicatedOreUpkeep() const { return ReplicatedOreUpkeep; }
+
 	void RefreshTroopUpkeepTimer();
 	void HandleTroopUpkeep();
 	int8 TrySpendTroopUpkeep();
@@ -141,4 +158,4 @@ private:
 	{
 		return GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 	}
-};
+};	

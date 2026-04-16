@@ -989,7 +989,8 @@ void UTWPlayerUIBridge::RefreshResources()
 	int32 WoodUpkeep = 0;
 	int32 OreUpkeep = 0;
 
-	if (const ATWPlayerState* TWPS = OwnerController->GetPlayerState<ATWPlayerState>())
+	const ATWPlayerState* TWPS = OwnerController->GetPlayerState<ATWPlayerState>();
+	if (TWPS)
 	{
 		Wood = TWPS->GetResourceAmount(EResourceType::Wood);
 		Gas = TWPS->GetResourceAmount(EResourceType::Ore);
@@ -998,18 +999,18 @@ void UTWPlayerUIBridge::RefreshResources()
 		PendingPopulation = TWPS->GetPendingPopulation();
 		PopulationLimit = TWPS->GetPopulationLimit();
 		MaxPopulation = TWPS->GetMaxPopulation();
-		
-		const TMap<EResourceType, int32>& TotalCost = TWPS->GetTotalTroopUpkeepCost();
 
-		if (const int32* FoundWoodUpkeep = TotalCost.Find(EResourceType::Wood))
-		{
-			WoodUpkeep = *FoundWoodUpkeep;
-		}
+		WoodUpkeep = TWPS->GetReplicatedWoodUpkeep();
+		OreUpkeep = TWPS->GetReplicatedOreUpkeep();
 
-		if (const int32* FoundOreUpkeep = TotalCost.Find(EResourceType::Ore))
-		{
-			OreUpkeep = *FoundOreUpkeep;
-		}
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[RefreshResources] PlayerSlot=%d | WoodUpkeep=%d | OreUpkeep=%d"),
+			TWPS->PlayerSlot,
+			WoodUpkeep,
+			OreUpkeep
+		);
 	}
 
 	const int32 DisplayPopulation = CurrentPopulation + PendingPopulation;
