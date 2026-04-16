@@ -18,6 +18,7 @@ public class CH4_Project : ModuleRules
 			"Niagara",
 			"UMG",
 			"Slate",
+			"SlateCore",
 			"MassEntity",
 			"MassCommon",
 			"MassMovement",

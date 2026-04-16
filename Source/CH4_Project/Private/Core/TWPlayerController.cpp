@@ -12,6 +12,8 @@
 #include "UI/Core/TWPlayerUIBridge.h"
 #include "UI/Data/TWUIDataTypes.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -149,6 +151,47 @@ namespace
 		const bool bOverlapY = (BuildingMin.Y <= RectMax.Y) && (BuildingMax.Y >= RectMin.Y);
 		return bOverlapX && bOverlapY;
 	}
+	
+	static bool IsMouseOverHitTestableUI()
+	{
+		if (!FSlateApplication::IsInitialized())
+		{
+			return false;
+		}
+
+		FSlateApplication& SlateApp = FSlateApplication::Get();
+
+		const FWidgetPath WidgetPath = SlateApp.LocateWindowUnderMouse(
+			SlateApp.GetCursorPos(),
+			SlateApp.GetInteractiveTopLevelWindows(),
+			true
+		);
+
+		if (!WidgetPath.IsValid())
+		{
+			return false;
+		}
+
+		for (int32 Index = WidgetPath.Widgets.Num() - 1; Index >= 0; --Index)
+		{
+			const TSharedRef<SWidget>& Widget = WidgetPath.Widgets[Index].Widget;
+
+			// 뷰포트에 닿으면 월드 클릭으로 본다
+			if (Widget->GetTypeAsString() == TEXT("SViewport"))
+			{
+				return false;
+			}
+
+			// 뷰포트보다 위에 hit-test 되는 위젯이 있으면 UI 클릭
+			if (Widget->IsEnabled())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+	
 	// 디버그용
 	static void DrawUnitSelectableRadiusDebug(UWorld* World, const FVector& UnitLocation, const FColor& Color)
 	{
@@ -461,6 +504,20 @@ void ATWPlayerController::SetupInputComponent()
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
 	bConsumeLeftMouseRelease = false;
+	
+	if (IsMouseOverHitTestableUI())
+	{
+		bIsLeftMousePressed = false;
+		bIsDraggingSelectionVisual = false;
+
+		if (PlayerUIBridge)
+		{
+			PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+		}
+
+		bConsumeLeftMouseRelease = true;
+		return;
+	}
 	
 	if (BuildComponent->GetBuildMode())
 	{
