@@ -37,6 +37,7 @@
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "Selection/TWSelectionVisualManager.h"
+#include "DrawDebugHelpers.h"
 
 namespace
 {
@@ -148,6 +149,37 @@ namespace
 		const bool bOverlapY = (BuildingMin.Y <= RectMax.Y) && (BuildingMax.Y >= RectMin.Y);
 		return bOverlapX && bOverlapY;
 	}
+	// 디버그용
+	static void DrawUnitSelectableRadiusDebug(UWorld* World, const FVector& UnitLocation, const FColor& Color)
+	{
+		if (!World)
+		{
+			return;
+		}
+
+		DrawDebugSphere(
+			World,
+			UnitLocation,
+			SingleSelectionHitRadius,
+			24,
+			Color,
+			false,
+			0.0f,
+			0,
+			2.5f
+		);
+
+		DrawDebugLine(
+			World,
+			UnitLocation,
+			UnitLocation + FVector(0.f, 0.f, 120.f),
+			Color,
+			false,
+			0.0f,
+			0,
+			2.5f
+		);
+	}
 }
 
 ATWPlayerController::ATWPlayerController()
@@ -228,6 +260,73 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	if (SelectionVisualManager)
 	{
 		SelectionVisualManager->Tick(DeltaSeconds);
+	}
+	
+	// 건물
+	for (TActorIterator<ATWBaseBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWBaseBuilding* Building = *It;
+		if (!IsValid(Building))
+		{
+			continue;
+		}
+
+		FVector Origin = FVector::ZeroVector;
+		FVector Extent = FVector::ZeroVector;
+		Building->GetActorBounds(false, Origin, Extent);
+
+		DrawDebugBox(
+			GetWorld(),
+			Origin,
+			Extent,
+			FColor::Red,
+			false,
+			0.0f,
+			0,
+			2.0f
+		);
+	}
+	
+	// 유닛
+	if (IsLocalController())
+	{
+		UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
+		UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+		const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+
+		if (RepSubsystem && EntitySubsystem && LocalPS)
+		{
+			FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+			const int32 MyPlayerSlot = LocalPS->PlayerSlot;
+
+			for (const TPair<FMassNetworkID, FMassReplicationEntityInfo>& Pair : RepSubsystem->GetEntityInfoMap())
+			{
+				const FMassEntityHandle EntityHandle = Pair.Value.Entity;
+				if (!EntityManager.IsEntityActive(EntityHandle))
+				{
+					continue;
+				}
+
+				const FTransformFragment* TransformFragment =
+					EntityManager.GetFragmentDataPtr<FTransformFragment>(EntityHandle);
+				const FTWUnitFragment* UnitFragment =
+					EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
+
+				if (!TransformFragment || !UnitFragment)
+				{
+					continue;
+				}
+
+				const FVector UnitLocation = TransformFragment->GetTransform().GetLocation();
+				const bool bIsMine = (UnitFragment->GetOwner() == MyPlayerSlot);
+
+				DrawUnitSelectableRadiusDebug(
+					GetWorld(),
+					UnitLocation,
+					bIsMine ? FColor::Green : FColor::Red
+				);
+			}
+		}
 	}
 }
 
@@ -356,6 +455,8 @@ void ATWPlayerController::SetupInputComponent()
 #pragma region 마우스
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
+	bConsumeLeftMouseRelease = false;
+	
 	if (bBuildShortcutModeActive)
 	{
 		if (BuildComponent->GetBuildMode())
@@ -364,20 +465,51 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 			RefreshDynamicMappingContexts();
 		}
 
+		bConsumeLeftMouseRelease = true;
 		return;
 	}
 	
 	FHitResult HitResult;
 	FVector ClickLocation;
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-	{
-		ClickLocation = HitResult.Location;
-	}
-	else
+	if (!GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
 		return;
 	}
+	ClickLocation = HitResult.Location;
 
+	if (CurrentCommandType != ETWCommandType::None)
+	{
+		if (!CanControlCurrentUnitSelection(this))
+		{
+			ChangeCurrentCommandType(ETWCommandType::None);
+			bConsumeLeftMouseRelease = true;
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Move)
+		{
+			ServerHandleMoveCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
+			bConsumeLeftMouseRelease = true;
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Attack)
+		{
+			ServerHandleAttackCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
+			bConsumeLeftMouseRelease = true;
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Hold)
+		{
+			ServerHandleHoldCommand();
+			ChangeCurrentCommandType(ETWCommandType::None);
+			bConsumeLeftMouseRelease = true;
+			return;
+		}
+	}
 	bIsLeftMousePressed = true;
 
 	// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
@@ -389,45 +521,6 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 	else
 	{
 		DragStartScreenPosition = LastValidMouseScreenPosition;
-	}
-
-	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-	{
-		ClickLocation = HitResult.Location;
-	}
-	else
-	{
-		return;
-	}
-
-	if (CurrentCommandType != ETWCommandType::None)
-	{
-		if (!CanControlCurrentUnitSelection(this))
-		{
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-
-		if (CurrentCommandType == ETWCommandType::Move)
-		{
-			ServerHandleMoveCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-
-		if (CurrentCommandType == ETWCommandType::Attack)
-		{
-			ServerHandleAttackCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-
-		if (CurrentCommandType == ETWCommandType::Hold)
-		{
-			ServerHandleHoldCommand();
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
 	}
 	
 	ClickStartLocation = ClickLocation;
@@ -443,6 +536,12 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 	if (PlayerUIBridge)
 	{
 		PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+	}
+	
+	if (bConsumeLeftMouseRelease)
+	{
+		bConsumeLeftMouseRelease = false;
+		return;
 	}
 	
 	if (bBuildShortcutModeActive)

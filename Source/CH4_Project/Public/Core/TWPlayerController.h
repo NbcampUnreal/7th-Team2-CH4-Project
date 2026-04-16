@@ -296,6 +296,7 @@ private:
 
 	bool bIsLeftMousePressed = false;
 	bool bIsDraggingSelectionVisual = false;
+	bool bConsumeLeftMouseRelease = false;
 
 	FVector2D DragStartScreenPosition = FVector2D::ZeroVector;
 	FVector2D CurrentMouseScreenPosition = FVector2D::ZeroVector;
