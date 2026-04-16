@@ -30,7 +30,7 @@ public class CH4_Project : ModuleRules
 			"MassReplication",
 			"MassEQS",
 			"NetCore", "CommonUI",
-			
+			"SlateCore",
 			
 		});
 
