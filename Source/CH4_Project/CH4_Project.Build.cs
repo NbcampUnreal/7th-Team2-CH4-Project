@@ -29,7 +29,6 @@ public class CH4_Project : ModuleRules
 			"GameplayTags",
 			"MassReplication",
 			"MassEQS",
-			"MassReplication",
 			"NetCore", "CommonUI",
 			
 			

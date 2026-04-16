@@ -6,9 +6,9 @@
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Components/VerticalBox.h"
+#include "Components/ProgressBar.h"
 #include "Engine/Texture2D.h"
 #include "UI/Data/TWSelectionQueueItemObject.h"
-#include "Components/ProgressBar.h"
 #include "UI/Data/TWSelectionSummaryItemObject.h"
 
 float UTWSelectionPanelWidget::ResolveSafeHPPercent(const FSelectionViewModel& InData) const
@@ -40,6 +40,20 @@ void UTWSelectionPanelWidget::ApplyHPColor(UProgressBar* InProgressBar, float In
 	{
 		InProgressBar->SetFillColorAndOpacity(FLinearColor(0.2f, 0.85f, 0.3f, 1.f));
 	}
+}
+
+FText UTWSelectionPanelWidget::FormatStatInt(const TCHAR* Label, float Value) const
+{
+	return FText::FromString(
+		FString::Printf(TEXT("%s: %d"), Label, FMath::RoundToInt(Value))
+	);
+}
+
+FText UTWSelectionPanelWidget::FormatStatFloat(const TCHAR* Label, float Value) const
+{
+	return FText::FromString(
+		FString::Printf(TEXT("%s: %.2f"), Label, Value)
+	);
 }
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
@@ -172,27 +186,27 @@ void UTWSelectionPanelWidget::RefreshSingleState(const FSelectionViewModel& InDa
 
 	if (TextDamage)
 	{
-		TextDamage->SetText(FText::FromString(FString::Printf(TEXT("ATK: %.0f"), InData.Damage)));
+		TextDamage->SetText(FormatStatInt(TEXT("ATK"), InData.Damage));
 	}
 
 	if (TextArmor)
 	{
-		TextArmor->SetText(FText::FromString(FString::Printf(TEXT("DEF: %.0f"), InData.Armor)));
+		TextArmor->SetText(FormatStatInt(TEXT("DEF"), InData.Armor));
 	}
 
 	if (TextAttackSpeed)
 	{
-		TextAttackSpeed->SetText(FText::FromString(FString::Printf(TEXT("AS: %.2f"), InData.AttackSpeed)));
+		TextAttackSpeed->SetText(FormatStatFloat(TEXT("AS"), InData.AttackSpeed));
 	}
 
 	if (TextMoveSpeed)
 	{
-		TextMoveSpeed->SetText(FText::FromString(FString::Printf(TEXT("SPD: %.2f"), InData.MoveSpeed)));
+		TextMoveSpeed->SetText(FormatStatFloat(TEXT("SPD"), InData.MoveSpeed));
 	}
 
 	if (TextRange)
 	{
-		TextRange->SetText(FText::FromString(FString::Printf(TEXT("RNG: %.0f"), InData.Range)));
+		TextRange->SetText(FormatStatInt(TEXT("RNG"), InData.Range));
 	}
 
 	RebuildMultiSummaryTiles({});

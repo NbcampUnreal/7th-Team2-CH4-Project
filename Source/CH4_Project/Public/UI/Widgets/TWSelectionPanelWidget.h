@@ -32,6 +32,10 @@ protected:
 
 	float ResolveSafeHPPercent(const FSelectionViewModel& InData) const;
 	void ApplyHPColor(UProgressBar* InProgressBar, float InPercent) const;
+	
+	FText FormatStatInt(const TCHAR* Label, float Value) const;
+	FText FormatStatFloat(const TCHAR* Label, float Value) const;
+
 
 protected:
 	UPROPERTY(meta = (BindWidget))
