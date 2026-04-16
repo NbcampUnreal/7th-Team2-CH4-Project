@@ -1,5 +1,6 @@
 ﻿#include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
+
 #include "Building/TWTroopSpawnBuilding.h"
 #include "Building/TWPopulationBuilding.h"
 #include "Building/TWNexusBuilding.h"
@@ -7,38 +8,31 @@
 #include "Building/TWUpgradeBuilding.h"
 #include "Building/TWBlockingBuilding.h"
 #include "Building/TWResourceBuilding.h"
-#include "Core/TWGameMode.h"
-#include "MassCommonFragments.h"
+
 #include "UI/Core/TWPlayerUIBridge.h"
-#include "UI/Widgets/TWHUDRootWidget.h"
 #include "UI/Data/TWUIDataTypes.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 
 #include "EnhancedInputComponent.h"
-#include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
+#include "InputAction.h"
 #include "InputMappingContext.h"
-#include "EnhancedPlayerInput.h"
+
+#include "NavigationSystem.h"
+#include "Component/TWBuildComponent.h"
+#include "Subsystems/TWUnitSubsystem.h"
+#include "UObject/UnrealType.h"
+
+#include "MassCommonFragments.h"
 #include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
-#include "MassExecutionContext.h"
 #include "MassSignalSubsystem.h"
 #include "MassStateTreeFragments.h"
 #include "MassNavigationFragments.h"
 #include "MassReplicationFragments.h"
 #include "MassReplicationSubsystem.h"
-#include "NavigationSystem.h"
-#include "Building/GhostBuilding.h"
-#include "Component/TWBuildComponent.h"
-#include "Data/TWBuildingDataAsset.h"
-#include "Kismet/GameplayStatics.h"
-#include "Net/UnrealNetwork.h"
-#include "Subsystems/TWGridSubSystem.h"
-#include "Subsystems/TWUnitSubsystem.h"
-#include "UObject/UnrealType.h"
-
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
@@ -180,12 +174,19 @@ void ATWPlayerController::BeginPlay()
 		return;
 	}
 
-	check(IsValid(DefaultMappingContext));
-
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
-		GetLocalPlayer()))
+		LocalPlayer))
 	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		if (IMC_Common)
+		{
+			Subsystem->AddMappingContext(IMC_Common, 0);
+		}
+#if WITH_EDITOR
+		if (IMC_Debug)
+		{
+			Subsystem->AddMappingContext(IMC_Debug, -1);
+		}
+#endif
 	}
 
 	FInputModeGameAndUI InputMode;
@@ -199,6 +200,7 @@ void ATWPlayerController::BeginPlay()
 
 	InitializeUIBridge();
 	RefreshUIBridge();
+	RefreshDynamicMappingContexts();
 }
 
 void ATWPlayerController::Tick(float DeltaSeconds)
@@ -218,7 +220,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !BuildComponent->GetBuildMode())
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !bBuildShortcutModeActive)
 	{
 		UpdateDragSelectionOverlay();
 	}
@@ -229,157 +231,210 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
+void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority,
+	bool bShouldBeActive, bool& bCurrentActive)
+{
+	if (!IsLocalController() || !MappingContext)
+	{
+		return;
+	}
 
-#pragma region Input
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer);
+	if (!Subsystem)
+	{
+		return;
+	}
+
+	if (bShouldBeActive)
+	{
+		if (!bCurrentActive)
+		{
+			Subsystem->AddMappingContext(MappingContext, Priority);
+			bCurrentActive = true;
+		}
+	}
+	else
+	{
+		if (bCurrentActive)
+		{
+			Subsystem->RemoveMappingContext(MappingContext);
+			bCurrentActive = false;
+		}
+	}
+}
+
+void ATWPlayerController::RefreshDynamicMappingContexts()
+{
+	SetMappingContextActive(IMC_UnitCommand, 1, ShouldUseUnitCommandContext(), bUnitCommandContextActive);
+	SetMappingContextActive(IMC_Build, 2, ShouldUseBuildContext(), bBuildContextActive);
+}
+
+bool ATWPlayerController::ShouldUseUnitCommandContext() const
+{
+	if (GetSelectedBuilding() != nullptr)
+	{
+		return false;
+	}
+
+	if (GetLocalSelectedUnitCount() <= 0)
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	return GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot;
+}
+
+bool ATWPlayerController::ShouldUseBuildContext() const
+{
+	return bBuildShortcutModeActive;
+}
 
 void ATWPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	check(IsValid(LeftMouseAction));
+	check(IsValid(RightMouseAction));
+	
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-
-	check(IsValid(SelectResourceCommandAction));
+	
+	check(IsValid(ToggleBuildModeAction));
+	check(IsValid(SelectWoodCommandAction));
 	check(IsValid(SelectPopulationCommandAction));
+	check(IsValid(SelectStoneCommandAction));
+	check(IsValid(SelectTroopCommandAction));
+	check(IsValid(SelectUpgradeCommandAction));
+	check(IsValid(SelectBlockingCommandAction));
+	
+	check(IsValid(IA_TestSpawnTroop));
+	check(IsValid(IA_TestIncreasePopulation));
+	check(IsValid(IA_TestDamageBlockingBuilding));
+	check(IsValid(IA_TestUpgrade));
+	
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
 	{
 		return;
 	}
 
-	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this,
-	                                   &ThisClass::OnStartLeftMouseAction);
-	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this,
-	                                   &ThisClass::OnEndLeftMouseAction);
+	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
+	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
 	EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
+	
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
-	EnhancedInputComponent->BindAction(SelectResourceCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
-	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
-	if (IA_TestSpawnTroop)
-	{
-		EnhancedInputComponent->BindAction(
-			IA_TestSpawnTroop,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestSpawnTroop
-		);
-	}
-
-	if (IA_TestIncreasePopulation)
-	{
-		EnhancedInputComponent->BindAction(
-			IA_TestIncreasePopulation,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestIncreasePopulation
-		);
-	}
-
-	if (IA_TestDamageBlockingBuilding)
-	{
-		EnhancedInputComponent->BindAction(
-			IA_TestDamageBlockingBuilding,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestDamageBlockingBuilding
-		);
-	}
 	
-	if (IA_TestUpgrade)
-	{
-		EnhancedInputComponent->BindAction(
-			IA_TestUpgrade,
-			ETriggerEvent::Started,
-			this,
-			&ATWPlayerController::HandleTestUpgrade
-		);
-	}
+	EnhancedInputComponent->BindAction(ToggleBuildModeAction, ETriggerEvent::Started, this, &ThisClass::OnToggleBuildModeAction);
+	EnhancedInputComponent->BindAction(SelectWoodCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectStoneCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectStoneBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectTroopCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectTroopBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectUpgradeCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectUpgradeBuildingCommandAction);
+	EnhancedInputComponent->BindAction(SelectBlockingCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectBlockingBuildingCommandAction);
+	
+	EnhancedInputComponent->BindAction(IA_TestSpawnTroop, ETriggerEvent::Started, this, &ThisClass::HandleTestSpawnTroop);
+	EnhancedInputComponent->BindAction(IA_TestIncreasePopulation, ETriggerEvent::Started, this, &ThisClass::HandleTestIncreasePopulation);
+	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
+	EnhancedInputComponent->BindAction(IA_TestUpgrade, ETriggerEvent::Started, this, &ThisClass::HandleTestUpgrade);
 }
 
-
+#pragma region 마우스
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	if (!BuildComponent->GetBuildMode())
+	if (bBuildShortcutModeActive)
 	{
-		FHitResult HitResult;
-		FVector ClickLocation;
-		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+		if (BuildComponent->GetBuildMode())
 		{
-			ClickLocation = HitResult.Location;
-		}
-		else
-		{
-			return;
+			BuildComponent->RequestBuild();
+			RefreshDynamicMappingContexts();
 		}
 
-		bIsLeftMousePressed = true;
-
-		// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
-		FVector2D ScaledMousePos = FVector2D::ZeroVector;
-		if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
-		{
-			DragStartScreenPosition = ScaledMousePos;
-		}
-		else
-		{
-			DragStartScreenPosition = LastValidMouseScreenPosition;
-		}
+		return;
+	}
 	
-		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-		{
-			ClickLocation = HitResult.Location;
-		}
-		else
-		{
-			return;
-		}
-
-		if (CurrentCommandType != ETWCommandType::None)
-		{
-			if (!CanControlCurrentUnitSelection(this))
-			{
-				ChangeCurrentCommandType(ETWCommandType::None);
-				return;
-			}
-
-			if (CurrentCommandType == ETWCommandType::Move)
-			{
-				ServerHandleMoveCommand(ClickLocation);
-				ChangeCurrentCommandType(ETWCommandType::None);
-				return;
-			}
-
-			if (CurrentCommandType == ETWCommandType::Attack)
-			{
-				ServerHandleAttackCommand(ClickLocation);
-				ChangeCurrentCommandType(ETWCommandType::None);
-				return;
-			}
-
-			if (CurrentCommandType == ETWCommandType::Hold)
-			{
-				ServerHandleHoldCommand();
-				ChangeCurrentCommandType(ETWCommandType::None);
-				return;
-			}
-		}
-		
-		ClickStartLocation = ClickLocation;
+	FHitResult HitResult;
+	FVector ClickLocation;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	{
+		ClickLocation = HitResult.Location;
 	}
 	else
 	{
-		if (BuildComponent)
+		return;
+	}
+
+	bIsLeftMousePressed = true;
+
+	// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
+	FVector2D ScaledMousePos = FVector2D::ZeroVector;
+	if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
+	{
+		DragStartScreenPosition = ScaledMousePos;
+	}
+	else
+	{
+		DragStartScreenPosition = LastValidMouseScreenPosition;
+	}
+
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	{
+		ClickLocation = HitResult.Location;
+	}
+	else
+	{
+		return;
+	}
+
+	if (CurrentCommandType != ETWCommandType::None)
+	{
+		if (!CanControlCurrentUnitSelection(this))
 		{
-			BuildComponent->RequestBuild();
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Move)
+		{
+			ServerHandleMoveCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Attack)
+		{
+			ServerHandleAttackCommand(ClickLocation);
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
+		}
+
+		if (CurrentCommandType == ETWCommandType::Hold)
+		{
+			ServerHandleHoldCommand();
+			ChangeCurrentCommandType(ETWCommandType::None);
+			return;
 		}
 	}
+	
+	ClickStartLocation = ClickLocation;
 }
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
-{
+{	
 	ChangeCurrentCommandType(ETWCommandType::None);
 	
 	bIsLeftMousePressed = false;
@@ -388,6 +443,11 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 	if (PlayerUIBridge)
 	{
 		PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+	}
+	
+	if (bBuildShortcutModeActive)
+	{
+		return;
 	}
 
 	FHitResult HitResult;
@@ -417,37 +477,40 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 
 void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActionValue)
 {
-	if (!BuildComponent->GetBuildMode())
+	if (bBuildShortcutModeActive)
 	{
-		// Cancle Command
-		if (CurrentCommandType != ETWCommandType::None)
-		{
-			ChangeCurrentCommandType(ETWCommandType::None);
-			return;
-		}
-		
-		if (!CanControlCurrentUnitSelection(this))
-		{
-			return;
-		}
-
-		// Move Command Execute
-		FHitResult HitResult;
-		if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
-		{
-			FVector ClickLocation = HitResult.Location;
-			ServerHandleMoveCommand(ClickLocation);
-		}
-	}
-	else
-	{
-		if (BuildComponent)
+		if (BuildComponent->GetBuildMode())
 		{
 			BuildComponent->EndBuildMode();
+			RefreshDynamicMappingContexts();
 		}
+
+		return;
+	}
+	
+	// Cancle Command
+	if (CurrentCommandType != ETWCommandType::None)
+	{
+		ChangeCurrentCommandType(ETWCommandType::None);
+		return;
+	}
+		
+	if (!CanControlCurrentUnitSelection(this))
+	{
+		return;
+	}
+
+	// Move Command Execute
+	FHitResult HitResult;
+	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	{
+		FVector ClickLocation = HitResult.Location;
+		ServerHandleMoveCommand(ClickLocation);
 	}
 }
+#pragma endregion
 
+#pragma region 유닛 명령
 inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
 {
 	if (!CanControlCurrentUnitSelection(this))
@@ -473,11 +536,6 @@ void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActi
 		return;
 	}
 	ServerHandleHoldCommand();
-}
-
-void ATWPlayerController::OnBuildCommandAction(const FInputActionValue& InputActionValue)
-{
-	
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
@@ -665,7 +723,9 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 
 	EntityManager.AppendCommands(CommandBuffer);
 }
+#pragma endregion
 
+#pragma region 선택/드래그
 void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector& CommandLocation)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
@@ -923,6 +983,7 @@ void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuild
 
 	ClientApplyBuildingSelection(TargetBuilding);
 }
+#pragma endregion
 
 bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 {
@@ -983,10 +1044,7 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommandType CommandType)
 	UpdateInputOverlayState();
 }
 
-#pragma endregion
-
 #pragma region UI
-
 void ATWPlayerController::InitializeUIBridge()
 {
 	if (false == IsLocalController())
@@ -1206,6 +1264,7 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 		bHasLocalPrimarySelectedUnitStatus = true;
 	}
 
+	RefreshDynamicMappingContexts();
 	RefreshUIBridge();
 	RefreshSelectionVisualManager();
 }
@@ -1214,6 +1273,7 @@ void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBui
 {
 	ClearLocalSelectionCache();
 	SelectedBuilding = InBuilding;
+	RefreshDynamicMappingContexts();
 	RefreshUIBridge();
 	RefreshSelectionVisualManager();
 }
@@ -1221,6 +1281,7 @@ void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBui
 void ATWPlayerController::ClientClearSelection_Implementation()
 {
 	ClearLocalSelectionCache();
+	RefreshDynamicMappingContexts();
 	RefreshUIBridge();
 	RefreshSelectionVisualManager();
 }
@@ -1748,20 +1809,22 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 #pragma endregion
 
 #pragma region 건설
-void ATWPlayerController::OnRequestBuildCommandAction()
+void ATWPlayerController::OnToggleBuildModeAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->RequestBuild();
-	}
-}
+	bBuildShortcutModeActive = !bBuildShortcutModeActive;
 
-void ATWPlayerController::OnCancelBuildCommandAction()
-{
-	if (BuildComponent)
+	if (!bBuildShortcutModeActive)
 	{
-		BuildComponent->EndBuildMode();
+		if (BuildComponent->GetBuildMode())
+		{
+			BuildComponent->EndBuildMode();
+		}
+
+		ChangeCurrentCommandType(ETWCommandType::None);
 	}
+	UE_LOG(LogTemp, Warning, TEXT("건설 모드: %s"), bBuildShortcutModeActive ? TEXT("ON") : TEXT("OFF"));
+
+	RefreshDynamicMappingContexts();
 }
 
 void ATWPlayerController::OnSelectWoodBuildingCommandAction()

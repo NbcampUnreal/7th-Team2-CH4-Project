@@ -1,36 +1,22 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "MassCommonTypes.h"
-#include "MassEntityConfigAsset.h"
 #include "MassEntityHandle.h"
 #include "GameFramework/PlayerController.h"
-#include "Mass/Fragments/TWCommandFragment.h"
 #include "Data/TWUnitStatus.h"
 #include "UI/Data/TWUIDataTypes.h"
 #include "TWPlayerController.generated.h"
 
+class ATWBaseBuilding;
 struct FInputActionValue;
 class UInputAction;
 class UInputMappingContext;
 class UDataTable;
-class ATWPopulationBuilding;
-class ATWBlockingBuilding;
-class ATWBaseBuilding;
-class ATWTroopSpawnBuilding;
-class ATWResourceBuilding;
-class ATWNexusBuilding;
-class AGhostBuilding;
-class ATWBaseBuilding;
 class UTWBuildComponent;
 class UTWPlayerUIBridge;
 class UTWHUDRootWidget;
 class UTWSelectionVisualManager;
-/**
- * 
- */
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -43,6 +29,29 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputMappingContext> IMC_Common = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputMappingContext> IMC_UnitCommand = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputMappingContext> IMC_Build = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputMappingContext> IMC_Debug = nullptr;
+	
+	bool bUnitCommandContextActive = false;
+	bool bBuildContextActive = false;
+	bool bBuildShortcutModeActive = false;
+	
+	void SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority, bool bShouldBeActive, bool& bCurrentActive);
+	void RefreshDynamicMappingContexts();
+	bool ShouldUseUnitCommandContext() const;
+	bool ShouldUseBuildContext() const;
+	
+	
 
 #pragma region Input
 protected:
@@ -62,14 +71,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> HoldCommandAction; // h
-
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectResourceCommandAction;
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectPopulationCommandAction;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScreenEdgeEnterMargin = 10.0f;
@@ -92,7 +93,6 @@ protected:
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
 	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
-	void OnBuildCommandAction(const FInputActionValue& InputActionValue);
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleMoveCommand(const FVector& CommandLocation);
@@ -154,8 +154,28 @@ protected:
 
 #pragma region 건설
 protected:
-	void OnRequestBuildCommandAction();
-	void OnCancelBuildCommandAction();
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> ToggleBuildModeAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectWoodCommandAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectStoneCommandAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectPopulationCommandAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectTroopCommandAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectUpgradeCommandAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectBlockingCommandAction;
+
+	void OnToggleBuildModeAction();
 	void OnSelectWoodBuildingCommandAction();
 	void OnSelectStoneBuildingCommandAction();
 	void OnSelectPopulationBuildingCommandAction();
@@ -170,6 +190,7 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWBuildComponent> BuildComponent;
+#pragma endregion
 	
 #pragma region 업그레이드
 	UPROPERTY(EditDefaultsOnly, Category="Input")
