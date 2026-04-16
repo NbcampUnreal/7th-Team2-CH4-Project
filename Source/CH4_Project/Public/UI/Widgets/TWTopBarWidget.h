@@ -18,6 +18,8 @@ public:
 
 protected:
 	FString ResolvePopulationDisplayText(const FTopBarViewModel& InData) const;
+	FString FormatUpkeepText(int32 InUpkeep) const;
+	FSlateColor ResolveUpkeepColor(int32 InUpkeep) const;
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -34,4 +36,10 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TextGameTime = nullptr;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextWoodUpkeep = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextOreUpkeep = nullptr;
 };

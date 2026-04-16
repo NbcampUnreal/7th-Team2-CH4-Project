@@ -1,11 +1,31 @@
 #include "UI/Widgets/TWTopBarWidget.h"
-
+#include "Styling/SlateColor.h"
 #include "Components/TextBlock.h"
 #include "UObject/UnrealType.h"
 
 #include "UI/Widgets/TWTopBarWidget.h"
 
 #include "Components/TextBlock.h"
+
+FString UTWTopBarWidget::FormatUpkeepText(int32 InUpkeep) const
+{
+	if (InUpkeep <= 0)
+	{
+		return TEXT("");
+	}
+
+	return FString::Printf(TEXT("(-%d)"), InUpkeep);
+}
+
+FSlateColor UTWTopBarWidget::ResolveUpkeepColor(int32 InUpkeep) const
+{
+	if (InUpkeep > 0)
+	{
+		return FSlateColor(FLinearColor(1.0f, 0.2f, 0.2f, 1.0f));
+	}
+
+	return FSlateColor(FLinearColor::Transparent);
+}
 
 void UTWTopBarWidget::SetTopBarData(const FTopBarViewModel& InData)
 {
@@ -26,9 +46,11 @@ void UTWTopBarWidget::SetTopBarData(const FTopBarViewModel& InData)
 	
 	if (TextPopulation)
 	{
-		if (!InData.PopulationText.IsEmpty())
+		const FString PopulationDisplayText = ResolvePopulationDisplayText(InData);
+
+		if (!PopulationDisplayText.IsEmpty())
 		{
-			TextPopulation->SetText(FText::FromString(InData.PopulationText));
+			TextPopulation->SetText(FText::FromString(PopulationDisplayText));
 		}
 		else
 		{
@@ -39,6 +61,26 @@ void UTWTopBarWidget::SetTopBarData(const FTopBarViewModel& InData)
 	if (TextGameTime)
 	{
 		TextGameTime->SetText(FText::FromString(InData.GameTimeText));
+	}
+
+	if (TextWoodUpkeep)
+	{
+		const FString UpkeepText = FormatUpkeepText(InData.WoodUpkeep);
+		TextWoodUpkeep->SetText(FText::FromString(UpkeepText));
+		TextWoodUpkeep->SetColorAndOpacity(ResolveUpkeepColor(InData.WoodUpkeep));
+		TextWoodUpkeep->SetVisibility(
+			UpkeepText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible
+		);
+	}
+
+	if (TextOreUpkeep)
+	{
+		const FString UpkeepText = FormatUpkeepText(InData.GasUpkeep);
+		TextOreUpkeep->SetText(FText::FromString(UpkeepText));
+		TextOreUpkeep->SetColorAndOpacity(ResolveUpkeepColor(InData.GasUpkeep));
+		TextOreUpkeep->SetVisibility(
+			UpkeepText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible
+		);
 	}
 }
 

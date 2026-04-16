@@ -11,13 +11,40 @@
 class UTWPlayerUnitContainer;
 struct FTWUnitTableRowBase;
 class ATWPlayerController;
+class ATWUnit;
 struct FMassEntityHandle;
+
+USTRUCT(BlueprintType)
+struct CH4_PROJECT_API FTWUnitSelectionVisualStyle
+{
+	GENERATED_BODY()
+
+	/** 선택 링 반지름 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
+	float SelectionCircleRadius = 54.f;
+
+	/** 선택 링 두께 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
+	float CircleThickness = 2.2f;
+
+	/** 선택 표시 위치 보간 속도 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
+	float LocationInterpSpeed = 35.f;
+
+	/** 너무 멀면 즉시 스냅 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
+	float LocationSnapDistance = 78.f;
+
+	/** 거리 클수록 보간 가속 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
+	float LocationMaxInterpSpeedMultiplier = 5.0f;
+};
 
 UCLASS()
 class CH4_PROJECT_API UTWUnitSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
-
+	
 public:
 	UTWUnitSubsystem();
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
@@ -70,8 +97,54 @@ public:
 #endif
 	
 #pragma endregion
-	
-	
+#ifdef WITH_CLIENT_CODE
+public:
+	/** 선택 링용 월드 위치 */
+	bool TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const;
+
+	/** HP 바용 월드 위치 */
+	bool TryGetUnitHPBarWorldLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const;
+
+	/** 현재 HP */
+	bool TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutCurrentHP) const;
+
+	/** 최대 HP */
+	bool TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutMaxHP) const;
+
+	/** 유닛 타입 ID */
+	bool TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutUnitID) const;
+
+	/** 선택 비주얼 스타일 */
+	bool TryGetUnitSelectionVisualStyle(
+		const FMassNetworkID& UnitNetID,
+		FTWUnitSelectionVisualStyle& OutStyle
+	) const;
+
+	/** 클라 기준 현재 상태 */
+	FTWUnitStatus GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot);
+
+private:
+	bool TryGetReplicationEntityInfo(
+		const FMassNetworkID& UnitNetID,
+		const FMassReplicationEntityInfo*& OutEntityInfo
+	) const;
+
+	bool TryGetUnitVisualActor(
+		const FMassNetworkID& UnitNetID,
+		const ATWUnit*& OutVisualActor
+	) const;
+
+	bool TryGetUnitLocationInternal(
+		const FMassNetworkID& UnitNetID,
+		FVector& OutLocation
+	) const;
+
+	bool TryProjectWorldPointToGround(
+		const FVector& InWorldPoint,
+		FVector& OutGroundPoint,
+		const AActor* ActorToIgnore = nullptr
+	) const;
+#endif
 	
 	FTWUnitTableRowBase* GetUnitTableRowBase(FName UnitID) const;
 

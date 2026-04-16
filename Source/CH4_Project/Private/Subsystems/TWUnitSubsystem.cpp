@@ -1,7 +1,12 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿#include "Subsystems/TWUnitSubsystem.h"
 
-#include "Subsystems/TWUnitSubsystem.h"
 #include "Core/TWPlayerUnitContainer.h"
+#include "Core/TWGameState.h"
+#include "Core/TWPlayerState.h"
+#include "Core/TWPlayerController.h"
+#include "Data/TWUnitTableRowBase.h"
+#include "Mass/TWUnit.h"
+
 #include "EngineUtils.h"
 #include "MassCommonFragments.h"
 #include "MassEntityManager.h"
@@ -11,10 +16,7 @@
 #include "MassEntityConfigAsset.h"
 #include "MassNavigationFragments.h"
 #include "MassSpawner.h"
-#include "Core/TWGameState.h"
-#include "Core/TWPlayerState.h"
-#include "Core/TWPlayerController.h" 
-#include "Data/TWUnitTableRowBase.h"
+#include "MassActorSubsystem.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWMassClientBubbleInfo.h"
@@ -27,7 +29,7 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 
-	FString Path = TEXT("/Game/CH4_Project/Datas/Tables/DT_UnitTableRowBase.DT_UnitTableRowBase");
+	const FString Path = TEXT("/Game/CH4_Project/Datas/Tables/DT_UnitTableRowBase.DT_UnitTableRowBase");
 	UnitTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *Path));
 
 	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
@@ -36,7 +38,7 @@ void UTWUnitSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 		FindNearestEntityQuery.Initialize(EntityManager.AsShared());
 		FindNearestEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-		FindNearestEntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly); 
+		FindNearestEntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly);
 	}
 
 	TArray<FTWUnitTableRowBase*> UnitTableRowBases;
@@ -78,8 +80,11 @@ void UTWUnitSubsystem::Deinitialize()
 {
 	UnitContainers.Empty();
 	CachedUnitTableRows.Empty();
+
 	Super::Deinitialize();
 }
+
+#ifdef WITH_SERVER_CODE
 
 void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 {
@@ -88,13 +93,16 @@ void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
 	check(GameState);
 
-	UnitContainers.Add(PlayerSlot, NewObject<UTWPlayerUnitContainer>(this));
-	UnitContainers[PlayerSlot]->Init(PlayerSlot);
+	UTWPlayerUnitContainer* NewContainer = NewObject<UTWPlayerUnitContainer>(this);
+	if (!NewContainer)
+	{
+		return;
+	}
+
+	NewContainer->Init(PlayerSlot);
+	UnitContainers.Add(PlayerSlot, NewContainer);
 }
 
-#ifdef WITH_SERVER_CODE
-
-// TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
 bool UTWUnitSubsystem::FindNearestEntity(
 	const FVector& Location,
 	FMassEntityHandle& OutEntityHandle,
@@ -132,7 +140,6 @@ bool UTWUnitSubsystem::FindNearestEntity(
 				continue;
 			}
 
-			// 내 유닛만 선택 대상으로 제한
 			if (UnitFrag->GetOwner() != OwnerPlayerSlot)
 			{
 				continue;
@@ -191,14 +198,13 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 			{
 				continue;
 			}
-			
+
 			if (UnitFrag->GetOwner() != OwnerPlayerSlot)
 			{
 				continue;
 			}
 
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
-
 			const double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
 			if (DotResult < 0.0)
 			{
@@ -230,7 +236,6 @@ void UTWUnitSubsystem::SpawnUnit(
 	}
 
 	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
-
 	const FMassEntityTemplate& EntityTemplate =
 		UnitTableRowBase.MassEntityConfigAsset->GetOrCreateEntityTemplate(*GetWorld());
 
@@ -240,23 +245,18 @@ void UTWUnitSubsystem::SpawnUnit(
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
 		[Location, EntityTemplate, WeakPlayerController, WeakThis, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
 		{
-			if (!WeakPlayerController.IsValid())
+			if (!WeakPlayerController.IsValid() || !WeakThis.IsValid())
 			{
 				return;
 			}
 
-			if (!WeakThis.IsValid())
+			UWorld* LocalWorld = InOutEntityManager.GetWorld();
+			if (!LocalWorld)
 			{
 				return;
 			}
 
-			UWorld* World = InOutEntityManager.GetWorld();
-			if (!World)
-			{
-				return;
-			}
-
-			UMassSpawnerSubsystem* MassSpawnerSubsystem = World->GetSubsystem<UMassSpawnerSubsystem>();
+			UMassSpawnerSubsystem* MassSpawnerSubsystem = LocalWorld->GetSubsystem<UMassSpawnerSubsystem>();
 			if (!MassSpawnerSubsystem)
 			{
 				return;
@@ -277,18 +277,11 @@ void UTWUnitSubsystem::SpawnUnit(
 			}
 
 			FMassEntityHandle SpawnedUnit = SpawnedEntities[0];
-			
-			if (FMassNetworkIDFragment* NetworkIDFragment = InOutEntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(SpawnedUnit))
-			{
-				FMassNetworkID NetID = NetworkIDFragment->NetID;
-				UE_LOG(LogTemp, Warning, TEXT("%d"), NetID.GetValue());
-			}
-			
-			
+
 			if (FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(SpawnedUnit))
 			{
 				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
-				UnitFragment->SetOwner(PlayerState->PlayerSlot); 
+				UnitFragment->SetOwner(PlayerState->PlayerSlot);
 			}
 
 			if (FTransformFragment* TransformFragment =
@@ -306,38 +299,44 @@ void UTWUnitSubsystem::SpawnUnit(
 			if (FTWStatusFragment* StatusFragment =
 				InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 			{
-				FTWUnitStatus UnitStatus = WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID,PlayerState->PlayerSlot);
+				const FTWUnitStatus UnitStatus =
+					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
 				StatusFragment->SetStatus(UnitStatus);
-				//TODO Apply Move Speed;
 			}
 
 			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
-
-			// PendingPopulation 차감은 호출부(생산 완료 처리)에서만 하도록 유지
-			// PlayerState->RemovePendingPopulation(UnitTableRowBase.Population);
 		});
 }
 
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
 {
+	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
+	{
+		return {};
+	}
+
 	return UnitContainers[PlayerSlot]->GetUpkeep();
 }
 
 int32 UTWUnitSubsystem::GetCurrentPopulation(int32 PlayerSlot) const
 {
+	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
+	{
+		return 0;
+	}
+
 	return UnitContainers[PlayerSlot]->GetCurrentPopulation();
 }
 
 void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	if (!Unit.IsValid())
 	{
 		return;
 	}
 
-	// [MOD] 컨테이너 누락 방어
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
 	{
 		return;
@@ -349,7 +348,7 @@ void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
 	{
 		return;
@@ -358,56 +357,61 @@ void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 	UnitContainers[PlayerSlot]->RemoveUnit(Idx);
 }
 
+void UTWUnitSubsystem::ApplyStatus(FName UnitID, int32 PlayerSlot)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
+	{
+		return;
+	}
+
+	const FTWUnitStatus UnitStatus = GetUnitDefaultStatus(UnitID, PlayerSlot);
+	UnitContainers[PlayerSlot]->ApplyStatus(UnitID, UnitStatus);
+}
+
+#endif
+
 FTWUnitStatus UTWUnitSubsystem::GetUnitDefaultStatus(FName UnitID, int32 PlayerSlot)
 {
-	FTWUnitStatus UnitStatus= GetUnitTableRowBase(UnitID)->BaseStatus;
-	ATWGameState* GameState = Cast<ATWGameState> (GetWorld()->GetGameState());
-	if (false == IsValid(GameState))
+	FTWUnitStatus UnitStatus;
+
+	if (FTWUnitTableRowBase* UnitRow = GetUnitTableRowBase(UnitID))
+	{
+		UnitStatus = UnitRow->BaseStatus;
+	}
+
+	ATWGameState* GameState = Cast<ATWGameState>(GetWorld()->GetGameState());
+	if (!IsValid(GameState))
 	{
 		return UnitStatus;
 	}
 
 	ATWPlayerState* PlayerState = GameState->GetPlayerState(PlayerSlot);
-	if (false == IsValid(PlayerState))
+	if (!IsValid(PlayerState))
 	{
 		return UnitStatus;
 	}
+
 	UnitStatus += PlayerState->GetUnitUpgradeBonus(UnitID);
 	return UnitStatus;
 }
 
-FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, const int32 PlayerSlot)
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, int32 PlayerSlot)
 {
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-	if (EntityManager)
-	{
-		return EntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit)->GetStatus();
-	}
-	return FTWUnitStatus();
-}
-
-FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, const int32 PlayerSlot)
-{
-	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-	if (false == IsValid(RepSubsystem))
+	if (!EntityManager || !Unit.IsValid())
 	{
 		return FTWUnitStatus();
 	}
-	const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(UnitNetID);
-	if (!EntityInfo)
+
+	const FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit);
+	if (!StatusFragment)
 	{
 		return FTWUnitStatus();
 	}
-	FMassEntityHandle EntityHandle = EntityInfo->Entity;
-	return GetUnitCurrentStatus(EntityHandle, PlayerSlot);
-}
 
-void UTWUnitSubsystem::ApplyStatus(FName UnitID, int32 PlayerSlot)
-{
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
-	FTWUnitStatus UnitStatus = GetUnitDefaultStatus(UnitID, PlayerSlot);
-	UnitContainers[PlayerSlot]->ApplyStatus(UnitID, UnitStatus);
+	return StatusFragment->GetStatus();
 }
 
 FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
@@ -419,4 +423,285 @@ FTWUnitTableRowBase* UTWUnitSubsystem::GetUnitTableRowBase(FName UnitID) const
 
 	return nullptr;
 }
+
+#ifdef WITH_CLIENT_CODE
+
+bool UTWUnitSubsystem::TryGetReplicationEntityInfo(
+	const FMassNetworkID& UnitNetID,
+	const FMassReplicationEntityInfo*& OutEntityInfo
+) const
+{
+	OutEntityInfo = nullptr;
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	UMassReplicationSubsystem* RepSubsystem = World->GetSubsystem<UMassReplicationSubsystem>();
+	if (!IsValid(RepSubsystem))
+	{
+		return false;
+	}
+
+	const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(UnitNetID);
+	if (!EntityInfo || !EntityInfo->Entity.IsValid())
+	{
+		return false;
+	}
+
+	OutEntityInfo = EntityInfo;
+	return true;
+}
+
+FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitNetID, int32 PlayerSlot)
+{
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return FTWUnitStatus();
+	}
+
+	return GetUnitCurrentStatus(EntityInfo->Entity, PlayerSlot);
+}
+
+bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutUnitID) const
+{
+	OutUnitID = NAME_None;
+
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return false;
+	}
+
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!EntityManager)
+	{
+		return false;
+	}
+
+	const FTWUnitFragment* UnitFragment =
+		EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
+	if (!UnitFragment)
+	{
+		return false;
+	}
+
+	OutUnitID = UnitFragment->GetUnitID();
+	return OutUnitID != NAME_None;
+}
+
+bool UTWUnitSubsystem::TryGetUnitTWUnit(
+	const FMassNetworkID& UnitNetID,
+	const ATWUnit*& OutTWUnit
+) const
+{
+	OutTWUnit = nullptr;
+
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return false;
+	}
+
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!EntityManager)
+	{
+		return false;
+	}
+
+	const FMassActorFragment* ActorFragment =
+		EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
+	if (!ActorFragment || !ActorFragment->IsValid())
+	{
+		return false;
+	}
+
+	const AActor* Actor = ActorFragment->Get();
+	if (!IsValid(Actor))
+	{
+		return false;
+	}
+
+	const ATWUnit* TWUnit = Cast<ATWUnit>(Actor);
+	if (!IsValid(TWUnit))
+	{
+		return false;
+	}
+
+	OutTWUnit = TWUnit;
+	return true;
+}
+
+bool UTWUnitSubsystem::TryGetUnitLocationInternal(
+	const FMassNetworkID& UnitNetID,
+	FVector& OutLocation
+) const
+{
+	OutLocation = FVector::ZeroVector;
+
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return false;
+	}
+
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!EntityManager)
+	{
+		return false;
+	}
+
+	const FTransformFragment* TransformFragment =
+		EntityManager->GetFragmentDataPtr<FTransformFragment>(EntityInfo->Entity);
+	if (!TransformFragment)
+	{
+		return false;
+	}
+
+	OutLocation = TransformFragment->GetTransform().GetLocation();
+	return true;
+}
+
+bool UTWUnitSubsystem::TryProjectWorldPointToGround(
+	const FVector& InWorldPoint,
+	FVector& OutGroundPoint,
+	const AActor* ActorToIgnore
+) const
+{
+	OutGroundPoint = InWorldPoint;
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	const FVector TraceStart = InWorldPoint + FVector(0.f, 0.f, 300.f);
+	const FVector TraceEnd = InWorldPoint - FVector(0.f, 0.f, 800.f);
+
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(TWSelectionGroundTrace), false);
+	Params.bTraceComplex = false;
+
+	if (IsValid(ActorToIgnore))
+	{
+		Params.AddIgnoredActor(ActorToIgnore);
+	}
+
+	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params))
+	{
+		return false;
+	}
+
+	OutGroundPoint = Hit.Location;
+	return true;
+}
+
+bool UTWUnitSubsystem::TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const
+{
+	OutLocation = FVector::ZeroVector;
+
+	const ATWUnit* TWUnit = nullptr;
+	if (TryGetUnitTWUnit(UnitNetID, TWUnit) && IsValid(TWUnit))
+	{
+		const FVector AnchorWorldLocation = TWUnit->GetSelectionAnchorWorldLocation();
+
+		FVector GroundLocation = FVector::ZeroVector;
+		if (TryProjectWorldPointToGround(AnchorWorldLocation, GroundLocation, TWUnit))
+		{
+			OutLocation = GroundLocation;
+			return true;
+		}
+
+		OutLocation = AnchorWorldLocation;
+		return true;
+	}
+
+	FVector BaseLocation = FVector::ZeroVector;
+	if (!TryGetUnitLocationInternal(UnitNetID, BaseLocation))
+	{
+		return false;
+	}
+
+	FVector GroundLocation = FVector::ZeroVector;
+	if (TryProjectWorldPointToGround(BaseLocation, GroundLocation, nullptr))
+	{
+		OutLocation = GroundLocation;
+		return true;
+	}
+
+	OutLocation = BaseLocation;
+	return true;
+}
+
+bool UTWUnitSubsystem::TryGetUnitHPBarWorldLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const
+{
+	OutLocation = FVector::ZeroVector;
+
+	const ATWUnit* TWUnit = nullptr;
+	if (TryGetUnitTWUnit(UnitNetID, TWUnit) && IsValid(TWUnit))
+	{
+		OutLocation = TWUnit->GetHPBarAnchorWorldLocation();
+		return true;
+	}
+
+	FVector BaseLocation = FVector::ZeroVector;
+	if (!TryGetUnitLocationInternal(UnitNetID, BaseLocation))
+	{
+		return false;
+	}
+
+	OutLocation = BaseLocation + FVector(0.f, 0.f, 120.f);
+	return true;
+}
+
+bool UTWUnitSubsystem::TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutCurrentHP) const
+{
+	OutCurrentHP = 0.f;
+
+	const FTWUnitStatus Status =
+		const_cast<UTWUnitSubsystem*>(this)->GetUnitCurrentStatus(UnitNetID, PlayerSlot);
+
+	OutCurrentHP = Status.GetStatus(ETWStatusType::Health);
+	return OutCurrentHP > 0.f;
+}
+
+bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutMaxHP) const
+{
+	OutMaxHP = 0.f;
+
+	FName UnitID = NAME_None;
+	if (!TryGetUnitID(UnitNetID, UnitID))
+	{
+		return false;
+	}
+
+	if (FTWUnitTableRowBase* UnitRow = const_cast<UTWUnitSubsystem*>(this)->GetUnitTableRowBase(UnitID))
+	{
+		OutMaxHP = UnitRow->BaseStatus.GetStatus(ETWStatusType::Health);
+		return OutMaxHP > 0.f;
+	}
+
+	return false;
+}
+
+bool UTWUnitSubsystem::TryGetUnitSelectionVisualStyle(
+	const FMassNetworkID& UnitNetID,
+	FTWUnitSelectionVisualStyle& OutStyle
+) const
+{
+	OutStyle = FTWUnitSelectionVisualStyle();
+
+	FName UnitID = NAME_None;
+	if (!TryGetUnitID(UnitNetID, UnitID))
+	{
+		return false;
+	}
+	
+	return true;
+}
+
 #endif

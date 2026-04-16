@@ -77,6 +77,30 @@ struct CH4_PROJECT_API FTopBarViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString GameTimeText = TEXT("00:00");
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 CurrentPopulation = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 PendingPopulation = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 PopulationLimit = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 MaxPopulation = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 WoodDelta = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 GasDelta = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 WoodUpkeep = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 GasUpkeep = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -200,6 +224,25 @@ struct CH4_PROJECT_API FSelectionViewModel
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FBuildingProductionViewModel Production;
+	
+	// 단일 유닛 상세 스탯 표시용
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Damage = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Armor = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float AttackSpeed = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float MoveSpeed = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Range = 0.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bShowDetailStats = false;
 };
 
 USTRUCT(BlueprintType)
