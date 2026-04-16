@@ -252,7 +252,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !bBuildShortcutModeActive)
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !BuildComponent->GetBuildMode())
 	{
 		UpdateDragSelectionOverlay();
 	}
@@ -377,6 +377,11 @@ void ATWPlayerController::RefreshDynamicMappingContexts()
 
 bool ATWPlayerController::ShouldUseUnitCommandContext() const
 {
+	if (bBuildShortcutModeActive)
+	{
+		return false;
+	}
+	
 	if (GetSelectedBuilding() != nullptr)
 	{
 		return false;
@@ -457,14 +462,10 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 {
 	bConsumeLeftMouseRelease = false;
 	
-	if (bBuildShortcutModeActive)
+	if (BuildComponent->GetBuildMode())
 	{
-		if (BuildComponent->GetBuildMode())
-		{
-			BuildComponent->RequestBuild();
-			RefreshDynamicMappingContexts();
-		}
-
+		BuildComponent->RequestBuild();
+		RefreshDynamicMappingContexts();
 		bConsumeLeftMouseRelease = true;
 		return;
 	}
@@ -544,7 +545,7 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 		return;
 	}
 	
-	if (bBuildShortcutModeActive)
+	if (BuildComponent->GetBuildMode())
 	{
 		return;
 	}
@@ -1562,6 +1563,28 @@ void ATWPlayerController::HandleUICommandRequested(FName CommandId)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UI Click] CommandMeta not found: %s"), *CommandId.ToString());
 		return;
+	}
+	
+	if (bBuildShortcutModeActive)
+	{
+		const bool bBlockedInBuildShortcutMode =
+			CommandMeta->CommandType == ETWCommandType::Move ||
+			CommandMeta->CommandType == ETWCommandType::Attack ||
+			CommandMeta->CommandType == ETWCommandType::Hold ||
+			CommandMeta->CommandType == ETWCommandType::ProduceUnit ||
+			CommandMeta->CommandType == ETWCommandType::BuildStructure ||
+			CommandMeta->CommandType == ETWCommandType::Research;
+
+		if (bBlockedInBuildShortcutMode)
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("[UI Click] Blocked by build shortcut mode: %s"),
+				*CommandId.ToString()
+			);
+			return;
+		}
 	}
 
 	UE_LOG(
