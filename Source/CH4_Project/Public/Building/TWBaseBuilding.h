@@ -8,6 +8,7 @@ class UTWBuildingDataAsset;
 class ATWPlayerState;
 class USceneComponent;
 class UStaticMeshComponent;
+class UNavModifierComponent;
 
 UENUM(BlueprintType)
 enum class ETWBuildingState : uint8
@@ -108,6 +109,9 @@ protected:
 	void StartConstruction();
 	void UpdateConstruction();
 	void FinishConstruction();
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Navigation")
+	TObjectPtr<UNavModifierComponent> NavModifier;
 	
 public:
 	UFUNCTION(BlueprintCallable, Category="Building")

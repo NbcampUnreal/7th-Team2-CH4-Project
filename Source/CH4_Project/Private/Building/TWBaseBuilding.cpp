@@ -5,6 +5,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/TWBuildingManagerSubsystem.h"
 #include "Subsystems/TWGridSubSystem.h"
+#include "NavModifierComponent.h"
+#include "NavAreas/NavArea_Null.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
 {
@@ -22,6 +24,12 @@ ATWBaseBuilding::ATWBaseBuilding()
 	MeshComponent->SetupAttachment(SceneRoot);
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	MeshComponent->SetCollisionProfileName(TEXT("BlockAll"));
+	
+	NavModifier = CreateDefaultSubobject<UNavModifierComponent>(TEXT("NavModifier"));
+	NavModifier->SetAreaClass(UNavArea_Null::StaticClass());
+	
+	MeshComponent->SetCanEverAffectNavigation(false);
+	
 }
 
 void ATWBaseBuilding::BeginPlay()
