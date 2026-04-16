@@ -685,10 +685,27 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			{
 				return;
 			}
+			UTWUnitSubsystem* UnitSubsystem = ThisWeakPtr->GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+			if (false == IsValid(UnitSubsystem))
+			{
+				return;
+			}
+			
+			ETWMassCommand CommandType = ETWMassCommand::None;
+			FVector TargetLocation = FVector::ZeroVector;
+			FMassEntityHandle TargetEntity;
+			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
+			{
+				CommandType = ETWMassCommand::MoveToUnit;
+			}else
+			{
+				CommandType = ETWMassCommand::MoveToLocation;
+				TargetLocation = NavCommandLocation;
+			}
 
 			TArray<FMassEntityHandle> ValidEntities;
 			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
-
+			
 			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
@@ -709,16 +726,13 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 
 				ValidEntities.Add(Entity);
 
-				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandTypeFragment>(Entity))
+				if (FTWCommandFragment* CommandFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandFragment>(Entity))
 				{
-					TypeFragment->SetType(ETWMassCommand::MoveToLocation);
+					CommandFragment->SetType(CommandType);
+					CommandFragment->SetLocation(TargetLocation);
+					CommandFragment->SetTarget(TargetEntity);
 				}
-
-				if (FTWCommandDataFragment* CommandData = InOutEntityManager.GetSharedFragmentDataPtr<FTWCommandDataFragment>(Entity))
-				{
-					CommandData->SetLocation(NavCommandLocation);
-					CommandData->SetTarget(FMassEntityHandle());
-				}
+				
 
 				if (FMassMoveTargetFragment* MoveTarget = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(Entity))
 				{
@@ -730,7 +744,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			{
 				if (ValidEntities.Num() > 0)
 				{
-					SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate, ValidEntities);
+					SignalSubsystem->SignalEntities(CommandSignal, ValidEntities);
 				}
 			}
 		});
@@ -744,7 +758,121 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 
 void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector& CommandLocation)
 {
-	// TODO
+	checkf(HasAuthority(), TEXT("Server Logic Called!"));
+	if (ServerSelectedEntities.IsEmpty())
+	{
+		return;
+	}
+	
+	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem)
+	{
+		return;
+	}
+
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+
+	FNavLocation ProjectedLocation;
+	FVector NavCommandLocation = FVector::ZeroVector;
+	if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation,
+	                                               FVector(500.f, 500.f, 500.f)))
+	{
+		NavCommandLocation = ProjectedLocation.Location;
+	}
+	else
+	{
+		return;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+	TSharedRef<FMassCommandBuffer> CommandBuffer = MakeShared<FMassCommandBuffer>();
+	TWeakObjectPtr<ThisClass> ThisWeakPtr(this);
+
+	CommandBuffer->PushCommand<FMassDeferredSetCommand>(
+		[ThisWeakPtr, NavCommandLocation, MyPlayerSlot](FMassEntityManager& InOutEntityManager)
+		{
+			if (false == ThisWeakPtr.IsValid())
+			{
+				return;
+			}
+			UTWUnitSubsystem* UnitSubsystem = ThisWeakPtr->GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+			if (false == IsValid(UnitSubsystem))
+			{
+				return;
+			}
+			
+			ETWMassCommand CommandType = ETWMassCommand::None;
+			FVector TargetLocation = FVector::ZeroVector;
+			FMassEntityHandle TargetEntity;
+			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
+			{
+				CommandType = ETWMassCommand::AttackToUnit;
+			}else
+			{
+				CommandType = ETWMassCommand::AttackToLocation;
+				TargetLocation = NavCommandLocation;
+			}
+
+			TArray<FMassEntityHandle> ValidEntities;
+			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
+			
+			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
+			{
+				if (!InOutEntityManager.IsEntityActive(Entity))
+				{
+					continue;
+				}
+				
+				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+				if (!UnitFragment)
+				{
+					continue;
+				}
+
+				if (UnitFragment->GetOwner() != MyPlayerSlot)
+				{
+					continue;
+				}
+
+				ValidEntities.Add(Entity);
+
+				if (FTWCommandFragment* CommandFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandFragment>(Entity))
+				{
+					CommandFragment->SetType(CommandType);
+					CommandFragment->SetLocation(TargetLocation);
+					CommandFragment->SetTarget(TargetEntity);
+				}
+				
+
+				if (FMassMoveTargetFragment* MoveTarget = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(Entity))
+				{
+					MoveTarget->Center = NavCommandLocation;
+				}
+			}
+
+			if (UMassSignalSubsystem* SignalSubsystem = InOutEntityManager.GetWorld()->GetSubsystem<UMassSignalSubsystem>())
+			{
+				if (ValidEntities.Num() > 0)
+				{
+					SignalSubsystem->SignalEntities(CommandSignal, ValidEntities);
+				}
+			}
+		});
+
+	EntityManager.AppendCommands(CommandBuffer);
+
+	UE_LOG(LogTemp, Log, TEXT("[Attack] SelectedEntities=%d / Target=%s"),
+	       ServerSelectedEntities.Num(),
+	       *NavCommandLocation.ToString());
 }
 
 void ATWPlayerController::ServerHandleHoldCommand_Implementation()
@@ -805,7 +933,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 
 				ValidEntities.Add(Entity);
 
-				if (FTWCommandTypeFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandTypeFragment>(Entity))
+				if (FTWCommandFragment* TypeFragment = InOutEntityManager.GetFragmentDataPtr<FTWCommandFragment>(Entity))
 				{
 					TypeFragment->SetType(ETWMassCommand::Hold);
 				}
@@ -815,7 +943,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 			{
 				if (ValidEntities.Num() > 0)
 				{
-					SignalSubsystem->SignalEntities(UE::Mass::Signals::StateTreeActivate, ValidEntities);
+					SignalSubsystem->SignalEntities(CommandSignal, ValidEntities);
 				}
 			}
 		});
@@ -1123,14 +1251,18 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	{
 		MoveDirection.X = -1.f;
 	}
-
-	const bool bIsEdgeScrollingNow = !MoveDirection.IsNearlyZero();
+	FVector PawnMoveDirection = MoveDirection.Y * GetPawn()->GetActorTransform().GetRotation().GetRightVector()+
+		MoveDirection.X * GetPawn()->GetActorTransform().GetRotation().GetForwardVector();
+	PawnMoveDirection.Z = 0.0;
+	
+	
+	const bool bIsEdgeScrollingNow = !PawnMoveDirection.IsNearlyZero();
 
 	if (bIsEdgeScrollingNow)
 	{
 		if (APawn* MyPawn = GetPawn())
 		{
-			MyPawn->AddMovementInput(MoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
+			MyPawn->AddMovementInput(PawnMoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
 		}
 	}
 

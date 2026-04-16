@@ -58,13 +58,23 @@ public:
 public:
 	void AddPlayer(int32 PlayerSlot);
 
-	bool FindNearestEntity(
+	bool FindNearestOwnedEntity(
 		const FVector& Location,
 		FMassEntityHandle& OutEntityHandle,
 		int32 OwnerPlayerSlot,
-		float MaxDistance = 50.0f
+		float MaxDistance = 100.0f
 	);
-
+	bool FindNearestAnyEntity(
+		const FVector& Location,
+		FMassEntityHandle& OutEntityHandle,
+		float MaxDistance = 100.0f
+	);
+	bool FindNearestEnemyEntity(
+		const FVector& Location,
+		FMassEntityHandle& OutEntityHandle,
+		int32 OwnerPlayerSlot,
+		float MaxDistance = 100.0f
+	);
 	bool GetEntitiesInRectangle(
 		const FVector& StartLocation,
 		const FVector& EndLocation,
@@ -98,7 +108,10 @@ public:
 #ifdef WITH_SERVER_CODE
 	void ApplyStatus(FName UnitID, int32 PlayerSlot);
 #endif
+
 #pragma endregion
+
+
 
 #ifdef WITH_CLIENT_CODE
 public:

@@ -1,0 +1,276 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "Mass/Processor/TWCommandProcessor.h"
+
+#include "MassExecutionContext.h"
+#include "MassNavigationFragments.h"
+#include "MassNavigationTypes.h"
+#include "MassNavMeshNavigationUtils.h"
+#include "MassNavMeshNavigationFragments.h"
+#include "MassMovementFragments.h"
+#include "MassSignalSubsystem.h"
+#include "Mass/Fragments/TWCommandFragment.h"
+#include "Mass/Fragments/TWTransformOffsetFragment.h"
+#include "Mass/Traits/TWCommandTrait.h"
+
+
+UTWCommandProcessor::UTWCommandProcessor(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer), EntityQuery(*this)
+{
+	bRequiresGameThreadExecution = true;
+
+	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
+	// ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Tasks;
+	//TODO Client Tasks
+
+	ExecutionOrder.ExecuteAfter.Add(UE::Mass::ProcessorGroupNames::SyncWorldToMass);
+}
+
+void UTWCommandProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
+{
+	EntityQuery.AddRequirement<FTWCommandFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassNavMeshShortPathFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddConstSharedRequirement<FMassMovementParameters>();
+
+	EntityQuery.AddSubsystemRequirement<UMassSignalSubsystem>(EMassFragmentAccess::ReadWrite);
+
+	ProcessorRequirements.AddSubsystemRequirement<UMassSignalSubsystem>(EMassFragmentAccess::ReadWrite);
+}
+
+void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMassExecutionContext& Context,
+                                         FMassSignalNameLookup& EntitySignals)
+{
+	auto TickFunc = [EntitySignals, &EntityManager](FMassExecutionContext& Context)
+	{
+		UMassSignalSubsystem* SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Context.GetWorld());
+		if (false == IsValid(SignalSubsystem))
+		{
+			return;
+		}	
+		
+		
+		const TArrayView<FTWCommandFragment> CommandFragments = Context.GetMutableFragmentView<FTWCommandFragment>();
+		const TConstArrayView<FTransformFragment> TransformFragments = Context.GetFragmentView<FTransformFragment>();
+		const TArrayView<FMassMoveTargetFragment> MoveTargetFragments = Context.GetMutableFragmentView<
+			FMassMoveTargetFragment>();
+		const TArrayView<FMassNavMeshShortPathFragment> NavMeshShortPathFragments = Context.GetMutableFragmentView<
+			FMassNavMeshShortPathFragment>();
+		const FMassMovementParameters& MovementParameters = Context.GetConstSharedFragment<FMassMovementParameters>();
+
+		TArray<FMassEntityHandle> EntitiesToSignalPathInit;
+		
+		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
+		{
+			FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
+			TArray<FName> Signals;
+			EntitySignals.GetSignalsForEntity(Entity, Signals);
+			if (Signals.Contains(CommandSignal))
+			{
+
+
+				//TODO Navigation Init
+				switch (CommandFragments[EntityIdx].GetType())
+				{
+				case ETWMassCommand::None:
+					check(false);
+					break;
+				case ETWMassCommand::MoveToLocation:
+					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					EntitiesToSignalPathInit.Add(Entity);
+					break;
+				case ETWMassCommand::MoveToUnit:
+					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					EntitiesToSignalPathInit.Add(Entity);
+					break;
+				case ETWMassCommand::AttackToLocation:
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					EntitiesToSignalPathInit.Add(Entity);
+					break;
+				case ETWMassCommand::AttackToUnit:
+					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					EntitiesToSignalPathInit.Add(Entity);
+					break;
+				case ETWMassCommand::Hold:
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					//TODO
+					break;
+				}
+			}
+			if (Signals.Contains(MoveCompleteSignal))
+			{
+				FMassNavMeshShortPathFragment& ShortPath = NavMeshShortPathFragments[EntityIdx];
+				FMassMoveTargetFragment& MoveTarget = MoveTargetFragments[EntityIdx];
+
+				const UWorld* World = Context.GetWorld();
+				checkf(World != nullptr, TEXT("A valid world is expected from the execution context."));
+
+				const FVector AgentNavLocation = TransformFragments[EntityIdx].GetTransform().GetLocation();
+
+				switch (CommandFragments[EntityIdx].GetType())
+				{
+				case ETWMassCommand::None:
+					check(false);
+					break;
+				case ETWMassCommand::MoveToLocation:
+#pragma region Stand
+					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+
+					MoveTarget.Center = AgentNavLocation;
+					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
+
+					UE::MassNavigation::ActivateActionStand(
+						World,
+						Entity,
+						MovementParameters.DefaultDesiredSpeed,
+						MoveTarget,
+						ShortPath);
+#pragma endregion
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					continue;
+					break;
+				case ETWMassCommand::MoveToUnit:
+					if (
+						FVector::DistSquared(
+							TransformFragments[EntityIdx].GetTransform().GetLocation(),
+							EntityManager.GetFragmentDataChecked<FTransformFragment>(
+								CommandFragments[EntityIdx].GetTarget()).GetTransform().GetLocation()
+						) < 10000.0f
+					)
+					{
+#pragma region Stand
+						CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+
+						MoveTarget.Center = AgentNavLocation;
+						MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
+
+						UE::MassNavigation::ActivateActionStand(
+							World,
+							Entity,
+							MovementParameters.DefaultDesiredSpeed,
+							MoveTarget,
+							ShortPath);
+						
+
+						Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+						Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+						continue;
+#pragma endregion
+					}
+					else
+					{
+						EntitiesToSignalPathInit.Add(Entity);
+					}
+					break;
+				case ETWMassCommand::AttackToLocation:
+#pragma region Stand
+					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+
+					MoveTarget.Center = AgentNavLocation;
+					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
+
+					UE::MassNavigation::ActivateActionStand(
+						World,
+						Entity,
+						MovementParameters.DefaultDesiredSpeed,
+						MoveTarget,
+						ShortPath);
+#pragma endregion
+
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					continue;
+					break;
+				case ETWMassCommand::AttackToUnit:
+
+					
+#pragma region Stand
+					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+
+					MoveTarget.Center = AgentNavLocation;
+					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
+
+					UE::MassNavigation::ActivateActionStand(
+						World,
+						Entity,
+						MovementParameters.DefaultDesiredSpeed,
+						MoveTarget,
+						ShortPath);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					continue;
+#pragma endregion
+
+					break;
+				case ETWMassCommand::Hold:
+					check(false);
+					break;
+				}
+			}
+			if (Signals.Contains(AttackCompleteSignal))
+			{
+				switch (CommandFragments[EntityIdx].GetType())
+				{
+				case ETWMassCommand::None:
+					check(false);
+					break;
+				case ETWMassCommand::MoveToLocation:
+					check(false);
+					break;
+				case ETWMassCommand::MoveToUnit:
+					check(false);
+					break;
+				case ETWMassCommand::AttackToLocation:
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					//TODO Navigation Init
+					break;
+				case ETWMassCommand::AttackToUnit:
+					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
+					break;
+				case ETWMassCommand::Hold:
+					check(false);
+					break;
+				}
+			}
+		}
+		if (EntitiesToSignalPathInit.Num())
+		{
+			SignalSubsystem->SignalEntities(PathInitSignal, EntitiesToSignalPathInit);
+		}
+	};
+
+	EntityQuery.ForEachEntityChunk(Context, TickFunc);
+}
+
+void UTWCommandProcessor::InitializeInternal(UObject& Owner,
+                                             const TSharedRef<FMassEntityManager>& EntityManager)
+{
+	Super::InitializeInternal(Owner, EntityManager);
+	UMassSignalSubsystem* SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Owner.GetWorld());
+
+	SubscribeToSignal(*SignalSubsystem, CommandSignal);
+	SubscribeToSignal(*SignalSubsystem, AttackCompleteSignal);
+	SubscribeToSignal(*SignalSubsystem, MoveCompleteSignal);
+}

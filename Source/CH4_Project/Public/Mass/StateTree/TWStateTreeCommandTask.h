@@ -40,6 +40,5 @@ struct CH4_PROJECT_API FTWStateTreeCommandTask : public FMassStateTreeTaskBase
 	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
 protected:
-	TStateTreeExternalDataHandle<FTWCommandDataFragment> EntityCommandDataHandle;
-	TStateTreeExternalDataHandle<FTWCommandTypeFragment> EntityCommandTypeHandle;
+	TStateTreeExternalDataHandle<FTWCommandFragment> EntityCommandTypeHandle;
 };

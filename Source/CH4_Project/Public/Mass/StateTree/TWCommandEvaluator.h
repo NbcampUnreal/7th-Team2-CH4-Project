@@ -26,7 +26,7 @@ struct CH4_PROJECT_API FTWCommandEvaluator : public FMassStateTreeEvaluatorBase
 	GENERATED_BODY()
 	using FInstanceDataType = FTWCommandEvaluatorInstanceData;
 protected:
-	TStateTreeExternalDataHandle<FTWCommandTypeFragment> CommandTypeHandle;
+	TStateTreeExternalDataHandle<FTWCommandFragment> CommandTypeHandle;
 
 	virtual bool Link(FStateTreeLinker& Linker) override;
 	virtual void Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;

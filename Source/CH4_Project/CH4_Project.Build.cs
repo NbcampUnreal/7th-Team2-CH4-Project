@@ -25,11 +25,13 @@ public class CH4_Project : ModuleRules
 			"MassSpawner",
 			"MassAIBehavior",
 			"MassNavigation",
+			"MassNavMeshNavigation",
 			"MassSignals",
 			"GameplayTags",
 			"MassReplication",
 			"MassEQS",
 			"NetCore", "CommonUI",
+			"NavCorridor"
 			
 			
 		});

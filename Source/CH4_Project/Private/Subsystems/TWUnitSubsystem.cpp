@@ -103,7 +103,8 @@ void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 	UnitContainers.Add(PlayerSlot, NewContainer);
 }
 
-bool UTWUnitSubsystem::FindNearestEntity(
+// TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
+bool UTWUnitSubsystem::FindNearestOwnedEntity(
 	const FVector& Location,
 	FMassEntityHandle& OutEntityHandle,
 	int32 OwnerPlayerSlot,
@@ -165,6 +166,124 @@ bool UTWUnitSubsystem::FindNearestEntity(
 	return false;
 }
 
+bool UTWUnitSubsystem::FindNearestAnyEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle,
+	float MaxDistance)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem)
+	{
+		return false;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+	TArray<FMassArchetypeHandle> MatchingArchetypes;
+	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
+
+	float MinSquaredDistance = FMath::Square(MaxDistance);
+	FMassEntityHandle NearestEntity;
+
+	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
+	{
+		TArray<FMassEntityHandle> EntityHandles;
+		FMassArchetypeEntityCollection Collection(Archetype);
+		Collection.ExportEntityHandles(EntityHandles);
+
+		for (const FMassEntityHandle& Entity : EntityHandles)
+		{
+			const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity);
+			if (!TransformFrag)
+			{
+				continue;
+			}
+			
+			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+			const float DistSq = FVector::DistSquared(Location, EntityPos);
+
+			if (DistSq < MinSquaredDistance)
+			{
+				MinSquaredDistance = DistSq;
+				NearestEntity = Entity;
+			}
+		}
+	}
+
+	if (NearestEntity.IsValid())
+	{
+		OutEntityHandle = NearestEntity;
+		return true;
+	}
+
+	return false;
+	
+}
+
+bool UTWUnitSubsystem::FindNearestEnemyEntity(
+	const FVector& Location, 
+	FMassEntityHandle& OutEntityHandle,
+	int32 OwnerPlayerSlot,
+	float MaxDistance)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem)
+	{
+		return false;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+	TArray<FMassArchetypeHandle> MatchingArchetypes;
+	EntityManager.GetMatchingArchetypes(FindNearestEntityQuery, MatchingArchetypes);
+
+	float MinSquaredDistance = FMath::Square(MaxDistance);
+	FMassEntityHandle NearestEntity;
+
+	for (const FMassArchetypeHandle& Archetype : MatchingArchetypes)
+	{
+		TArray<FMassEntityHandle> EntityHandles;
+		FMassArchetypeEntityCollection Collection(Archetype);
+		Collection.ExportEntityHandles(EntityHandles);
+
+		for (const FMassEntityHandle& Entity : EntityHandles)
+		{
+			const FTransformFragment* TransformFrag = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity);
+			const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+			if (!TransformFrag || !UnitFrag)
+			{
+				continue;
+			}
+
+			// 적 유닛만 선택 대상으로 제한
+			if (UnitFrag->GetOwner() == OwnerPlayerSlot)
+			{
+				continue;
+			}
+
+			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+			const float DistSq = FVector::DistSquared(Location, EntityPos);
+
+			if (DistSq < MinSquaredDistance)
+			{
+				MinSquaredDistance = DistSq;
+				NearestEntity = Entity;
+			}
+		}
+	}
+
+	if (NearestEntity.IsValid())
+	{
+		OutEntityHandle = NearestEntity;
+		return true;
+	}
+
+	return false;
+	
+}
+
 bool UTWUnitSubsystem::GetEntitiesInRectangle(
 	const FVector& StartLocation,
 	const FVector& EndLocation,
@@ -212,7 +331,8 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 			}
 
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
-
+			// const double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
+			// if (DotResult < 0.0)
 			if (EntityPos.X >= MinX && EntityPos.X <= MaxX &&
 				EntityPos.Y >= MinY && EntityPos.Y <= MaxY)
 			{
@@ -290,6 +410,7 @@ void UTWUnitSubsystem::SpawnUnit(
 			{
 				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
 				UnitFragment->SetOwner(PlayerState->PlayerSlot);
+				UE_LOG(LogTemp,Warning, TEXT("PlayerSlot :	%d"), PlayerState->PlayerSlot)
 			}
 
 			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
@@ -307,6 +428,7 @@ void UTWUnitSubsystem::SpawnUnit(
 				const FTWUnitStatus UnitStatus =
 					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
 				StatusFragment->SetStatus(UnitStatus);
+				//TODO Apply Move Speed;
 			}
 
 			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
