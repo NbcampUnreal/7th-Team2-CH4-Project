@@ -27,6 +27,23 @@ protected:
 public:
 	void UpdateCapture();
 	
+	UFUNCTION(BlueprintCallable, Category = "Minimap")
+	FVector GetWorldLocationFromTouch(FVector2D TouchPos, FVector2D WidgetSize);
+	
 private:
 	FTimerHandle CaptureTimerHandle;
+	
+#pragma region Outline
+public:
+	void DrawCameraFrustum();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Minimap")
+	UTextureRenderTarget2D* FrustumRT; // 외곽선 전용 렌더 타겟
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap")
+	FLinearColor FrustumColor = FLinearColor::White;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap")
+	float FrustumThickness = 2.0f;
+#pragma endregion
 };
