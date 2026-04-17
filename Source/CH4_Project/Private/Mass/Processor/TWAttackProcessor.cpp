@@ -81,6 +81,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			if (!EntityManager.IsEntityValid(TargetEntity))
 			{
 				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 				AttackList[EntityIdx].bIsTargetSet = false;
 				CommandList[EntityIdx].SetType(ETWMassCommand::None);
 				continue;
@@ -98,7 +99,9 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					AttackList[EntityIdx].bIsTargetSet = false;
 					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-				}else
+				}
+				if (CommandList[EntityIdx].GetType()== ETWMassCommand::AttackToUnit||
+				CommandList[EntityIdx].GetType()== ETWMassCommand::AttackToLocation)
 				{
 					SignalSubsystem->SignalEntity(PathInitSignal, Entity);
 				}

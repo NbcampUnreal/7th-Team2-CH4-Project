@@ -148,10 +148,6 @@ void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityVie
 	
 	FMassVelocityFragment& VelocityFragment = EntityView.GetFragmentData<FMassVelocityFragment>();
 	VelocityFragment.Value = Item.GetVelocity();
-	
-				
-	UE_LOG(LogTemp,Warning,TEXT("%lf, %lf : %lf"), 		VelocityFragment.Value.X,		VelocityFragment.Value.Y	,	VelocityFragment.Value.Size2D())
-
 }
 
 #endif //UE_REPLICATION_COMPILE_CLIENT_CODE
