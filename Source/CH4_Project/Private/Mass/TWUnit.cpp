@@ -4,6 +4,7 @@
 #include "Mass/TWUnit.h"
 
 #include "Component/TWTeamColorComponent.h"
+#include "Component/TWTeamComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -26,6 +27,8 @@ ATWUnit::ATWUnit()
 	HPBarAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("HPBarAnchor"));
 	HPBarAnchor->SetupAttachment(SkeletalMeshComponent);
 
+	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
+	
 	TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
 	
 	// 기본값

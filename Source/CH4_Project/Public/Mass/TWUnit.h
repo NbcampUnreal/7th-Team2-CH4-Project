@@ -7,6 +7,7 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UTWTeamComponent;
 class UTWTeamColorComponent;
 class UAnimMontage;
 
@@ -36,6 +37,8 @@ protected:
 	TObjectPtr<USceneComponent> SelectionAnchor = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Anchor")
 	TObjectPtr<USceneComponent> HPBarAnchor = nullptr;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Team")
+	TObjectPtr<UTWTeamComponent> TeamComponent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|TeamColor")
 	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
 public:

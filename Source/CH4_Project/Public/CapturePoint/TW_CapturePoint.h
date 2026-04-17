@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "TW_CapturePoint.generated.h"
 
+class UTWTeamColorComponent;
 class UTWResourceBuildingDataAsset;
 class UBoxComponent;
 class UTWTeamComponent;
@@ -22,6 +23,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Capture")
 	UBoxComponent* CaptureArea;
@@ -34,6 +36,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Capture")
 	UStaticMeshComponent* MeshComp;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Component|TeamColor")
+	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
 	
 	UPROPERTY(EditAnywhere, Category = "Capture")
 	float MaxGauge = 100.0f;
@@ -90,5 +95,17 @@ protected:
 	void StartMithrilProduction(); // 자원 생산 시작
 	void HandleMithrilResource(); // 자원 지급
 	
+#pragma endregion
+	
+#pragma region Team Color
+	
+public:
+	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
+	int32 OwnerPlayerSlot = -1;
+	
+	void SetOwnerPlayerSlot(int32 InSlot);
+	
+	UFUNCTION()
+	void OnRep_OwnerPlayerSlot();
 #pragma endregion
 };
