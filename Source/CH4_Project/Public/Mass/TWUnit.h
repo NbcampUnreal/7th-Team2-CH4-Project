@@ -7,6 +7,8 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UAnimMontage;
+
 UCLASS()
 class CH4_PROJECT_API ATWUnit : public AActor
 {
@@ -23,4 +25,9 @@ protected:
 	TObjectPtr<USkeletalMeshComponent> SkeletalMeshComponent;
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
 	TObjectPtr<UMassAgentComponent> MassAgentComponent;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=AnimMontage)
+	TObjectPtr<UAnimMontage> AttackMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=AnimMontage)
+	TObjectPtr<UAnimMontage> DeadMontage;
 };
