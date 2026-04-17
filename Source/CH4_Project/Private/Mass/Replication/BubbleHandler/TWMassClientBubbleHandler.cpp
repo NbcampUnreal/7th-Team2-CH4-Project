@@ -8,6 +8,7 @@
 #include "Mass/Fragments/TWTransformOffsetParams.h"
 #include "MassReplicationTransformHandlers.h"
 #include "Mass/Fragments/TWAttackFragment.h"
+#include "Mass/Fragments/TWClientVelocityFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Replication/Agent/TWReplicatedAgent.h"
@@ -18,7 +19,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 	TArrayView<FTransformFragment> TransformFragments;
 	TArrayView<FTWUnitFragment> UnitFragments;
 	TArrayView<FTWAttackFragment> AttackFragments;
-	TArrayView<FMassVelocityFragment> VelocityFragments;
+	TArrayView<FTWClientVelocityFragment> VelocityFragments;
 	
 	// Add the requirements for the query used to grab all the status fragments
 	auto AddRequirementsForSpawnQuery = [this](FMassEntityQuery& InQuery)
@@ -27,7 +28,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		InQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 		InQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadWrite);
 		InQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadWrite);
-		InQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
+		InQuery.AddRequirement<FTWClientVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	};
 
 	// Cache the status fragments
@@ -38,7 +39,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		TransformFragments = InExecContext.GetMutableFragmentView<FTransformFragment>();
 		UnitFragments = InExecContext.GetMutableFragmentView<FTWUnitFragment>();
 		AttackFragments = InExecContext.GetMutableFragmentView<FTWAttackFragment>();
-		VelocityFragments = InExecContext.GetMutableFragmentView<FMassVelocityFragment>();
+		VelocityFragments = InExecContext.GetMutableFragmentView<FTWClientVelocityFragment>();
 	};
 
 	// Called when a new entity is spawned. Stores the entity status in the status fragment
@@ -65,7 +66,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		const float LastAttackTime = ReplicatedEntity.GetLastAttackTime();
 		AttackFragments[EntityIdx].LastAttackTime = LastAttackTime;
 		
-		VelocityFragments[EntityIdx].Value = ReplicatedEntity.GetVelocity();
+		VelocityFragments[EntityIdx].Velocity = ReplicatedEntity.GetVelocity();
 	};
 
 	auto SetModifiedEntityData = [this](const FMassEntityView& EntityView, const FTWReplicatedAgent& Item)
@@ -146,8 +147,8 @@ void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityVie
 	const float LastAttackTime = Item.GetLastAttackTime();
 	AttackFragment.LastAttackTime = LastAttackTime;
 	
-	FMassVelocityFragment& VelocityFragment = EntityView.GetFragmentData<FMassVelocityFragment>();
-	VelocityFragment.Value = Item.GetVelocity();
+	FTWClientVelocityFragment& VelocityFragment = EntityView.GetFragmentData<FTWClientVelocityFragment>();
+	VelocityFragment.Velocity = Item.GetVelocity();
 }
 
 #endif //UE_REPLICATION_COMPILE_CLIENT_CODE

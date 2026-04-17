@@ -14,6 +14,7 @@ struct FTWAttackFragment : public FMassFragment
 	FMassEntityHandle TargetEntity;
 	float LastSearchTime = 0.0f;
 	float LastAttackTime = 0.0f;
+	float LastAttackAnimationTime = 0.0f;
 	uint8 bIsTargetSet = false;
 	
 };
