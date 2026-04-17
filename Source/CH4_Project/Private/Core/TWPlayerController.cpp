@@ -9,7 +9,6 @@
 #include "Building/TWBlockingBuilding.h"
 #include "Building/TWResourceBuilding.h"
 
-#include "UI/Core/TWPlayerUIBridge.h"
 #include "UI/Data/TWUIDataTypes.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Framework/Application/SlateApplication.h"
@@ -23,6 +22,8 @@
 
 #include "NavigationSystem.h"
 #include "Component/TWBuildComponent.h"
+#include "Component/TWPlayerUIControllerComponent.h"
+#include "Component/TWPlayerSelectionVisualComponent.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "UObject/UnrealType.h"
 
@@ -38,7 +39,6 @@
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
-#include "Selection/TWSelectionVisualManager.h"
 #include "DrawDebugHelpers.h"
 
 namespace
@@ -77,7 +77,7 @@ namespace
 
 		return false;
 	}
-	
+
 	static bool CanControlCurrentUnitSelection(const ATWPlayerController* PC)
 	{
 		if (!PC)
@@ -85,26 +85,22 @@ namespace
 			return false;
 		}
 
-		// 건물 선택 상태면 유닛 명령 불가
 		if (PC->GetSelectedBuilding() != nullptr)
 		{
 			return false;
 		}
 
-		// 유닛이 하나도 안 선택되어 있으면 불가
 		if (PC->GetLocalSelectedUnitCount() <= 0)
 		{
 			return false;
 		}
-		
-		// 상대 유닛 선택 상태면 명령 불가
+
 		const ATWPlayerState* LocalPS = PC->GetPlayerState<ATWPlayerState>();
 		if (!LocalPS)
 		{
 			return false;
 		}
 
-		// 내 유닛 선택일 때만 허용
 		return PC->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot;
 	}
 
@@ -151,7 +147,7 @@ namespace
 		const bool bOverlapY = (BuildingMin.Y <= RectMax.Y) && (BuildingMax.Y >= RectMin.Y);
 		return bOverlapX && bOverlapY;
 	}
-	
+
 	static bool IsMouseOverHitTestableUI()
 	{
 		if (!FSlateApplication::IsInitialized())
@@ -175,14 +171,17 @@ namespace
 		for (int32 Index = WidgetPath.Widgets.Num() - 1; Index >= 0; --Index)
 		{
 			const TSharedRef<SWidget>& Widget = WidgetPath.Widgets[Index].Widget;
+			const FString WidgetType = Widget->GetTypeAsString();
 
-			// 뷰포트에 닿으면 월드 클릭으로 본다
-			if (Widget->GetTypeAsString() == TEXT("SViewport"))
+			if (
+				WidgetType == TEXT("SViewport") ||
+				WidgetType == TEXT("SPIEViewport") ||
+				WidgetType == TEXT("SGameLayerManager")
+			)
 			{
 				return false;
 			}
 
-			// 뷰포트보다 위에 hit-test 되는 위젯이 있으면 UI 클릭
 			if (Widget->IsEnabled())
 			{
 				return true;
@@ -191,8 +190,6 @@ namespace
 
 		return false;
 	}
-	
-	// 디버그용
 	static void DrawUnitSelectableRadiusDebug(UWorld* World, const FVector& UnitLocation, const FColor& Color)
 	{
 		if (!World)
@@ -233,11 +230,14 @@ ATWPlayerController::ATWPlayerController()
 	ClientSelectedEntities.Empty();
 
 	BuildComponent = CreateDefaultSubobject<UTWBuildComponent>(TEXT("BuildComponent"));
+	PlayerUIControllerComponent = CreateDefaultSubobject<UTWPlayerUIControllerComponent>(TEXT("PlayerUIControllerComponent"));
+	PlayerSelectionVisualComponent = CreateDefaultSubobject<UTWPlayerSelectionVisualComponent>(TEXT("PlayerSelectionVisualComponent"));
 }
 
 void ATWPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (!IsLocalController())
 	{
 		return;
@@ -249,8 +249,7 @@ void ATWPlayerController::BeginPlay()
 		return;
 	}
 
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
-		LocalPlayer))
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
 	{
 		if (IMC_Common)
 		{
@@ -281,96 +280,35 @@ void ATWPlayerController::BeginPlay()
 void ATWPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
 	UpdateCursorOverlayPosition();
 
 	const bool bIsEdgeScrollingNow = HandleScreenEdgeScrolling(DeltaSeconds);
 
 	if (bIsEdgeScrollingNow != bWasEdgeScrollingLastFrame)
 	{
-		if (PlayerUIBridge)
+		if (PlayerUIControllerComponent)
 		{
-			PlayerUIBridge->SetEdgeScrollingActive(bIsEdgeScrollingNow);
+			PlayerUIControllerComponent->UpdateCursorOverlayPosition(
+				LastValidMouseScreenPosition,
+				bIsEdgeScrollingNow
+			);
 		}
 
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && !BuildComponent->GetBuildMode())
+	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && (!BuildComponent || !BuildComponent->GetBuildMode()))
 	{
 		UpdateDragSelectionOverlay();
 	}
-	
-	if (SelectionVisualManager)
+
+	if (PlayerSelectionVisualComponent)
 	{
-		SelectionVisualManager->Tick(DeltaSeconds);
+		PlayerSelectionVisualComponent->TickVisuals(DeltaSeconds);
 	}
-	
-	// 건물
-	for (TActorIterator<ATWBaseBuilding> It(GetWorld()); It; ++It)
-	{
-		ATWBaseBuilding* Building = *It;
-		if (!IsValid(Building))
-		{
-			continue;
-		}
 
-		FVector Origin = FVector::ZeroVector;
-		FVector Extent = FVector::ZeroVector;
-		Building->GetActorBounds(false, Origin, Extent);
-
-		DrawDebugBox(
-			GetWorld(),
-			Origin,
-			Extent,
-			FColor::Red,
-			false,
-			0.0f,
-			0,
-			2.0f
-		);
-	}
-	
-	// 유닛
-	if (IsLocalController())
-	{
-		UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-		UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
-		const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
-
-		if (RepSubsystem && EntitySubsystem && LocalPS)
-		{
-			FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
-			const int32 MyPlayerSlot = LocalPS->PlayerSlot;
-
-			for (const TPair<FMassNetworkID, FMassReplicationEntityInfo>& Pair : RepSubsystem->GetEntityInfoMap())
-			{
-				const FMassEntityHandle EntityHandle = Pair.Value.Entity;
-				if (!EntityManager.IsEntityActive(EntityHandle))
-				{
-					continue;
-				}
-
-				const FTransformFragment* TransformFragment =
-					EntityManager.GetFragmentDataPtr<FTransformFragment>(EntityHandle);
-				const FTWUnitFragment* UnitFragment =
-					EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
-
-				if (!TransformFragment || !UnitFragment)
-				{
-					continue;
-				}
-
-				const FVector UnitLocation = TransformFragment->GetTransform().GetLocation();
-				const bool bIsMine = (UnitFragment->GetOwner() == MyPlayerSlot);
-
-				DrawUnitSelectableRadiusDebug(
-					GetWorld(),
-					UnitLocation,
-					bIsMine ? FColor::Green : FColor::Red
-				);
-			}
-		}
-	}
+	RefreshLocalSelectionRuntimeData();
 }
 
 void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority,
@@ -424,7 +362,7 @@ bool ATWPlayerController::ShouldUseUnitCommandContext() const
 	{
 		return false;
 	}
-	
+
 	if (GetSelectedBuilding() != nullptr)
 	{
 		return false;
@@ -454,11 +392,11 @@ void ATWPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	check(IsValid(LeftMouseAction));
 	check(IsValid(RightMouseAction));
-	
+
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-	
+
 	check(IsValid(ToggleBuildModeAction));
 	check(IsValid(SelectWoodCommandAction));
 	check(IsValid(SelectPopulationCommandAction));
@@ -466,12 +404,12 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(SelectTroopCommandAction));
 	check(IsValid(SelectUpgradeCommandAction));
 	check(IsValid(SelectBlockingCommandAction));
-	
+
 	check(IsValid(IA_TestSpawnTroop));
 	check(IsValid(IA_TestIncreasePopulation));
 	check(IsValid(IA_TestDamageBlockingBuilding));
 	check(IsValid(IA_TestUpgrade));
-	
+
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
 	{
@@ -481,11 +419,11 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
 	EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
-	
+
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
-	
+
 	EnhancedInputComponent->BindAction(ToggleBuildModeAction, ETriggerEvent::Started, this, &ThisClass::OnToggleBuildModeAction);
 	EnhancedInputComponent->BindAction(SelectWoodCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
@@ -493,7 +431,7 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(SelectTroopCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectTroopBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectUpgradeCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectUpgradeBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectBlockingCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectBlockingBuildingCommandAction);
-	
+
 	EnhancedInputComponent->BindAction(IA_TestSpawnTroop, ETriggerEvent::Started, this, &ThisClass::HandleTestSpawnTroop);
 	EnhancedInputComponent->BindAction(IA_TestIncreasePopulation, ETriggerEvent::Started, this, &ThisClass::HandleTestIncreasePopulation);
 	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
@@ -504,35 +442,42 @@ void ATWPlayerController::SetupInputComponent()
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
 	bConsumeLeftMouseRelease = false;
-	
-	if (IsMouseOverHitTestableUI())
+
+	const bool bMouseOverUI = IsMouseOverHitTestableUI();
+	if (bMouseOverUI)
 	{
 		bIsLeftMousePressed = false;
 		bIsDraggingSelectionVisual = false;
-
-		if (PlayerUIBridge)
-		{
-			PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
-		}
-
 		bConsumeLeftMouseRelease = true;
+
+		if (PlayerUIControllerComponent)
+		{
+			PlayerUIControllerComponent->UpdateDragSelectionOverlay(
+				false,
+				FVector2D::ZeroVector,
+				FVector2D::ZeroVector
+			);
+		}
 		return;
 	}
-	
-	if (BuildComponent->GetBuildMode())
+
+	if (BuildComponent && BuildComponent->GetBuildMode())
 	{
 		BuildComponent->RequestBuild();
 		RefreshDynamicMappingContexts();
 		bConsumeLeftMouseRelease = true;
 		return;
 	}
-	
+
 	FHitResult HitResult;
-	FVector ClickLocation;
-	if (!GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	FVector ClickLocation = FVector::ZeroVector;
+
+	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+	if (!bHit)
 	{
 		return;
 	}
+
 	ClickLocation = HitResult.Location;
 
 	if (CurrentCommandType != ETWCommandType::None)
@@ -568,9 +513,9 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 			return;
 		}
 	}
+
 	bIsLeftMousePressed = true;
 
-	// 드래그 UI용 시작 좌표는 DPI 보정 좌표 사용
 	FVector2D ScaledMousePos = FVector2D::ZeroVector;
 	if (UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y))
 	{
@@ -580,42 +525,45 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 	{
 		DragStartScreenPosition = LastValidMouseScreenPosition;
 	}
-	
+
 	ClickStartLocation = ClickLocation;
 }
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
-{	
+{
 	ChangeCurrentCommandType(ETWCommandType::None);
-	
+
 	bIsLeftMousePressed = false;
 	bIsDraggingSelectionVisual = false;
 
-	if (PlayerUIBridge)
+	if (PlayerUIControllerComponent)
 	{
-		PlayerUIBridge->SetDragSelectionState(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+		PlayerUIControllerComponent->UpdateDragSelectionOverlay(
+			false,
+			FVector2D::ZeroVector,
+			FVector2D::ZeroVector
+		);
 	}
-	
+
 	if (bConsumeLeftMouseRelease)
 	{
 		bConsumeLeftMouseRelease = false;
 		return;
 	}
-	
-	if (BuildComponent->GetBuildMode())
+
+	if (BuildComponent && BuildComponent->GetBuildMode())
 	{
 		return;
 	}
 
 	FHitResult HitResult;
-	if (false == GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+	if (!GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
 		return;
 	}
 
-	FVector ClickLocation = HitResult.Location;
+	const FVector ClickLocation = HitResult.Location;
 
-	// 단일 선택
 	if (FVector::DistSquared(ClickLocation, ClickStartLocation) < 50.0f * 50.0f)
 	{
 		if (ATWBaseBuilding* ClickedBuilding = Cast<ATWBaseBuilding>(HitResult.GetActor()))
@@ -626,7 +574,7 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 
 		ServerHandleSingleSelect(ClickLocation);
 	}
-	else // 다중 선택
+	else
 	{
 		ServerHandleMultipleSelect(ClickStartLocation, ClickLocation);
 	}
@@ -634,9 +582,14 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 
 void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActionValue)
 {
+	if (IsMouseOverHitTestableUI())
+	{
+		return;
+	}
+
 	if (bBuildShortcutModeActive)
 	{
-		if (BuildComponent->GetBuildMode())
+		if (BuildComponent && BuildComponent->GetBuildMode())
 		{
 			BuildComponent->EndBuildMode();
 			RefreshDynamicMappingContexts();
@@ -644,24 +597,22 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 
 		return;
 	}
-	
-	// Cancle Command
+
 	if (CurrentCommandType != ETWCommandType::None)
 	{
 		ChangeCurrentCommandType(ETWCommandType::None);
 		return;
 	}
-		
+
 	if (!CanControlCurrentUnitSelection(this))
 	{
 		return;
 	}
 
-	// Move Command Execute
 	FHitResult HitResult;
 	if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
 	{
-		FVector ClickLocation = HitResult.Location;
+		const FVector ClickLocation = HitResult.Location;
 		ServerHandleMoveCommand(ClickLocation);
 	}
 }
@@ -702,7 +653,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 	{
 		return;
 	}
-	
+
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
 	if (!TWPS)
 	{
@@ -721,8 +672,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 
 	FNavLocation ProjectedLocation;
 	FVector NavCommandLocation = FVector::ZeroVector;
-	if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation,
-	                                               FVector(500.f, 500.f, 500.f)))
+	if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation, FVector(500.f, 500.f, 500.f)))
 	{
 		NavCommandLocation = ProjectedLocation.Location;
 	}
@@ -748,14 +698,15 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			{
 				return;
 			}
-			
+
 			ETWMassCommand CommandType = ETWMassCommand::None;
 			FVector TargetLocation = FVector::ZeroVector;
 			FMassEntityHandle TargetEntity;
 			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
 			{
 				CommandType = ETWMassCommand::MoveToUnit;
-			}else
+			}
+			else
 			{
 				CommandType = ETWMassCommand::MoveToLocation;
 				TargetLocation = NavCommandLocation;
@@ -763,14 +714,14 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 
 			TArray<FMassEntityHandle> ValidEntities;
 			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
-			
+
 			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
 				{
 					continue;
 				}
-				
+
 				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
 				if (!UnitFragment)
 				{
@@ -790,7 +741,6 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 					CommandFragment->SetLocation(TargetLocation);
 					CommandFragment->SetTarget(TargetEntity);
 				}
-				
 
 				if (FMassMoveTargetFragment* MoveTarget = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(Entity))
 				{
@@ -821,7 +771,7 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 	{
 		return;
 	}
-	
+
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
 	if (!TWPS)
 	{
@@ -840,8 +790,7 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 
 	FNavLocation ProjectedLocation;
 	FVector NavCommandLocation = FVector::ZeroVector;
-	if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation,
-	                                               FVector(500.f, 500.f, 500.f)))
+	if (NavSys && NavSys->ProjectPointToNavigation(CommandLocation, ProjectedLocation, FVector(500.f, 500.f, 500.f)))
 	{
 		NavCommandLocation = ProjectedLocation.Location;
 	}
@@ -867,14 +816,15 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 			{
 				return;
 			}
-			
+
 			ETWMassCommand CommandType = ETWMassCommand::None;
 			FVector TargetLocation = FVector::ZeroVector;
 			FMassEntityHandle TargetEntity;
 			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
 			{
 				CommandType = ETWMassCommand::AttackToUnit;
-			}else
+			}
+			else
 			{
 				CommandType = ETWMassCommand::AttackToLocation;
 				TargetLocation = NavCommandLocation;
@@ -882,14 +832,14 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 
 			TArray<FMassEntityHandle> ValidEntities;
 			ValidEntities.Reserve(ThisWeakPtr->ServerSelectedEntities.Num());
-			
+
 			for (const FMassEntityHandle& Entity : ThisWeakPtr->ServerSelectedEntities)
 			{
 				if (!InOutEntityManager.IsEntityActive(Entity))
 				{
 					continue;
 				}
-				
+
 				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
 				if (!UnitFragment)
 				{
@@ -909,7 +859,6 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 					CommandFragment->SetLocation(TargetLocation);
 					CommandFragment->SetTarget(TargetEntity);
 				}
-				
 
 				if (FMassMoveTargetFragment* MoveTarget = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(Entity))
 				{
@@ -935,13 +884,12 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 
 void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 {
-	// TODO Hold
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
 	if (ServerSelectedEntities.IsEmpty())
 	{
 		return;
 	}
-	
+
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
 	if (!TWPS)
 	{
@@ -977,7 +925,7 @@ void ATWPlayerController::ServerHandleHoldCommand_Implementation()
 				{
 					continue;
 				}
-				
+
 				const FTWUnitFragment* UnitFragment = InOutEntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
 				if (!UnitFragment)
 				{
@@ -1172,7 +1120,7 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 
 			return BestBuilding;
 		};
-	// 내 유닛
+
 	TArray<FMassEntityHandle> OwnedEntities;
 	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, OwnedEntities, TWPS->PlayerSlot) && OwnedEntities.Num() > 0)
 	{
@@ -1180,14 +1128,12 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		return;
 	}
 
-	// 내 건물 1개
 	if (ATWBaseBuilding* OwnedBuilding = FindBestBuildingInRect(true, TWPS->PlayerSlot))
 	{
 		ServerHandleBuildingSelect(OwnedBuilding);
 		return;
 	}
 
-	// 적 유닛 1개
 	FMassEntityHandle BestEnemyEntity;
 	float BestEnemyDistanceSq = TNumericLimits<float>::Max();
 	int32 BestEnemyOwnerSlot = INDEX_NONE;
@@ -1241,7 +1187,6 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		return;
 	}
 
-	// 적 건물 1개
 	if (ATWBaseBuilding* EnemyBuilding = FindBestBuildingInRect(false, TWPS->PlayerSlot))
 	{
 		ServerHandleBuildingSelect(EnemyBuilding);
@@ -1282,6 +1227,12 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 		return false;
 	}
 
+	APawn* MyPawn = GetPawn();
+	if (!IsValid(MyPawn))
+	{
+		return false;
+	}
+
 	const FVector2D& MousePosition = CurrentFrameRawMousePosition;
 
 	int32 ViewportSizeX = 0;
@@ -1290,7 +1241,6 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 
 	FVector MoveDirection = FVector::ZeroVector;
 
-	// Left / Right
 	if (MousePosition.X <= ScreenEdgeEnterMargin)
 	{
 		MoveDirection.Y = -1.f;
@@ -1300,7 +1250,6 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 		MoveDirection.Y = 1.f;
 	}
 
-	// Top / Bottom
 	if (MousePosition.Y <= ScreenEdgeEnterMargin)
 	{
 		MoveDirection.X = 1.f;
@@ -1309,24 +1258,22 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	{
 		MoveDirection.X = -1.f;
 	}
-	FVector PawnMoveDirection = MoveDirection.Y * GetPawn()->GetActorTransform().GetRotation().GetRightVector()+
-		MoveDirection.X * GetPawn()->GetActorTransform().GetRotation().GetForwardVector();
-	PawnMoveDirection.Z = 0.0;
-	
-	
+
+	FVector PawnMoveDirection =
+		MoveDirection.Y * MyPawn->GetActorTransform().GetRotation().GetRightVector() +
+		MoveDirection.X * MyPawn->GetActorTransform().GetRotation().GetForwardVector();
+
+	PawnMoveDirection.Z = 0.0f;
+
 	const bool bIsEdgeScrollingNow = !PawnMoveDirection.IsNearlyZero();
 
 	if (bIsEdgeScrollingNow)
 	{
-		if (APawn* MyPawn = GetPawn())
-		{
-			MyPawn->AddMovementInput(PawnMoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
-		}
+		MyPawn->AddMovementInput(PawnMoveDirection.GetSafeNormal(), ScrollSpeed * DeltaSeconds);
 	}
 
 	return bIsEdgeScrollingNow;
 }
-
 void ATWPlayerController::ChangeCurrentCommandType(ETWCommandType CommandType)
 {
 	CurrentCommandType = CommandType;
@@ -1336,22 +1283,17 @@ void ATWPlayerController::ChangeCurrentCommandType(ETWCommandType CommandType)
 #pragma region UI
 void ATWPlayerController::InitializeUIBridge()
 {
-	if (false == IsLocalController())
+	if (!IsLocalController())
 	{
 		return;
 	}
 
-	if (!PlayerUIBridge)
-	{
-		PlayerUIBridge = NewObject<UTWPlayerUIBridge>(this);
-	}
-
-	if (!PlayerUIBridge)
+	if (!PlayerUIControllerComponent)
 	{
 		return;
 	}
 
-	PlayerUIBridge->Initialize(
+	PlayerUIControllerComponent->InitializeUI(
 		this,
 		HUDRootWidgetClass,
 		CommandMetaTable,
@@ -1361,16 +1303,13 @@ void ATWPlayerController::InitializeUIBridge()
 		DefaultSelectedBuildingId,
 		DefaultMultiSelectedUnitId
 	);
-
-	PlayerUIBridge->GetOnUICommandRequestedDelegate().RemoveAll(this);
-	PlayerUIBridge->GetOnUICommandRequestedDelegate().AddUObject(this, &ATWPlayerController::HandleUICommandRequested);
 }
 
 void ATWPlayerController::RefreshUIBridge()
 {
-	if (PlayerUIBridge)
+	if (PlayerUIControllerComponent)
 	{
-		PlayerUIBridge->RefreshAll();
+		PlayerUIControllerComponent->RefreshUI();
 	}
 }
 
@@ -1381,54 +1320,46 @@ void ATWPlayerController::InitializeSelectionVisualManager()
 		return;
 	}
 
-	if (!SelectionVisualManager)
+	if (PlayerSelectionVisualComponent)
 	{
-		SelectionVisualManager = NewObject<UTWSelectionVisualManager>(this);
-	}
-
-	if (SelectionVisualManager)
-	{
-		SelectionVisualManager->Initialize(this);
+		PlayerSelectionVisualComponent->InitializeVisuals(this);
 	}
 }
 
 void ATWPlayerController::RefreshSelectionVisualManager()
 {
-	if (!SelectionVisualManager)
+	if (!IsLocalController())
 	{
 		return;
 	}
 
-	if (ClientSelectedEntities.Num() > 0)
+	if (!PlayerSelectionVisualComponent)
 	{
-		SelectionVisualManager->ApplyUnitSelection(ClientSelectedEntities);
 		return;
 	}
 
-	if (SelectedBuilding)
-	{
-		TArray<ATWBaseBuilding*> Buildings;
-		Buildings.Add(SelectedBuilding);
-		SelectionVisualManager->ApplyBuildingSelection(Buildings);
-		return;
-	}
-
-	SelectionVisualManager->ClearSelectionVisuals();
+	PlayerSelectionVisualComponent->RefreshSelectionVisuals(
+		ClientSelectedEntities,
+		SelectedBuilding,
+		LocalSelectedOwnerPlayerSlot
+	);
 }
 
 void ATWPlayerController::ClearLocalSelectionCache()
 {
-	if (SelectionVisualManager)
-	{
-		SelectionVisualManager->ClearSelectionVisuals();
-	}
-	
 	SelectedBuilding = nullptr;
 	LocalSelectedUnitCount = 0;
 	LocalPrimarySelectedUnitId = NAME_None;
+	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
 	bHasLocalPrimarySelectedUnitStatus = false;
 	LocalSelectionSummaryItems.Empty();
 	LocalSelectedOwnerPlayerSlot = INDEX_NONE;
+	ClientSelectedEntities.Empty();
+
+	if (PlayerSelectionVisualComponent)
+	{
+		PlayerSelectionVisualComponent->ClearSelectionVisuals();
+	}
 }
 
 void ATWPlayerController::RebuildLocalSelectionSummary(const TArray<FName>& InUnitIds)
@@ -1477,7 +1408,7 @@ void ATWPlayerController::BuildSelectionPayloadFromEntities(
 		{
 			continue;
 		}
-		
+
 		if (FMassNetworkIDFragment* NetworkIDFragmentFragment = EntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(Entity))
 		{
 			OutNetworkIds.Add(NetworkIDFragmentFragment->NetID);
@@ -1506,47 +1437,124 @@ const FUICommandMetaRow* ATWPlayerController::FindCommandMetaRowFromTable(FName 
 	return CommandMetaTable->FindRow<FUICommandMetaRow>(CommandId, ContextString);
 }
 
+void ATWPlayerController::RefreshLocalSelectionRuntimeData()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (SelectedBuilding)
+	{
+		return;
+	}
+
+	if (ClientSelectedEntities.IsEmpty())
+	{
+		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+		bHasLocalPrimarySelectedUnitStatus = false;
+		return;
+	}
+
+	RefreshLocalPrimarySelectedUnitStatus();
+}
+
+bool ATWPlayerController::RefreshLocalPrimarySelectedUnitStatus()
+{
+	if (ClientSelectedEntities.IsEmpty())
+	{
+		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+		bHasLocalPrimarySelectedUnitStatus = false;
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	UMassReplicationSubsystem* RepSubsystem = World->GetSubsystem<UMassReplicationSubsystem>();
+	if (!RepSubsystem)
+	{
+		return false;
+	}
+
+	const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(ClientSelectedEntities[0]);
+	if (!EntityInfo)
+	{
+		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+		bHasLocalPrimarySelectedUnitStatus = false;
+		return false;
+	}
+
+	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
+	if (!EntityManager.IsEntityActive(EntityInfo->Entity))
+	{
+		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+		bHasLocalPrimarySelectedUnitStatus = false;
+		return false;
+	}
+
+	if (FTWStatusFragment* StatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(EntityInfo->Entity))
+	{
+		LocalPrimarySelectedUnitStatus = StatusFragment->GetMutableStatus();
+		bHasLocalPrimarySelectedUnitStatus = true;
+		return true;
+	}
+
+	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+	bHasLocalPrimarySelectedUnitStatus = false;
+	return false;
+}
+
 void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	const TArray<FMassNetworkID>& InNetworkIds,
 	float InPrimaryHealth,
-	bool bInHasPrimaryHealth, int32 InSelectedOwnerPlayerSlot)
+	bool bInHasPrimaryHealth,
+	int32 InSelectedOwnerPlayerSlot)
 {
 	ClearLocalSelectionCache();
+
 	LocalSelectedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
-	
 	LocalSelectedUnitCount = InNetworkIds.Num();
-	
 	ClientSelectedEntities = InNetworkIds;
+
 	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
-	TArray<FName> InUnitIds;
-
-	//우선 기존 코드 방식 유지해뒀어요
-	//리슨서버에서는 ServerSelectedUnits에서 정보를 얻어와야해요
-	for (const FMassNetworkID& NetID : InNetworkIds)
+	if (RepSubsystem)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%d"), NetID.GetValue());
-		
-		const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(NetID);
-		if (!EntityInfo)
+		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
+		TArray<FName> UnitIds;
+
+		for (const FMassNetworkID& NetID : InNetworkIds)
 		{
-			continue;
+			const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(NetID);
+			if (!EntityInfo)
+			{
+				continue;
+			}
+
+			const FMassEntityHandle EntityHandle = EntityInfo->Entity;
+			const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
+			if (!UnitFragment)
+			{
+				continue;
+			}
+
+			UnitIds.Add(UnitFragment->GetUnitID());
 		}
-		FMassEntityHandle EntityHandle = EntityInfo->Entity;
-		FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
-		check(UnitFragment != nullptr);
-		
-		InUnitIds.Add(UnitFragment->GetUnitID());
-	}
-	
-	if (InUnitIds.Num() > 0)
-	{
 
-		LocalPrimarySelectedUnitId = InUnitIds[0];
-		RebuildLocalSelectionSummary(InUnitIds);
+		if (UnitIds.Num() > 0)
+		{
+			LocalPrimarySelectedUnitId = UnitIds[0];
+			RebuildLocalSelectionSummary(UnitIds);
+		}
 	}
 
-	if (bInHasPrimaryHealth)
+	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
+	bHasLocalPrimarySelectedUnitStatus = false;
+
+	if (!RefreshLocalPrimarySelectedUnitStatus() && bInHasPrimaryHealth)
 	{
 		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
 		LocalPrimarySelectedUnitStatus.SetStatus(ETWStatusType::Health, InPrimaryHealth);
@@ -1562,6 +1570,12 @@ void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBui
 {
 	ClearLocalSelectionCache();
 	SelectedBuilding = InBuilding;
+
+	if (SelectedBuilding)
+	{
+		LocalSelectedOwnerPlayerSlot = SelectedBuilding->OwnerPlayerSlot;
+	}
+
 	RefreshDynamicMappingContexts();
 	RefreshUIBridge();
 	RefreshSelectionVisualManager();
@@ -1577,9 +1591,9 @@ void ATWPlayerController::ClientClearSelection_Implementation()
 
 void ATWPlayerController::ClientForceRefreshSelectionBridge_Implementation()
 {
-	if (PlayerUIBridge)
+	if (PlayerUIControllerComponent)
 	{
-		PlayerUIBridge->ForceRefreshSelectionFromGameplayEvent();
+		PlayerUIControllerComponent->ForceRefreshSelectionBridge();
 	}
 	else
 	{
@@ -1597,31 +1611,14 @@ void ATWPlayerController::HandleUICommandRequested(FName CommandId)
 		return;
 	}
 
-	if (PlayerUIBridge && PlayerUIBridge->HandleContextCommand(CommandId))
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UI Click] Consumed by HandleContextCommand: %s"), *CommandId.ToString());
-		RefreshUIBridge();
-		return;
-	}
-
-	const FUICommandMetaRow* CommandMeta = nullptr;
-
-	if (PlayerUIBridge)
-	{
-		CommandMeta = PlayerUIBridge->FindCommandMetaRow(CommandId);
-	}
-
-	if (!CommandMeta)
-	{
-		CommandMeta = FindCommandMetaRowFromTable(CommandId);
-	}
+	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
 
 	if (!CommandMeta)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UI Click] CommandMeta not found: %s"), *CommandId.ToString());
 		return;
 	}
-	
+
 	if (bBuildShortcutModeActive)
 	{
 		const bool bBlockedInBuildShortcutMode =
@@ -1704,14 +1701,14 @@ void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName Co
 		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: SelectedBuilding is invalid / CommandId=%s"), *CommandId.ToString());
 		return;
 	}
-	
+
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
 	if (!TWPS)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: PlayerState is invalid"));
 		return;
 	}
-	
+
 	if (CurrentSelectedBuilding->OwnerPlayerSlot != TWPS->PlayerSlot)
 	{
 		UE_LOG(
@@ -1989,7 +1986,6 @@ FName ATWPlayerController::ResolveBuildingSelectionId(const ATWBaseBuilding* InB
 
 	return InBuilding->GetClass()->GetFName();
 }
-
 #pragma endregion
 
 #pragma region 병력 스폰 대기열
@@ -2049,7 +2045,7 @@ void ATWPlayerController::ServerTestSpawnTroop_Implementation()
 }
 #pragma endregion
 
-#pragma region 인구 수 대기열	
+#pragma region 인구 수 대기열
 void ATWPlayerController::HandleTestIncreasePopulation(const FInputActionValue& Value)
 {
 	ServerTestIncreasePopulation();
@@ -2163,7 +2159,7 @@ void ATWPlayerController::OnSelectPopulationBuildingCommandAction()
 }
 
 void ATWPlayerController::OnSelectTroopBuildingCommandAction()
-{	
+{
 	if (BuildComponent)
 	{
 		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::TroopProduction);
@@ -2195,7 +2191,6 @@ void ATWPlayerController::NotifyResourceStateChanged()
 
 	RefreshUIBridge();
 }
-
 #pragma endregion
 
 #pragma region 업그레이드
@@ -2234,35 +2229,21 @@ void ATWPlayerController::ServerTestUpgrade_Implementation()
 #pragma endregion
 
 #pragma region Input Overlay
-
 void ATWPlayerController::UpdateInputOverlayState()
 {
-	if (!PlayerUIBridge)
+	if (!PlayerUIControllerComponent)
 	{
 		return;
 	}
 
 	const FName ArmedCommandId = ConvertCommandTypeToCommandId(CurrentCommandType);
-
-	if (ArmedCommandId.IsNone())
-	{
-		PlayerUIBridge->ClearArmedCommandState();
-	}
-	else
-	{
-		PlayerUIBridge->SetArmedCommandState(ArmedCommandId);
-	}
+	PlayerUIControllerComponent->UpdateInputOverlayState(ArmedCommandId);
 }
 
 void ATWPlayerController::UpdateDragSelectionOverlay()
 {
-	if (!PlayerUIBridge)
-	{
-		return;
-	}
-
 	FVector2D ScaledMousePos = FVector2D::ZeroVector;
-	bool bHasScaledMouse =
+	const bool bHasScaledMouse =
 		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y);
 
 	if (bHasScaledMouse)
@@ -2277,21 +2258,18 @@ void ATWPlayerController::UpdateDragSelectionOverlay()
 	const float Distance = FVector2D::Distance(DragStartScreenPosition, CurrentMouseScreenPosition);
 	bIsDraggingSelectionVisual = (Distance >= DragSelectionScreenThreshold);
 
-	PlayerUIBridge->SetDragSelectionState(
-		bIsDraggingSelectionVisual,
-		DragStartScreenPosition,
-		CurrentMouseScreenPosition
-	);
+	if (PlayerUIControllerComponent)
+	{
+		PlayerUIControllerComponent->UpdateDragSelectionOverlay(
+			bIsDraggingSelectionVisual,
+			DragStartScreenPosition,
+			CurrentMouseScreenPosition
+		);
+	}
 }
 
 void ATWPlayerController::UpdateCursorOverlayPosition()
 {
-	if (!PlayerUIBridge)
-	{
-		return;
-	}
-
-	// 1) 커서 표시용 좌표 (DPI 보정)
 	FVector2D ScaledMousePos = FVector2D::ZeroVector;
 	bHasValidMousePositionThisFrame =
 		UWidgetLayoutLibrary::GetMousePositionScaledByDPI(this, ScaledMousePos.X, ScaledMousePos.Y);
@@ -2302,7 +2280,6 @@ void ATWPlayerController::UpdateCursorOverlayPosition()
 		LastValidMouseScreenPosition = ScaledMousePos;
 	}
 
-	// 2) 엣지 스크롤 판정용 좌표 (raw viewport)
 	FVector2D RawMousePos = FVector2D::ZeroVector;
 	bHasValidRawMousePositionThisFrame = GetMousePosition(RawMousePos.X, RawMousePos.Y);
 
@@ -2311,8 +2288,13 @@ void ATWPlayerController::UpdateCursorOverlayPosition()
 		CurrentFrameRawMousePosition = RawMousePos;
 	}
 
-	// 커서는 마지막 정상 위치 유지
-	PlayerUIBridge->SetCursorScreenPosition(LastValidMouseScreenPosition);
+	if (PlayerUIControllerComponent)
+	{
+		PlayerUIControllerComponent->UpdateCursorOverlayPosition(
+			LastValidMouseScreenPosition,
+			bWasEdgeScrollingLastFrame
+		);
+	}
 }
 
 FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const
@@ -2329,6 +2311,4 @@ FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommandType InComman
 		return NAME_None;
 	}
 }
-
 #pragma endregion
-

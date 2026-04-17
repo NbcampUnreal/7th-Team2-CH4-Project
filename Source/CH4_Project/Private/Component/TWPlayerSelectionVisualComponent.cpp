@@ -209,7 +209,6 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedBuildingVisualData(ATWBaseB
 	FVector Extent = FVector::ZeroVector;
 	InSelectedBuilding->GetActorBounds(false, Origin, Extent);
 
-	// 바닥 기준 + 살짝 띄움(에디터에서 조정 가능)
 	const FVector SelectionLocation =
 		Origin - FVector(0.f, 0.f, Extent.Z) + FVector(0.f, 0.f, BuildingGroundLift);
 
@@ -224,8 +223,6 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedBuildingVisualData(ATWBaseB
 	BuildingVisualData.SelectionWorldLocation = SelectionLocation;
 	BuildingVisualData.BuildingHalfExtentXY =
 		InSelectedBuilding->GetSelectionRectangleHalfExtentXY(DefaultBuildingSelectionPadding);
-
-	// 이미 바닥 기준 위치를 맞췄으므로 추가 ZOffset은 0
 	BuildingVisualData.BuildingZOffset = 0.f;
 
 	SelectedBuildingVisuals.Add(BuildingVisualData);
