@@ -20,6 +20,7 @@ public:
 	void OnConstruction(const FTransform& Transform);
 	void BeginPlay();
 
+	void PlayAttackMontage();
 protected:
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
 	TObjectPtr<USceneComponent> SceneComponent;
