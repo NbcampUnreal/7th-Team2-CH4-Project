@@ -7,6 +7,8 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UAnimMontage;
+
 UCLASS()
 class CH4_PROJECT_API ATWUnit : public AActor
 {
@@ -64,4 +66,9 @@ public:
 
 protected:
 	void AutoPlaceAnchors();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=AnimMontage)
+	TObjectPtr<UAnimMontage> AttackMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=AnimMontage)
+	TObjectPtr<UAnimMontage> DeadMontage;
 };
