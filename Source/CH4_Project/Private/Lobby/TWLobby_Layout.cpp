@@ -7,7 +7,6 @@
 #include "Components/Button.h"
 #include "Components/EditableText.h"
 #include "Components/HorizontalBox.h"
-#include "Components/TextBlock.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Title/TWTitlePlayerController.h"
 #include "GameFramework/GameStateBase.h"
@@ -19,6 +18,8 @@ UTWLobby_Layout::UTWLobby_Layout(const FObjectInitializer& ObjectInitializer)
 
 void UTWLobby_Layout::NativeConstruct()
 {
+	Super::NativeConstruct();
+	
 	PlayButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnPlayButtonClicked);
 	ReadyButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnReadyButtonClicked);
 	CancelButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnCancelButtonClicked);
@@ -67,7 +68,7 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	}
 }
 
-void UTWLobby_Layout::UpdateUserList(FString NickName)
+void UTWLobby_Layout::UpdateUserList()
 {
 	for (UHorizontalBox* NickSlot : NickNameSlots)
 	{
@@ -82,19 +83,19 @@ void UTWLobby_Layout::UpdateUserList(FString NickName)
 		{
 			for (int32 i = 0; i< GS->PlayerArray.Num(); i++)
 			{
-				ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(GS->PlayerArray[i]);
-				if (LPS && NickNameSlots.IsValidIndex(i) && NickNameSlots[i])
+				if (NickNameSlots.IsValidIndex(i) && NickNameSlots[i])
 				{
 					NickNameSlots[i]->SetVisibility(ESlateVisibility::Visible);
-					
-					UTextBlock* NameText = Cast<UTextBlock>(NickNameSlots[i]->GetChildAt(0));
-					if (NameText)
-					{
-						NameText->SetText(FText::FromString(LPS->GetMyNickName()));
-					}	
 				}
 			}
 		}
 	}
 }
 
+void UTWLobby_Layout::ShowPlayButton()
+{
+	if (PlayButton)
+	{
+		PlayButton->SetVisibility(ESlateVisibility::Visible);
+	}
+}

@@ -35,7 +35,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	Super::PostLogin(NewPlayer);
 	
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
-	if (!GS) return;
+	if (!GS || !NewPlayer) return;
 	
 	if (!IsValid(NewPlayer)) return;
 	
@@ -45,15 +45,6 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		
 		if (LPS)
 		{
-			FString JoinedNickname = UGameplayStatics::ParseOption(OptionsString, TEXT("Name"));
-			
-			if (JoinedNickname.IsEmpty())
-			{
-				JoinedNickname = FString::Printf(TEXT("Player_%d"), GetNumPlayers());
-			}
-			
-			LPS->SetMyNickName(JoinedNickname);
-			
 			if (GS->PlayerArray.Num() == 1)
 			{
 				LPS->SetIsHost(true);
@@ -102,6 +93,12 @@ void ATWLobbyGameMode::CheckStartCondition()
 
 void ATWLobbyGameMode::StartGame()
 {
+	bUseSeamlessTravel = true;
+	GetWorld()->ServerTravel(TEXT("NewMap?listen"));
+}
+
+void ATWLobbyGameMode::AssignNewHost()
+{
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
 	if (!GS) return;
 	
@@ -126,10 +123,4 @@ void ATWLobbyGameMode::StartGame()
 			NewHost->SetIsHost(true);
 		}
 	}
-}
-
-void ATWLobbyGameMode::AssignNewHost()
-{
-	bUseSeamlessTravel = true;
-	GetWorld()->ServerTravel(TEXT("NewMap?listen"));
 }

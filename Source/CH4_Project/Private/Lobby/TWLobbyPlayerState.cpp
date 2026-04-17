@@ -11,16 +11,8 @@ ATWLobbyPlayerState::ATWLobbyPlayerState()
 {
 	bIsReady = false;
 	bIsHost = false;
-	MyNickName = TEXT("Default_Player");
 	
 	bReplicates = true;
-}
-
-void ATWLobbyPlayerState::SetMyNickName(const FString& InNickName)
-{
-	MyNickName = InNickName;
-	
-	UE_LOG(LogTemp, Log, TEXT("NickName Set : %s"), *MyNickName);
 }
 
 void ATWLobbyPlayerState::SetIsReady(bool bInReady)
@@ -38,25 +30,17 @@ void ATWLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ATWLobbyPlayerState, bIsReady);
-	DOREPLIFETIME(ATWLobbyPlayerState, MyNickName);
 	DOREPLIFETIME(ATWLobbyPlayerState, bIsHost);
 }
 
 void ATWLobbyPlayerState::OnRep_IsReady()
 {
-	UE_LOG(LogTemp, Log, TEXT("Client: %s's Ready State is now %s"), *MyNickName, bIsReady ? TEXT("True") : TEXT("False"));
-	
 	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
 	
 	if (PC && PC->LobbyWidgetInstance)
 	{
-		PC->LobbyWidgetInstance->UpdateUserList(MyNickName);
+		PC->LobbyWidgetInstance->UpdateUserList();
 	}
-}
-
-void ATWLobbyPlayerState::OnRep_MyNickName()
-{
-	UE_LOG(LogTemp, Log, TEXT("Client: Nickname Updated: %s"), *MyNickName);
 }
 
 void ATWLobbyPlayerState::OnRep_IsHost()
@@ -65,6 +49,15 @@ void ATWLobbyPlayerState::OnRep_IsHost()
 	{
 		UE_LOG(LogTemp, Log, TEXT("Client: I am the Host now!"));
 		
-		
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (PC)
+		{
+			ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
+			if (LPC && LPC->LobbyWidgetInstance)
+			{
+				LPC->LobbyWidgetInstance->ShowPlayButton();
+			}
+		}
 	}
 }
+

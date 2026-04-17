@@ -26,9 +26,6 @@ protected:
 	UFUNCTION()
 	void OnExitButtonClicked();
 	
-	UFUNCTION()
-	void OnNickNameCommitted(const FText& Text, ETextCommit::Type CommitMethod);
-	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, meta = (AllowPrivateAccess, BindWidget))
 	TObjectPtr<UButton> StartButton;
@@ -36,6 +33,4 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, meta = (AllowPrivateAccess, BindWidget))
 	TObjectPtr<UButton> ExitButton;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, meta = (AllowPrivateAccess, BindWidget))
-	TObjectPtr<UEditableText> NickNameIPEditableText;
 };

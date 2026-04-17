@@ -30,6 +30,9 @@ public:
 	void CreateLobbyWidget();
 	
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = ASUIPLayerController, Meta = (AllowPrivateAccess))
+	TSubclassOf<UUserWidget> UIWidgetClass;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Lobby")
 	TSubclassOf<class UTWLobby_Layout> LobbyWidgetClass;
 };

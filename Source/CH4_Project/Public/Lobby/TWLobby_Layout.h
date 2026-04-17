@@ -35,7 +35,9 @@ protected:
 	
 public:
 	UFUNCTION()
-	void UpdateUserList(FString NickName);
+	void UpdateUserList();
+	
+	void ShowPlayButton();
 	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
@@ -62,7 +64,11 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_4;
 	
+	
 	UPROPERTY()
 	TArray<UHorizontalBox*> NickNameSlots;
+	
+	UPROPERTY()
+	TArray<class UTextBlock*> NickNameTexts;
 };
 

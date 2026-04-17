@@ -45,6 +45,7 @@ bool ATWLobbyPlayerController::Server_RequestStartGame_Validate()
 {
 	return true;
 }
+
 void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 {
 	ATWLobbyGameMode* GM = GetWorld()->GetAuthGameMode<ATWLobbyGameMode>();
