@@ -2,11 +2,42 @@
 #include "GameFramework/PlayerController.h"
 #include "Building/TWBaseBuilding.h"
 #include "Building/GhostBuilding.h"
+#include "Building/TWUpgradeBuilding.h"
 #include "Data/TWBuildingDataAsset.h"
 #include "Subsystems/TWGridSubSystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/TWPlayerState.h"
 #include "Core/TWGameMode.h"
+#include "EngineUtils.h"
+
+namespace
+{
+	static bool HasOwnedUpgradeBuilding(UWorld* World, int32 InPlayerSlot)
+	{
+		if (!World)
+		{
+			return false;
+		}
+
+		for (TActorIterator<ATWUpgradeBuilding> It(World); It; ++It)
+		{
+			ATWUpgradeBuilding* UpgradeBuilding = *It;
+			if (!UpgradeBuilding)
+			{
+				continue;
+			}
+
+			if (UpgradeBuilding->OwnerPlayerSlot != InPlayerSlot)
+			{
+				continue;
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+}
 
 UTWBuildComponent::UTWBuildComponent()
 {
@@ -122,6 +153,15 @@ void UTWBuildComponent::RequestBuild()
 	{
 		return;
 	}
+	
+	if (DefaultBuilding->IsA(ATWUpgradeBuilding::StaticClass()))
+	{
+		if (HasOwnedUpgradeBuilding(GetWorld(), TWPS->PlayerSlot))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
+			return;
+		}
+	}
 
 	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
 	if (!GridSub)
@@ -191,6 +231,14 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 		return;
 	}
 
+	if (DefaultBuilding->IsA(ATWUpgradeBuilding::StaticClass()))
+	{
+		if (HasOwnedUpgradeBuilding(GetWorld(), TWPS->PlayerSlot))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
+			return;
+		}
+	}
 	
 	if (!GridSub->CanBuildArea(Anchor, BuildSize))
 	{
