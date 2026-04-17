@@ -5,9 +5,9 @@
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Lobby/TWLobbyGameState.h"
 #include "Lobby/TWLobbyPlayerController.h"
-
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerState.h"
+#include "Lobby/TWLobby_Layout.h"
 
 ATWLobbyGameMode::ATWLobbyGameMode()
 {
@@ -34,6 +34,8 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	
+	UE_LOG(LogTemp, Error, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *NewPlayer->GetName());
+	
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
 	if (!GS || !NewPlayer) return;
 	
@@ -42,12 +44,24 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	if (IsValid(NewPlayer))
 	{
 		ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		
 		if (LPS)
 		{
-			if (GS->PlayerArray.Num() == 1)
+			if (GetNumPlayers() == 1)
 			{
+				UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
+				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost(true) !!!"));
 				LPS->SetIsHost(true);
+			}
+		}
+		
+		if (PC && LPS->IsHost() == false)
+		{
+			ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
+			if (LPC && LPC->LobbyWidgetInstance)
+			{
+				LPC->LobbyWidgetInstance->ShowPlayButton(false);
 			}
 		}
 	}
@@ -94,7 +108,7 @@ void ATWLobbyGameMode::CheckStartCondition()
 void ATWLobbyGameMode::StartGame()
 {
 	bUseSeamlessTravel = true;
-	GetWorld()->ServerTravel(TEXT("NewMap?listen"));
+	GetWorld()->ServerTravel(TEXT("L_Main?listen"));
 }
 
 void ATWLobbyGameMode::AssignNewHost()

@@ -55,7 +55,7 @@ void ATWLobbyPlayerState::OnRep_IsHost()
 			ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
 			if (LPC && LPC->LobbyWidgetInstance)
 			{
-				LPC->LobbyWidgetInstance->ShowPlayButton();
+				LPC->LobbyWidgetInstance->ShowPlayButton(true);
 			}
 		}
 	}

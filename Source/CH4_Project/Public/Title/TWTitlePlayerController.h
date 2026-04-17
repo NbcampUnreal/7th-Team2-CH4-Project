@@ -16,7 +16,7 @@ class CH4_PROJECT_API ATWTitlePlayerController : public APlayerController
 	
 public:
 	virtual void BeginPlay() override;
-	void JoinServer(const FString& InIPAddress) const;
+	void JoinServer();
 	
 private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = ASUIPLayerController, Meta = (AllowPrivateAccess))

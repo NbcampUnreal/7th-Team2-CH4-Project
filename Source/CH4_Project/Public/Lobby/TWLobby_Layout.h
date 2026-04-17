@@ -37,7 +37,7 @@ public:
 	UFUNCTION()
 	void UpdateUserList();
 	
-	void ShowPlayButton();
+	void ShowPlayButton(bool bIsShow);
 	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
@@ -67,8 +67,5 @@ private:
 	
 	UPROPERTY()
 	TArray<UHorizontalBox*> NickNameSlots;
-	
-	UPROPERTY()
-	TArray<class UTextBlock*> NickNameTexts;
 };
 

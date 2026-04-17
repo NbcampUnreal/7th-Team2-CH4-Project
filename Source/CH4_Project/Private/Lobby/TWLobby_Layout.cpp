@@ -64,7 +64,7 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
 	if (PC)
 	{
-		PC->HandleLeaveLobby();
+		PC->ExitLobby();
 	}
 }
 
@@ -92,10 +92,14 @@ void UTWLobby_Layout::UpdateUserList()
 	}
 }
 
-void UTWLobby_Layout::ShowPlayButton()
+void UTWLobby_Layout::ShowPlayButton(bool bIsShow)
 {
-	if (PlayButton)
+	if (bIsShow)
 	{
 		PlayButton->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		PlayButton->SetVisibility(ESlateVisibility::Hidden);
 	}
 }

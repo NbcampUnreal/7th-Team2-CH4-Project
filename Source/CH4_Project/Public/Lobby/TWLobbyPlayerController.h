@@ -22,7 +22,7 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_RequestStartGame();
 	
-	void HandleLeaveLobby();
+	void ExitLobby();
 	
 	UPROPERTY()
 	class UTWLobby_Layout* LobbyWidgetInstance;

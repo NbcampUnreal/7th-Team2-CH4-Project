@@ -15,22 +15,41 @@ void ATWTitlePlayerController::BeginPlay()
 		return;
 	}
 	
-	if (IsValid(UIWidgetClass) == true)
+	if (IsValid(UIWidgetClass))
 	{
 		UIWidgetInstance = CreateWidget<UUserWidget>(this, UIWidgetClass);
-		if (IsValid(UIWidgetInstance) == true)
+		if (IsValid(UIWidgetInstance))
 		{
 			UIWidgetInstance->AddToViewport();
 			FInputModeUIOnly Mode;
-			Mode.SetWidgetToFocus(UIWidgetInstance->GetCachedWidget());
 			SetInputMode(Mode);
 			bShowMouseCursor = true;
 		}
 	}
+	/*if (GetWorld()->GetNetMode() == NM_Standalone)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_Standalone"));
+	}
+	if (GetWorld()->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_Client!!"));
+	}
+	if (GetWorld()->GetNetMode() == NM_ListenServer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_ListenServer!!"));
+	}
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_DedicatedServer!!"));
+	}*/
 }
 
-void ATWTitlePlayerController::JoinServer(const FString& InIPAddress) const
+void ATWTitlePlayerController::JoinServer()
 {
-	FName NextLevelName = FName(*InIPAddress);
-	UGameplayStatics::OpenLevel(GetWorld(), NextLevelName, true);
+	/*UGameplayStatics::OpenLevel(GetWorld(), "L_Lobby");*/
+	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] JoinServer Start ==="));
+	const FString URL = "127.0.0.1:17777";
+	ClientTravel(URL, TRAVEL_Absolute);
+	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] ClientTravel Called with URL: %s ==="), *URL);
+	/*ClientTravel("L_LobbyLevel", TRAVEL_Absolute);*/
 }

@@ -21,8 +21,9 @@ void ATWLobbyPlayerController::BeginPlay()
 // 준비 상태 설정 RPC
 bool ATWLobbyPlayerController::Server_SetReady_Validate(bool bNewReady)
 {
-	return true; // 보안 검사가 필요 없다면 true
+	return true;
 }
+
 void ATWLobbyPlayerController::Server_SetReady_Implementation(bool bNewReady)
 {
 	ATWLobbyPlayerState* LPS = GetPlayerState<ATWLobbyPlayerState>();
@@ -57,9 +58,9 @@ void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 
 
 
-void ATWLobbyPlayerController::HandleLeaveLobby()
+void ATWLobbyPlayerController::ExitLobby()
 {
-	ClientTravel(TEXT("Title"), ETravelType::TRAVEL_Absolute);
+	ClientTravel(TEXT("L_Title"), ETravelType::TRAVEL_Absolute);
 }
 
 void ATWLobbyPlayerController::CreateLobbyWidget()

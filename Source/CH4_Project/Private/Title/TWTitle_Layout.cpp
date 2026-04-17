@@ -23,8 +23,7 @@ void UTWTitle_Layout::OnStartButtonClicked()
 	
 	if (IsValid(PC) == true)
 	{
-		FString ServerIP = TEXT("127.0.0.1:17777");
-		PC->JoinServer(ServerIP);
+		PC->JoinServer();
 	}
 }
 
