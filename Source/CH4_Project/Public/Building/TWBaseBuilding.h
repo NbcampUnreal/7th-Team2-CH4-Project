@@ -48,7 +48,7 @@ public:
 	
 	// 0 = Player1, 1 = Player2 ... [테스트]
 	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
-	int32 OwnerPlayerSlot = 0;
+	int32 OwnerPlayerSlot = -1;
 	
 	UFUNCTION(BlueprintCallable, Category="Building")
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }

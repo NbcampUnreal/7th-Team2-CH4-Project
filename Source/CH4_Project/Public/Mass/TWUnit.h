@@ -7,6 +7,7 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UTWTeamColorComponent;
 class UAnimMontage;
 
 UCLASS()
@@ -21,6 +22,10 @@ public:
 	void BeginPlay();
 
 protected:
+	
+	virtual void PostInitializeComponents() override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
 	TObjectPtr<USceneComponent> SceneComponent;
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
@@ -31,7 +36,8 @@ protected:
 	TObjectPtr<USceneComponent> SelectionAnchor = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Anchor")
 	TObjectPtr<USceneComponent> HPBarAnchor = nullptr;
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|TeamColor")
+	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
 public:
 	UFUNCTION(BlueprintCallable, Category="MassVisual|Anchor")
 	USceneComponent* GetSelectionAnchorComponent() const { return SelectionAnchor; }
@@ -64,6 +70,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="MassVisual|Anchor", meta=(EditCondition="bAutoPlaceAnchorsFromMeshBounds"))
 	float AutoHPBarExtraHeight = 24.f;
 
+#pragma region TeamColors
+	
+protected:
+	
+	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Unit")
+	int32 OwnerPlayerSlot = 0;
+	
+	UFUNCTION()
+	void OnRep_OwnerPlayerSlot();
+	
+public:
+	
+	UFUNCTION(BlueprintCallable, Category="TeamColor")
+	void SetOwnerPlayerSlot(int32 InSlot);
+	
+#pragma endregion
+	
 protected:
 	void AutoPlaceAnchors();
 	
