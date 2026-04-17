@@ -12,7 +12,7 @@ struct FTWAttackFragment : public FMassFragment
 	
 	FTWAttackFragment() = default;
 	FMassEntityHandle TargetEntity;
-	//Last Searching Time
+	float LastSearchTime = 0.0f;
 	float LastAttackTime = 0.0f;
 	uint8 bIsTargetSet = false;
 	

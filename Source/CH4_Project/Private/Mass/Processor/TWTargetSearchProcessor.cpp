@@ -71,7 +71,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 			{
 				continue;
 			}
-			if (TimeSeconds - AttackList[EntityIdx].LastAttackTime < SearchingInterval)
+			if (TimeSeconds - AttackList[EntityIdx].LastSearchTime < SearchingInterval)
 			{
 				continue;
 			}
@@ -84,7 +84,6 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 			{
 				FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-				AttackList[EntityIdx].LastAttackTime = 0.0;
 				AttackList[EntityIdx].bIsTargetSet = true;
 				AttackList[EntityIdx].TargetEntity = Target;
 				Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
@@ -105,7 +104,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 			}
 			else
 			{
-				AttackList[EntityIdx].LastAttackTime = TimeSeconds;
+				AttackList[EntityIdx].LastSearchTime = TimeSeconds;
 			}
 		}
 	});

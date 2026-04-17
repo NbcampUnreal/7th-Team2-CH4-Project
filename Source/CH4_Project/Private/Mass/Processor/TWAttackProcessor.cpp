@@ -110,7 +110,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				}
 				continue;
 			}
-			
+			//TODO Divide Optimization
 			if (TimeSeconds - AttackList[EntityIdx].LastAttackTime < (1/StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::AttackSpeed)))
 			{
 				continue;
