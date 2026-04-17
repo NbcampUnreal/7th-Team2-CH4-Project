@@ -100,18 +100,51 @@ void UTWBuildComponent::SelectBuildingToConstruct(EBuildingCategory Category)
 
 void UTWBuildComponent::RequestBuild()
 {
-	if (bIsBuildMode && CurrentGhost)
+	if (!bIsBuildMode || !CurrentGhost || !SelectedBuildingClass)
 	{
-		Server_SpawnBuilding(CurrentAnchor,CurrentGhost->BuildingSize, SelectedBuildingClass);
-		
-		auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
-		if (GridSub)
-		{
-			GridSub->OccupyArea(CurrentAnchor, CurrentGhost->BuildingSize, nullptr);
-		}
-		
-		EndBuildMode();
+		return;
 	}
+	
+	APlayerController* PC = Cast<APlayerController>(GetOwner());
+	if (!PC)
+	{
+		return;
+	}
+
+	ATWPlayerState* TWPS = PC->GetPlayerState<ATWPlayerState>();
+	if (!TWPS)
+	{
+		return;
+	}
+
+	ATWBaseBuilding* DefaultBuilding = SelectedBuildingClass->GetDefaultObject<ATWBaseBuilding>();
+	if (!DefaultBuilding || !DefaultBuilding->BuildingData)
+	{
+		return;
+	}
+
+	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+	if (!GridSub)
+	{
+		return;
+	}
+	
+	if (!GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
+		return;
+	}
+	
+	if (TWPS->CanAffordCost(DefaultBuilding->BuildingData->BuildCost) == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
+		return;
+	}
+	
+	Server_SpawnBuilding(CurrentAnchor,CurrentGhost->BuildingSize, SelectedBuildingClass);	
+	
+	EndBuildMode();
+	
 }
 
 void UTWBuildComponent::EndBuildMode()
@@ -130,6 +163,10 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 	TSubclassOf<ATWBaseBuilding> ClassToSpawn)
 {
 	auto* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>();
+	if (!GridSub)
+	{
+		return;
+	}
 	
 	APlayerController* PC = Cast<APlayerController>(GetOwner());
 	if (!PC)
@@ -143,22 +180,48 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 		return;
 	}
 	
-	if (GridSub && GridSub->CanBuildArea(Anchor, BuildSize))
+	if (!ClassToSpawn)
 	{
-		FVector SpawnPos = GridSub->GetBuildingCenterPosition(Anchor, BuildSize);
-		ATWBaseBuilding* NewBuilding = GetWorld()->SpawnActor<ATWBaseBuilding>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
-		
-		if (NewBuilding)
-		{
-			NewBuilding->SetOwnerPlayerSlot(TWPS->PlayerSlot);
-		
-			if (ATWGameMode* TWGM = GetWorld()->GetAuthGameMode<ATWGameMode>())
-			{
-				TWGM->TryBindBuilding(NewBuilding);
-			}
-		
-			GridSub->OccupyArea(Anchor, BuildSize, NewBuilding);
-		}
+		return;
 	}
+	
+	ATWBaseBuilding* DefaultBuilding = ClassToSpawn->GetDefaultObject<ATWBaseBuilding>();
+	if (!DefaultBuilding || !DefaultBuilding->BuildingData)
+	{
+		return;
+	}
+
+	
+	if (!GridSub->CanBuildArea(Anchor, BuildSize))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
+		return;
+	}
+	
+	if (TWPS->CanAffordCost(DefaultBuilding->BuildingData->BuildCost) == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
+		return;
+	}
+	
+	FVector SpawnPos = GridSub->GetBuildingCenterPosition(Anchor, BuildSize);
+	ATWBaseBuilding* NewBuilding = GetWorld()->SpawnActor<ATWBaseBuilding>(ClassToSpawn, SpawnPos, FRotator::ZeroRotator);
+	
+	if (!NewBuilding)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: SpawnActor 실패"));
+		return;
+	}
+	
+	TWPS->SpendCost(DefaultBuilding->BuildingData->BuildCost);
+	
+	NewBuilding->SetOwnerPlayerSlot(TWPS->PlayerSlot);
+	
+	if (ATWGameMode* TWGM = GetWorld()->GetAuthGameMode<ATWGameMode>())
+	{
+		TWGM->TryBindBuilding(NewBuilding);
+	}
+		
+	GridSub->OccupyArea(Anchor, BuildSize, NewBuilding);
 }
 
