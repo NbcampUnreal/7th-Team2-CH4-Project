@@ -29,6 +29,7 @@ namespace TWCommandIds
 	static const FName Hold(TEXT("Hold"));
 	static const FName BuildMenu(TEXT("BuildMenu"));
 	static const FName Back(TEXT("Back"));
+	static const FName IncreasePopulation(TEXT("IncreasePopulation"));
 }
 
 namespace TWUIBridgeTopBarHelpers
@@ -284,6 +285,101 @@ namespace TWUIBridgeBuildingHelpers
 
 		return nullptr;
 	}
+
+	static const FUISelectionPresentationRow* FindSelectionPresentationRowByEntityId(
+		UDataTable* SelectionPresentationTable,
+		FName InEntityId)
+	{
+		if (!SelectionPresentationTable || InEntityId.IsNone())
+		{
+			return nullptr;
+		}
+
+		static const FString Context = TEXT("TWUIBridgeBuildingHelpers::FindSelectionPresentationRowByEntityId");
+
+		if (const FUISelectionPresentationRow* Row =
+			SelectionPresentationTable->FindRow<FUISelectionPresentationRow>(InEntityId, Context))
+		{
+			return Row;
+		}
+
+		TArray<FUISelectionPresentationRow*> AllRows;
+		SelectionPresentationTable->GetAllRows<FUISelectionPresentationRow>(Context, AllRows);
+
+		for (const FUISelectionPresentationRow* Candidate : AllRows)
+		{
+			if (Candidate && Candidate->EntityId == InEntityId)
+			{
+				return Candidate;
+			}
+		}
+
+		return nullptr;
+	}
+
+	static TSoftObjectPtr<UTexture2D> ResolveQueueItemIcon(
+		UDataTable* CommandMetaTable,
+		UDataTable* SelectionPresentationTable,
+		FName QueuedUnitId)
+	{
+		if (QueuedUnitId.IsNone())
+		{
+			return nullptr;
+		}
+
+		if (const FUISelectionPresentationRow* PresentationRow =
+			FindSelectionPresentationRowByEntityId(SelectionPresentationTable, QueuedUnitId))
+		{
+			if (!PresentationRow->PortraitIcon.IsNull())
+			{
+				return PresentationRow->PortraitIcon;
+			}
+
+			if (!PresentationRow->Portrait.IsNull())
+			{
+				return PresentationRow->Portrait;
+			}
+		}
+
+		if (const FUICommandMetaRow* CommandMeta = FindProduceUnitCommandMetaByPayload(CommandMetaTable, QueuedUnitId))
+		{
+			if (!CommandMeta->Icon.IsNull())
+			{
+				return CommandMeta->Icon;
+			}
+		}
+
+		return nullptr;
+	}
+}
+
+namespace TWUIBridgeUnitHelpers
+{
+	static void FillUnitDetailStats(
+		FSelectionViewModel& InOutVM,
+		const FTWUnitStatus* RuntimeStatus,
+		const FTWUnitStatus* BaseStatus
+	)
+	{
+		const FTWUnitStatus* PreferredStatus = RuntimeStatus ? RuntimeStatus : BaseStatus;
+		if (!PreferredStatus)
+		{
+			InOutVM.bShowDetailStats = false;
+			InOutVM.Damage = 0.f;
+			InOutVM.Armor = 0.f;
+			InOutVM.AttackSpeed = 0.f;
+			InOutVM.MoveSpeed = 0.f;
+			InOutVM.Range = 0.f;
+			return;
+		}
+
+		InOutVM.bShowDetailStats = true;
+		InOutVM.Damage = PreferredStatus->GetStatus(ETWStatusType::Damage);
+		InOutVM.Armor = PreferredStatus->GetStatus(ETWStatusType::Armor);
+		InOutVM.AttackSpeed = PreferredStatus->GetStatus(ETWStatusType::AttackSpeed);
+		InOutVM.MoveSpeed = PreferredStatus->GetStatus(ETWStatusType::MoveSpeed);
+		InOutVM.Range = PreferredStatus->GetStatus(ETWStatusType::Range);
+	}
 }
 
 void UTWPlayerUIBridge::Initialize(
@@ -374,6 +470,7 @@ void UTWPlayerUIBridge::RefreshAll()
 	{
 		HUDCoordinator->RefreshAll();
 	}
+
 	RefreshInputState();
 	RefreshDragSelectionState();
 
@@ -400,6 +497,7 @@ bool UTWPlayerUIBridge::HandleContextCommand(FName CommandId)
 	{
 		return false;
 	}
+
 	const bool bIsPureContextCommand =
 		(CommandMetaRow->CommandType == ETWCommandType::OpenContext) ||
 		(CommandMetaRow->CommandType == ETWCommandType::Back) ||
@@ -450,7 +548,28 @@ bool UTWPlayerUIBridge::HandleContextCommand(FName CommandId)
 void UTWPlayerUIBridge::HandleHUDCommandRequested(FName CommandId)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UIBridge] HUD command requested: %s"), *CommandId.ToString());
+
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	if (HandleContextCommand(CommandId))
+	{
+		if (HUDCoordinator)
+		{
+			HUDCoordinator->RefreshCommandPanel();
+			HUDCoordinator->RefreshSelectionPanel();
+		}
+		return;
+	}
+
 	OnUICommandRequested.Broadcast(CommandId);
+
+	if (HUDCoordinator)
+	{
+		HUDCoordinator->RefreshSelectionPanel();
+	}
 }
 
 const FUICommandMetaRow* UTWPlayerUIBridge::FindCommandMetaRow(FName CommandId) const
@@ -538,10 +657,7 @@ void UTWPlayerUIBridge::ForceRefreshSelectionFromGameplayEvent()
 	if (HUDCoordinator)
 	{
 		HUDCoordinator->RefreshSelectionPanel();
-		HUDCoordinator->RefreshCommandPanel();
 	}
-
-	StartPostCommandSelectionRefreshWindow();
 }
 
 void UTWPlayerUIBridge::StartProductionSelectionRefresh()
@@ -598,9 +714,20 @@ void UTWPlayerUIBridge::HandleProductionSelectionRefreshTick()
 	}
 
 	ATWBaseBuilding* SelectedBuilding = OwnerController->GetSelectedBuilding();
-	ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding);
+	bool bIsProducing = false;
+	bool bHasQueuedItems = false;
 
-	if (!TroopBuilding || !TroopBuilding->IsProducing())
+	if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
+	{
+		bIsProducing = TroopBuilding->IsProducing();
+		bHasQueuedItems = TroopBuilding->GetQueuedUnitIds().Num() > 0;
+	}
+	else if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(SelectedBuilding))
+	{
+		bIsProducing = PopulationBuilding->IsProducing();
+		bHasQueuedItems = PopulationBuilding->GetCurrentQueueCount() > 0;
+	}
+	else
 	{
 		StopProductionSelectionRefresh();
 
@@ -618,6 +745,16 @@ void UTWPlayerUIBridge::HandleProductionSelectionRefreshTick()
 	if (HUDCoordinator)
 	{
 		HUDCoordinator->RefreshSelectionPanel();
+	}
+
+	if (!bIsProducing && !bHasQueuedItems)
+	{
+		StopProductionSelectionRefresh();
+
+		if (HUDCoordinator)
+		{
+			HUDCoordinator->RefreshCommandPanel();
+		}
 	}
 }
 
@@ -687,13 +824,22 @@ void UTWPlayerUIBridge::HandlePostCommandSelectionRefreshTick()
 	if (HUDCoordinator)
 	{
 		HUDCoordinator->RefreshSelectionPanel();
-		HUDCoordinator->RefreshCommandPanel();
+	}
+	
+	ATWBaseBuilding* SelectedBuilding = OwnerController->GetSelectedBuilding();
+
+	bool bKeepRefreshing = false;
+
+	if (ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
+	{
+		bKeepRefreshing = TroopBuilding->IsProducing() || TroopBuilding->GetQueuedUnitIds().Num() > 0;
+	}
+	else if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(SelectedBuilding))
+	{
+		bKeepRefreshing = PopulationBuilding->IsProducing() || PopulationBuilding->GetCurrentQueueCount() > 0;
 	}
 
-	ATWBaseBuilding* SelectedBuilding = OwnerController->GetSelectedBuilding();
-	ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding);
-
-	if (TroopBuilding && (TroopBuilding->IsProducing() || TroopBuilding->GetQueuedUnitIds().Num() > 0))
+	if (bKeepRefreshing)
 	{
 		StopPostCommandSelectionRefreshWindow();
 		return;
@@ -736,9 +882,14 @@ void UTWPlayerUIBridge::RefreshSelection()
 		VM.TotalSelectedCount = 1;
 		VM.CountLabel = TEXT("");
 		VM.bShowProductionPanel = false;
+		VM.bShowDetailStats = false;
+		VM.Damage = 0.f;
+		VM.Armor = 0.f;
+		VM.AttackSpeed = 0.f;
+		VM.MoveSpeed = 0.f;
+		VM.Range = 0.f;
 		VM.Production = FBuildingProductionViewModel();
 
-		// 건물 기본 정보
 		VM.CurrentHP = SelectedBuilding->GetCurrentHP();
 		VM.MaxHP = SelectedBuilding->GetMaxHP();
 		VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
@@ -779,16 +930,25 @@ void UTWPlayerUIBridge::RefreshSelection()
 					QueueItem.bIsActive = (Index == 0 && TroopBuilding->IsProducing());
 					QueueItem.StackCount = 1;
 
+					QueueItem.Icon = TWUIBridgeBuildingHelpers::ResolveQueueItemIcon(
+						CommandMetaTable,
+						SelectionPresentationTable,
+						QueuedUnitId
+					);
+
 					if (!QueuedUnitId.IsNone())
 					{
 						if (const FUICommandMetaRow* QueueCommandMeta =
 							TWUIBridgeBuildingHelpers::FindProduceUnitCommandMetaByPayload(CommandMetaTable, QueuedUnitId))
 						{
-							QueueItem.Icon = QueueCommandMeta->Icon;
-
 							if (!QueueCommandMeta->DisplayName.IsEmpty())
 							{
 								QueueItem.DisplayName = QueueCommandMeta->DisplayName.ToString();
+							}
+
+							if (QueueItem.Icon.IsNull() && !QueueCommandMeta->Icon.IsNull())
+							{
+								QueueItem.Icon = QueueCommandMeta->Icon;
 							}
 						}
 					}
@@ -807,7 +967,6 @@ void UTWPlayerUIBridge::RefreshSelection()
 			}
 			else
 			{
-				// 상대 병력 생산 건물: 정보만 표시
 				VM.bShowProductionPanel = false;
 				VM.Production = FBuildingProductionViewModel();
 				CommandIds.Reset();
@@ -823,14 +982,80 @@ void UTWPlayerUIBridge::RefreshSelection()
 
 			if (!bIsOwnedByMe)
 			{
-				// 상대 건물: 정보만 표시
 				CommandIds.Reset();
 			}
-			else if (Cast<ATWPopulationBuilding>(SelectedBuilding))
+			else if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(SelectedBuilding))
 			{
-				CommandIds = {
-					TWCommandIds::BuildMenu
-				};
+				if (bIsOwnedByMe)
+				{
+					CommandIds = {
+						TWCommandIds::IncreasePopulation
+					};
+
+					VM.bShowProductionPanel = true;
+					VM.Production.bVisible = true;
+					VM.Production.Title = TEXT("생산 중");
+					VM.Production.ProgressRatio = PopulationBuilding->GetCurrentProductionProgressRatio();
+					VM.Production.ProgressText = PopulationBuilding->GetCurrentProductionProgressText();
+
+					TSoftObjectPtr<UTexture2D> PopulationQueueIcon = nullptr;
+					if (const FUICommandMetaRow* QueueCommandMeta = FindCommandMetaRow(TWCommandIds::IncreasePopulation))
+					{
+						PopulationQueueIcon = QueueCommandMeta->Icon;
+					}
+
+					if (PopulationQueueIcon.IsNull())
+					{
+						if (const FUISelectionPresentationRow* PresentationRow =
+							TWUIBridgeBuildingHelpers::FindSelectionPresentationRowByEntityId(SelectionPresentationTable, VM.SelectionId))
+						{
+							if (!PresentationRow->PortraitIcon.IsNull())
+							{
+								PopulationQueueIcon = PresentationRow->PortraitIcon;
+							}
+							else if (!PresentationRow->Portrait.IsNull())
+							{
+								PopulationQueueIcon = PresentationRow->Portrait;
+							}
+						}
+					}
+
+					const int32 QueueCount = PopulationBuilding->GetCurrentQueueCount();
+
+					for (int32 Index = 0; Index < QueueCount; ++Index)
+					{
+						FProductionQueueItemViewModel QueueItem;
+						QueueItem.PayloadId = TWCommandIds::IncreasePopulation;
+						QueueItem.DisplayName = TEXT("인구수 증가");
+						QueueItem.bIsActive = (Index == 0 && PopulationBuilding->IsProducing());
+						QueueItem.StackCount = 1;
+						QueueItem.Icon = PopulationQueueIcon;
+
+						if (const FUICommandMetaRow* QueueCommandMeta = FindCommandMetaRow(TWCommandIds::IncreasePopulation))
+						{
+							if (!QueueCommandMeta->DisplayName.IsEmpty())
+							{
+								QueueItem.DisplayName = QueueCommandMeta->DisplayName.ToString();
+							}
+
+							if (QueueItem.Icon.IsNull() && !QueueCommandMeta->Icon.IsNull())
+							{
+								QueueItem.Icon = QueueCommandMeta->Icon;
+							}
+						}
+
+						VM.Production.QueueItems.Add(QueueItem);
+					}
+
+					if (PopulationBuilding->IsProducing() || QueueCount > 0)
+					{
+						StartProductionSelectionRefresh();
+					}
+					else
+					{
+						StopProductionSelectionRefresh();
+					}
+				}
 			}
 			else if (Cast<ATWResourceBuilding>(SelectedBuilding) || Cast<ATWBlockingBuilding>(SelectedBuilding))
 			{
@@ -838,16 +1063,16 @@ void UTWPlayerUIBridge::RefreshSelection()
 			}
 		}
 
-			CurrentVisibleCommandIds = CommandIds;
+		CurrentVisibleCommandIds = CommandIds;
 
-			SelectionProvider->SetRuntimeSelection(
-				VM,
-				CommandIds,
-				ESelectionViewMode::Single,
-				VM.SelectionId,
-				1,
-				TArray<FSelectionSummaryItemViewModel>()
-			);
+		SelectionProvider->SetRuntimeSelection(
+			VM,
+			CommandIds,
+			ESelectionViewMode::Single,
+			VM.SelectionId,
+			1,
+			TArray<FSelectionSummaryItemViewModel>()
+		);
 
 		SelectionProvider->ClearRuntimeCommandData();
 
@@ -876,13 +1101,13 @@ void UTWPlayerUIBridge::RefreshSelection()
 	}
 
 	const bool bIsMultiSelection = LocalSelectedUnitCount > 1;
-	
+
 	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
 
 	const bool bLocalUnitSelectionOwnedByMe =
 		LocalPS &&
 		(OwnerController->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot);
-	
+
 	FSelectionViewModel VM;
 	VM.SelectionType = bIsMultiSelection ? ESelectionViewType::Multi : ESelectionViewType::Unit;
 	VM.ViewMode = bIsMultiSelection ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
@@ -890,14 +1115,20 @@ void UTWPlayerUIBridge::RefreshSelection()
 		? (bIsMultiSelection ? DefaultMultiSelectedUnitId : DefaultSelectedUnitId)
 		: LocalPrimarySelectedUnitId;
 
-	VM.DisplayName = bIsMultiSelection ? TEXT("Selected Units") : TEXT("");
-	VM.TypeLabel = bIsMultiSelection ? TEXT("Units") : TEXT("");
+	VM.DisplayName = bIsMultiSelection ? TEXT("Selected Units") : VM.SelectionId.ToString();
+	VM.TypeLabel = bIsMultiSelection ? TEXT("Units") : TEXT("Unit");
 	VM.TotalSelectedCount = LocalSelectedUnitCount;
 	VM.CountLabel = bIsMultiSelection
 		? FString::Printf(TEXT("%d Selected"), LocalSelectedUnitCount)
 		: TEXT("");
 	VM.bShowProductionPanel = false;
 	VM.Production = FBuildingProductionViewModel();
+	VM.bShowDetailStats = false;
+	VM.Damage = 0.f;
+	VM.Armor = 0.f;
+	VM.AttackSpeed = 0.f;
+	VM.MoveSpeed = 0.f;
+	VM.Range = 0.f;
 
 	if (bIsMultiSelection)
 	{
@@ -909,11 +1140,25 @@ void UTWPlayerUIBridge::RefreshSelection()
 		float MaxHP = 0.f;
 		bool bHasAnyHP = false;
 
+		FTWUnitStatus BaseStatus;
+		bool bHasBaseStatus = false;
+
+		VM.DisplayName = VM.SelectionId.ToString();
+		VM.TypeLabel = TEXT("Unit");
+
 		if (UTWUnitSubsystem* UnitSubsystem = OwnerController->GetWorld()->GetSubsystem<UTWUnitSubsystem>())
 		{
 			if (FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(VM.SelectionId))
 			{
-				MaxHP = UnitRow->BaseStatus.GetStatus(ETWStatusType::Health);
+				BaseStatus = UnitRow->BaseStatus;
+				bHasBaseStatus = true;
+
+				if (!UnitRow->UnitID.IsNone())
+				{
+					VM.DisplayName = UnitRow->UnitID.ToString();
+				}
+
+				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
 				if (MaxHP > 0.f)
 				{
 					bHasAnyHP = true;
@@ -921,10 +1166,15 @@ void UTWPlayerUIBridge::RefreshSelection()
 			}
 		}
 
+		const FTWUnitStatus* RuntimeStatusPtr = nullptr;
+		FTWUnitStatus RuntimeStatus;
+
 		if (OwnerController->HasLocalPrimarySelectedUnitStatus())
 		{
-			const FTWUnitStatus& Status = OwnerController->GetLocalPrimarySelectedUnitStatus();
-			CurrentHP = Status.GetStatus(ETWStatusType::Health);
+			RuntimeStatus = OwnerController->GetLocalPrimarySelectedUnitStatus();
+			RuntimeStatusPtr = &RuntimeStatus;
+
+			CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
 
 			if (MaxHP <= 0.f)
 			{
@@ -945,6 +1195,18 @@ void UTWPlayerUIBridge::RefreshSelection()
 			VM.MaxHP = MaxHP;
 			VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
 		}
+		else
+		{
+			VM.CurrentHP = 0.f;
+			VM.MaxHP = 0.f;
+			VM.HPText = TEXT("");
+		}
+
+		TWUIBridgeUnitHelpers::FillUnitDetailStats(
+			VM,
+			RuntimeStatusPtr,
+			bHasBaseStatus ? &BaseStatus : nullptr
+		);
 	}
 
 	TArray<FName> CommandIds;
@@ -1049,36 +1311,43 @@ int32 UTWPlayerUIBridge::ResolveBuildingQueueCount(FName CommandId) const
 	{
 		return 0;
 	}
-
-	const ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding);
-	if (!TroopBuilding)
+	
+	if (const ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(SelectedBuilding))
 	{
-		return 0;
-	}
-
-	const FUICommandMetaRow* CommandMeta = FindCommandMetaRow(CommandId);
-	if (!CommandMeta)
-	{
-		return 0;
-	}
-
-	if (CommandMeta->CommandType != ETWCommandType::ProduceUnit)
-	{
-		return 0;
-	}
-
-	int32 MatchedCount = 0;
-	const TArray<FName>& QueuedUnitIds = TroopBuilding->GetQueuedUnitIds();
-
-	for (const FName& QueuedUnitId : QueuedUnitIds)
-	{
-		if (QueuedUnitId == CommandMeta->PayloadId)
+		const FUICommandMetaRow* CommandMeta = FindCommandMetaRow(CommandId);
+		if (!CommandMeta)
 		{
-			++MatchedCount;
+			return 0;
+		}
+
+		if (CommandMeta->CommandType != ETWCommandType::ProduceUnit)
+		{
+			return 0;
+		}
+
+		int32 MatchedCount = 0;
+		const TArray<FName>& QueuedUnitIds = TroopBuilding->GetQueuedUnitIds();
+
+		for (const FName& QueuedUnitId : QueuedUnitIds)
+		{
+			if (QueuedUnitId == CommandMeta->PayloadId)
+			{
+				++MatchedCount;
+			}
+		}
+
+		return MatchedCount;
+	}
+	
+	if (const ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(SelectedBuilding))
+	{
+		if (CommandId == TWCommandIds::IncreasePopulation)
+		{
+			return PopulationBuilding->GetCurrentQueueCount();
 		}
 	}
 
-	return MatchedCount;
+	return 0;	
 }
 
 FString UTWPlayerUIBridge::NormalizeHotkeyLabelFromKey(const FKey& InKey) const
@@ -1147,12 +1416,10 @@ void UTWPlayerUIBridge::RefreshInputState()
 	VM.HintText = TEXT("");
 	VM.CursorVisualType = ETWCursorVisualType::Default;
 
-	// 1순위: 엣지 스크롤
 	if (bEdgeScrollingActive)
 	{
 		VM.CursorVisualType = ETWCursorVisualType::EdgeScroll;
 	}
-	// 2순위: 명령 armed 상태
 	else if (ArmedCommandId == TEXT("Move"))
 	{
 		VM.CursorVisualType = ETWCursorVisualType::Move;

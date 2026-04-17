@@ -265,6 +265,12 @@ bool ATWTroopSpawnBuilding::CanEnqueueUnitId(FName UnitId, FString* OutFailReaso
 		if (OutFailReason) { *OutFailReason = TEXT("OwningPlayerState is null"); }
 		return false;
 	}
+	
+	if (BuildingState != ETWBuildingState::Completed)
+	{
+		if (OutFailReason) { *OutFailReason = TEXT("Building is not completed"); }
+		return false;
+	}
 
 	if (UnitId.IsNone())
 	{

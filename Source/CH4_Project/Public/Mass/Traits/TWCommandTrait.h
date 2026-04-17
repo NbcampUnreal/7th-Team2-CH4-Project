@@ -13,6 +13,31 @@
 /**
  * 
  */
+
+USTRUCT()
+struct FTWMassMovingTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
+struct FTWMassSearchingTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
+struct FTWMassAttackingTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
+struct FTWMassHoldTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
 UCLASS()
 class CH4_PROJECT_API UTWCommandTrait : public UMassEntityTraitBase
 {

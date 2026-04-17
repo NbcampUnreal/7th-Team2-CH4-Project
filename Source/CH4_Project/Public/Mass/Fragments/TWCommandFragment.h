@@ -23,47 +23,36 @@ enum class ETWMassCommand:uint8
 	AttackToUnit,
 	Hold
 };
+const FName CommandSignal = FName(TEXT("CommandSignal"));
+const FName PathInitSignal = FName(TEXT("PathInitSignal"));
+const FName MoveCompleteSignal = FName(TEXT("MoveCompleteSignal"));
+const FName AttackCompleteSignal = FName(TEXT("AttackCompleteSignal"));
 
 
 USTRUCT()
-struct FTWCommandTypeFragment : public FMassFragment
+struct CH4_PROJECT_API FTWCommandFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	FTWCommandTypeFragment() = default;
+	FTWCommandFragment() = default;
 
-	FTWCommandTypeFragment(const ETWMassCommand InType)
-		: Type(InType)
+	FTWCommandFragment(const ETWMassCommand InType, const FVector& InLocation, const FMassEntityHandle& InTarget)
+	: Type(InType),
+	Location(InLocation),
+	  Target(InTarget)
 	{
 	}
 
 	ETWMassCommand GetType() const { return Type; }
 	void SetType(const ETWMassCommand InType) { Type = InType; }
-
+	FVector GetLocation() const { return Location; }
+	void SetLocation(const FVector& InLocation) { Location = InLocation; }
+	FMassEntityHandle GetTarget() const { return Target; }
+	void SetTarget(const FMassEntityHandle& InTarget) { Target = InTarget; }
+	
 protected:
 	UPROPERTY(Transient)
 	ETWMassCommand Type = ETWMassCommand::None;
-};
-
-USTRUCT()
-struct FTWCommandDataFragment : public FMassSharedFragment
-{
-	GENERATED_BODY()
-	FTWCommandDataFragment() = default;
-
-	FTWCommandDataFragment(const FVector& InLocation, const FMassEntityHandle& InTarget)
-		: Location(InLocation),
-		  Target(InTarget)
-	{
-	}
-
-	FVector GetLocation() const { return Location; }
-	void SetLocation(const FVector& InLocation) { Location = InLocation; }
-
-	FMassEntityHandle GetTarget() const { return Target; }
-	void SetTarget(const FMassEntityHandle& InTarget) { Target = InTarget; }
-
-protected:
 	UPROPERTY(Transient)
 	FVector Location = {0,0,0};
 	UPROPERTY(Transient)

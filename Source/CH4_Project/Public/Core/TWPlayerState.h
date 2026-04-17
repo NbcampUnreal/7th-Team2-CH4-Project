@@ -55,7 +55,7 @@ protected:
 	int32 MaxPopulation = 200;
 
 	UPROPERTY(ReplicatedUsing=OnRep_PopulationLimit, VisibleAnywhere, BlueprintReadOnly, Category="Population")
-	int32 PopulationLimit = 1;
+	int32 PopulationLimit = 10;
 
 	UPROPERTY(ReplicatedUsing=OnRep_CurrentPopulation, VisibleAnywhere, BlueprintReadOnly, Category="Population")
 	int32 CurrentPopulation = 0;

@@ -11,7 +11,6 @@
 
 bool FTWStateTreeCommandTask::Link(FStateTreeLinker& Linker)
 {
-	Linker.LinkExternalData(EntityCommandDataHandle);
 	Linker.LinkExternalData(EntityCommandTypeHandle);
 	return true;
 }
@@ -20,13 +19,13 @@ EStateTreeRunStatus FTWStateTreeCommandTask::EnterState(FStateTreeExecutionConte
 	const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-	const FTWCommandDataFragment& CommandData = Context.GetExternalData(EntityCommandDataHandle);
-	InstanceData.TargetLocation.EndOfPathPosition = CommandData.GetLocation();
 	
-	FTWCommandTypeFragment& CommandType = Context.GetExternalData(EntityCommandTypeHandle);
+	FTWCommandFragment& CommandType = Context.GetExternalData(EntityCommandTypeHandle);
 	CommandType.SetType(ETWMassCommand::None);
+	InstanceData.TargetLocation.EndOfPathPosition = CommandType.GetLocation();
 	
-	UE_LOG(LogMass, Warning, TEXT("%lf, %lf, %lf"), CommandData.GetLocation().X,CommandData.GetLocation().Y,CommandData.GetLocation().Z)
+	
+	UE_LOG(LogMass, Warning, TEXT("%lf, %lf, %lf"), CommandType.GetLocation().X,CommandType.GetLocation().Y,CommandType.GetLocation().Z)
 	return EStateTreeRunStatus::Running;
 	
 }

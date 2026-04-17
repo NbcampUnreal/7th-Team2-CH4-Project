@@ -57,6 +57,7 @@ public:
 	FOnUICommandRequested& GetOnUICommandRequestedDelegate() { return OnUICommandRequested; }
 
 	void SetEdgeScrollingActive(bool bInActive);
+	UTWHUDRootWidget* GetHUDRootWidget() const { return HUDRootWidget; }
 protected:
 	void HandleHUDCommandRequested(FName CommandId);
 

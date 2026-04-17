@@ -20,7 +20,7 @@ struct CH4_PROJECT_API FTWTransformOffsetParams : public FMassConstSharedFragmen
  
 	/** How much time the smooth can take */  
 	UPROPERTY(EditAnywhere, Category = "", meta = (UIMin = 0.0f, ClampMin = 0.0f))  
-	float SmoothTime = 0.9f;  
+	float SmoothTime = 0.1f;  
 //	float SmoothTime = 0.2f;  
  
 	/** The tolerated distance to smooth. If the distance is higher the mesh will snap to the actual position. */  

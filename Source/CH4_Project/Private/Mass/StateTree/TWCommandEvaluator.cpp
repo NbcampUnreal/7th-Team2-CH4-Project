@@ -17,7 +17,7 @@ void FTWCommandEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 {
 	FInstanceDataType& InstanceData =  Context.GetInstanceData(*this);
     
-	const FTWCommandTypeFragment& CommandType = Context.GetExternalData(CommandTypeHandle);
+	const FTWCommandFragment& CommandType = Context.GetExternalData(CommandTypeHandle);
     
 	InstanceData.CurrentCommand = CommandType.GetType();
 	

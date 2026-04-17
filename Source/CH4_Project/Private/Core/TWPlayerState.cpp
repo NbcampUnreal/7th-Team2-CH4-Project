@@ -26,7 +26,7 @@ ATWPlayerState::ATWPlayerState()
 	
 	PendingPopulation = 0;
 	MaxPopulation = 200;
-	PopulationLimit = 1;
+	PopulationLimit = 10;
 	CurrentPopulation = 0;
 }
 

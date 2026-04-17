@@ -12,14 +12,10 @@ void UTWCommandTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContex
                                     const UWorld& World) const
 {
 
-	BuildContext.AddFragment<FTWCommandTypeFragment>();
-	BuildContext.RequireFragment<FTWCommandDataFragment>();
+	BuildContext.AddFragment<FTWCommandFragment>();
 	
 	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(World);
 	
-	FTWCommandDataFragment CommandDataFragment;
-	FSharedStruct SharadFragment = EntityManager.GetOrCreateSharedFragment(CommandDataFragment);
-	BuildContext.AddSharedFragment(SharadFragment);
 	//TODO MOVE 
 	FTWTransformOffsetParams OffsetParamsFragment; 
 	const FConstSharedStruct OffsetConstSharedStruct = EntityManager.GetOrCreateConstSharedFragment(OffsetParamsFragment);

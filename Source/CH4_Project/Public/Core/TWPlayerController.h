@@ -14,9 +14,9 @@ class UInputAction;
 class UInputMappingContext;
 class UDataTable;
 class UTWBuildComponent;
-class UTWPlayerUIBridge;
 class UTWHUDRootWidget;
-class UTWSelectionVisualManager;
+class UTWPlayerUIControllerComponent;
+class UTWPlayerSelectionVisualComponent;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -29,7 +29,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
-	
+
+protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_Common = nullptr;
 
@@ -41,37 +42,35 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_Debug = nullptr;
-	
+
 	bool bUnitCommandContextActive = false;
 	bool bBuildContextActive = false;
 	bool bBuildShortcutModeActive = false;
-	
+
 	void SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority, bool bShouldBeActive, bool& bCurrentActive);
 	void RefreshDynamicMappingContexts();
 	bool ShouldUseUnitCommandContext() const;
 	bool ShouldUseBuildContext() const;
-	
-	
 
 #pragma region Input
 protected:
 	virtual void SetupInputComponent() override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> LeftMouseAction;
+	TObjectPtr<UInputAction> LeftMouseAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> RightMouseAction;
+	TObjectPtr<UInputAction> RightMouseAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> MoveCommandAction; // m
+	TObjectPtr<UInputAction> MoveCommandAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> AttackCommandAction; // a
+	TObjectPtr<UInputAction> AttackCommandAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> HoldCommandAction; // h
-	
+	TObjectPtr<UInputAction> HoldCommandAction = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScreenEdgeEnterMargin = 10.0f;
 
@@ -81,14 +80,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScrollSpeed = 1500.0f;
 
-	UFUNCTION()
 	void OnStartLeftMouseAction(const FInputActionValue& InputActionValue);
-
-	UFUNCTION()
 	void OnEndLeftMouseAction(const FInputActionValue& InputActionValue);
-
-	UFUNCTION()
-	void OnRightMouseAction(const FInputActionValue& InputActionValue); // 명령 있을 시 취소, 없으면 이동명령
+	void OnRightMouseAction(const FInputActionValue& InputActionValue);
 
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
@@ -119,7 +113,7 @@ private:
 #pragma region 병력 스폰 대기열
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestSpawnTroop;
+	TObjectPtr<UInputAction> IA_TestSpawnTroop = nullptr;
 
 	UFUNCTION()
 	void HandleTestSpawnTroop(const FInputActionValue& Value);
@@ -131,7 +125,7 @@ protected:
 #pragma region 인구 수 대기열
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestIncreasePopulation;
+	TObjectPtr<UInputAction> IA_TestIncreasePopulation = nullptr;
 
 	UFUNCTION()
 	void HandleTestIncreasePopulation(const FInputActionValue& Value);
@@ -143,7 +137,7 @@ protected:
 #pragma region 넥서스 데미지
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestDamageBlockingBuilding;
+	TObjectPtr<UInputAction> IA_TestDamageBlockingBuilding = nullptr;
 
 	UFUNCTION()
 	void HandleTestDamageBlockingBuilding(const FInputActionValue& Value);
@@ -155,25 +149,25 @@ protected:
 #pragma region 건설
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> ToggleBuildModeAction;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectWoodCommandAction;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectStoneCommandAction;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectPopulationCommandAction;
+	TObjectPtr<UInputAction> ToggleBuildModeAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectTroopCommandAction;
+	TObjectPtr<UInputAction> SelectWoodCommandAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectUpgradeCommandAction;
+	TObjectPtr<UInputAction> SelectStoneCommandAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> SelectBlockingCommandAction;
+	TObjectPtr<UInputAction> SelectPopulationCommandAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectTroopCommandAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectUpgradeCommandAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SelectBlockingCommandAction = nullptr;
 
 	void OnToggleBuildModeAction();
 	void OnSelectWoodBuildingCommandAction();
@@ -182,19 +176,20 @@ protected:
 	void OnSelectTroopBuildingCommandAction();
 	void OnSelectUpgradeBuildingCommandAction();
 	void OnSelectBlockingBuildingCommandAction();
-	
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "Component")
 	UTWBuildComponent* GetBuildComponent() const { return BuildComponent; }
+
 protected:
-	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UTWBuildComponent> BuildComponent;
+	TObjectPtr<UTWBuildComponent> BuildComponent = nullptr;
 #pragma endregion
-	
+
 #pragma region 업그레이드
+protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	UInputAction* IA_TestUpgrade;
+	TObjectPtr<UInputAction> IA_TestUpgrade = nullptr;
 
 	UFUNCTION()
 	void HandleTestUpgrade(const FInputActionValue& Value);
@@ -202,7 +197,16 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerTestUpgrade();
 #pragma endregion
-	
+
+#pragma region UI / Visual Components
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UTWPlayerUIControllerComponent> PlayerUIControllerComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UTWPlayerSelectionVisualComponent> PlayerSelectionVisualComponent = nullptr;
+#pragma endregion
+
 #pragma region UI
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -226,12 +230,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	FName DefaultMultiSelectedUnitId = NAME_None;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTWPlayerUIBridge> PlayerUIBridge = nullptr;
-	
-	UPROPERTY(Transient)
-	TObjectPtr<UTWSelectionVisualManager> SelectionVisualManager = nullptr;
-	
 	int32 LocalSelectedOwnerPlayerSlot = INDEX_NONE;
 
 private:
@@ -248,10 +246,18 @@ private:
 		float& OutPrimaryHealth,
 		bool& bOutHasPrimaryHealth);
 
+	void RefreshLocalSelectionRuntimeData();
+	bool RefreshLocalPrimarySelectedUnitStatus();
+
 	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
 
 	UFUNCTION(Client, Reliable)
-	void ClientApplyUnitSelection(const TArray<FMassNetworkID>& InNetworkIds, float InPrimaryHealth, bool bInHasPrimaryHealth, int32 InSelectedOwnerPlayerSlot);
+	void ClientApplyUnitSelection(
+		const TArray<FMassNetworkID>& InNetworkIds,
+		float InPrimaryHealth,
+		bool bInHasPrimaryHealth,
+		int32 InSelectedOwnerPlayerSlot
+	);
 
 	UFUNCTION(Client, Reliable)
 	void ClientApplyBuildingSelection(ATWBaseBuilding* InBuilding);
@@ -259,14 +265,15 @@ private:
 	UFUNCTION(Client, Reliable)
 	void ClientClearSelection();
 
+	bool TryInvokeBuildingProduceById(ATWBaseBuilding* TargetBuilding, FName UnitId) const;
+	bool TryInvokeBuildingProduceFallback(ATWBaseBuilding* TargetBuilding) const;
+
+public:
 	UFUNCTION()
 	void HandleUICommandRequested(FName CommandId);
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleUICommandRequested(FName CommandId);
-
-	bool TryInvokeBuildingProduceById(ATWBaseBuilding* TargetBuilding, FName UnitId) const;
-	bool TryInvokeBuildingProduceFallback(ATWBaseBuilding* TargetBuilding) const;
 #pragma endregion
 
 public:
@@ -283,14 +290,15 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void ClientForceRefreshSelectionBridge();
-	
+
 private:
 	void ChangeCurrentCommandType(ETWCommandType CommandType);
-	
+
 	void UpdateInputOverlayState();
 	void UpdateDragSelectionOverlay();
 	void UpdateCursorOverlayPosition();
 	FName ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const;
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	float DragSelectionScreenThreshold = 8.f;
 
@@ -306,9 +314,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FMassEntityHandle> ServerSelectedEntities;
+
 	UPROPERTY(Transient)
 	TArray<FMassNetworkID> ClientSelectedEntities;
-
 
 	UPROPERTY(Transient)
 	TObjectPtr<ATWBaseBuilding> SelectedBuilding = nullptr;
@@ -329,15 +337,15 @@ private:
 	TArray<FSelectionSummaryItemViewModel> LocalSelectionSummaryItems;
 
 	FVector ClickStartLocation = FVector::ZeroVector;
-	
+
 	bool bHasValidMousePositionThisFrame = false;
-	FVector2D LastValidMouseScreenPosition = FVector2D::ZeroVector;      // 커서 표시용 (DPI 보정)
-	FVector2D CurrentFrameMouseScreenPosition = FVector2D::ZeroVector;   // 커서 표시용 (DPI 보정)
+	FVector2D LastValidMouseScreenPosition = FVector2D::ZeroVector;
+	FVector2D CurrentFrameMouseScreenPosition = FVector2D::ZeroVector;
 
 	bool bHasValidRawMousePositionThisFrame = false;
-	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;      // 엣지 스크롤용 (raw)
+	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;
 	bool bWasEdgeScrollingLastFrame = false;
-	
+
 	bool bEdgeScrollLeftActive = false;
 	bool bEdgeScrollRightActive = false;
 	bool bEdgeScrollTopActive = false;
