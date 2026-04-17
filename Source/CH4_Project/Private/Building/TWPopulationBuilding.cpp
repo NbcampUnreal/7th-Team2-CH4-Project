@@ -3,6 +3,7 @@
 #include "Core/TWPlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "GameFramework/GameStateBase.h"
 
 ATWPopulationBuilding::ATWPopulationBuilding()
 {
@@ -15,7 +16,7 @@ const UTWPopulationBuildingDataAsset* ATWPopulationBuilding::GetPopulationBuildi
 	return Cast<UTWPopulationBuildingDataAsset>(BuildingData);
 }
 
-int8 ATWPopulationBuilding::RequestEnqueuePopulation()
+int32 ATWPopulationBuilding::RequestEnqueuePopulation()
 {
 	if (!HasAuthority())
 	{
@@ -53,15 +54,16 @@ int8 ATWPopulationBuilding::RequestEnqueuePopulation()
 	OwningPlayerState->SpendCost(PopulationData->ProductionCost);
 
 	CurrentQueueCount += 1;
+	ForceNetUpdate();
 	
 	UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 추가 | 현재 대기열 수: %d"), CurrentQueueCount);
 
-	StartPopulationQueueTimer();
+	TryStartNextProduction();
 	return 1;
 }
 
 
-int8 ATWPopulationBuilding::IncreasePopulationNow()
+int32 ATWPopulationBuilding::IncreasePopulationNow()
 {
 	if (!HasAuthority())
 	{
@@ -83,9 +85,19 @@ int8 ATWPopulationBuilding::IncreasePopulationNow()
 	return 1;
 }
 
-void ATWPopulationBuilding::StartPopulationQueueTimer()
+void ATWPopulationBuilding::TryStartNextProduction()
 {
 	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	if (bIsProducing)
+	{
+		return;
+	}
+
+	if (CurrentQueueCount <= 0)
 	{
 		return;
 	}
@@ -96,17 +108,34 @@ void ATWPopulationBuilding::StartPopulationQueueTimer()
 		return;
 	}
 
-	if (GetWorldTimerManager().IsTimerActive(PopulationQueueTimerHandle))
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return;
 	}
+
+	bIsProducing = true;
+	CurrentProducingDuration = FMath::Max(0.01f, PopulationData->ProductionInterval);
+
+	const AGameStateBase* GS = World->GetGameState();
+	CurrentProductionStartTime = GS ? GS->GetServerWorldTimeSeconds() : World->GetTimeSeconds();
+
+	ForceNetUpdate();
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[인구수 건물] 생산 시작 | 생산 시간: %.2f초 | 현재 대기열 수: %d"),
+		CurrentProducingDuration,
+		CurrentQueueCount
+	);
 
 	GetWorldTimerManager().SetTimer(
 		PopulationQueueTimerHandle,
 		this,
 		&ATWPopulationBuilding::HandlePopulationQueue,
-		PopulationData->ProductionInterval,
-		true
+		CurrentProducingDuration,
+		false
 	);
 }
 
@@ -117,15 +146,24 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 		return;
 	}
 
+	auto ResetProductionState = [this]()
+	{
+		bIsProducing = false;
+		CurrentProducingDuration = 0.f;
+		CurrentProductionStartTime = 0.f;
+		ForceNetUpdate();
+	};
+	
 	if (CurrentQueueCount <= 0)
 	{
-		ClearAllBuildingTimers();
+		ResetProductionState();
 		return;
 	}
 
 	const int8 bIncreaseSuccess = IncreasePopulationNow();
 	if (bIncreaseSuccess == 0)
 	{
+		ResetProductionState();
 		return;
 	}
 
@@ -133,10 +171,34 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 
 	UE_LOG(LogTemp, Log, TEXT("[인구수 건물] 현재 대기열 수: %d"), CurrentQueueCount);
 
-	if (CurrentQueueCount <= 0)
+	ResetProductionState();
+	TryStartNextProduction();
+}
+
+float ATWPopulationBuilding::GetCurrentProductionProgressRatio() const
+{
+	if (!bIsProducing || CurrentProducingDuration <= 0.f)
 	{
-		ClearAllBuildingTimers();
+		return 0.f;
 	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return 0.f;
+	}
+
+	const AGameStateBase* GS = World->GetGameState();
+	const float Now = GS ? GS->GetServerWorldTimeSeconds() : World->GetTimeSeconds();
+	const float Elapsed = FMath::Max(0.f, Now - CurrentProductionStartTime);
+
+	return FMath::Clamp(Elapsed / CurrentProducingDuration, 0.f, 1.f);
+}
+
+FString ATWPopulationBuilding::GetCurrentProductionProgressText() const
+{
+	const float Ratio = GetCurrentProductionProgressRatio();
+	return FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Ratio * 100.f));
 }
 
 void ATWPopulationBuilding::CancelQueuedPopulation()
@@ -157,6 +219,10 @@ void ATWPopulationBuilding::ClearAllBuildingTimers()
 	}
 
 	GetWorldTimerManager().ClearTimer(PopulationQueueTimerHandle);
+	bIsProducing = false;
+	CurrentProducingDuration = 0.f;
+	CurrentProductionStartTime = 0.f;
+	
 	CancelQueuedPopulation();
 	ForceNetUpdate();
 }
@@ -166,4 +232,7 @@ void ATWPopulationBuilding::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ATWPopulationBuilding, CurrentQueueCount);
+	DOREPLIFETIME(ATWPopulationBuilding, bIsProducing);
+	DOREPLIFETIME(ATWPopulationBuilding, CurrentProducingDuration);
+	DOREPLIFETIME(ATWPopulationBuilding, CurrentProductionStartTime);
 }

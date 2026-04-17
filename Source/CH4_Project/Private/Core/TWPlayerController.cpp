@@ -1742,6 +1742,25 @@ void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName Co
 	{
 	case ETWCommandType::ProduceUnit:
 	{
+		if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(CurrentSelectedBuilding))
+		{
+			if (PopulationBuilding->RequestEnqueuePopulation())
+			{
+				RefreshUIBridge();
+				ClientForceRefreshSelectionBridge();
+				return;
+			}
+
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("[UI Produce] Population enqueue failed: Building=%s / CommandId=%s"),
+				*PopulationBuilding->GetName(),
+				*CommandId.ToString()
+			);
+			return;
+		}
+			
 		bool bProduced = false;
 
 		if (TryInvokeBuildingProduceById(CurrentSelectedBuilding, CommandMeta->PayloadId))
@@ -2059,23 +2078,45 @@ void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
 		return;
 	}
 
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
+	ATWPopulationBuilding* TargetPopulationBuilding = nullptr;
 
-	for (TActorIterator<ATWPopulationBuilding> It(GetWorld()); It; ++It)
+	if (ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding())
 	{
-		ATWPopulationBuilding* PopulationBuilding = *It;
-		if (!PopulationBuilding)
-		{
-			continue;
-		}
+		TargetPopulationBuilding = Cast<ATWPopulationBuilding>(CurrentSelectedBuilding);
+	}
 
-		if (PopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
-		{
-			continue;
-		}
+	if (!TargetPopulationBuilding)
+	{
+		const int32 MyPlayerSlot = TWPS->PlayerSlot;
 
-		PopulationBuilding->RequestEnqueuePopulation();
+		for (TActorIterator<ATWPopulationBuilding> It(GetWorld()); It; ++It)
+		{
+			ATWPopulationBuilding* PopulationBuilding = *It;
+			if (!PopulationBuilding)
+			{
+				continue;
+			}
+
+			if (PopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
+			{
+				continue;
+			}
+
+			TargetPopulationBuilding = PopulationBuilding;
+			break;
+		}
+	}
+
+	if (!TargetPopulationBuilding)
+	{
 		return;
+	}
+
+	const int8 bEnqueueSuccess = TargetPopulationBuilding->RequestEnqueuePopulation();
+	if (bEnqueueSuccess != 0)
+	{
+		RefreshUIBridge();
+		ClientForceRefreshSelectionBridge();
 	}
 }
 #pragma endregion
