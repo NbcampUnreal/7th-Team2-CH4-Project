@@ -6,6 +6,7 @@
 #include "Subsystems/TWBuildingManagerSubsystem.h"
 #include "Subsystems/TWGridSubSystem.h"
 #include "NavModifierComponent.h"
+#include "Component/TWTeamColorComponent.h"
 #include "NavAreas/NavArea_Null.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
@@ -14,7 +15,6 @@ ATWBaseBuilding::ATWBaseBuilding()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	
 	bReplicates = true;
-	bHasCachedMaterials = false;
 	SetReplicateMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
@@ -29,14 +29,23 @@ ATWBaseBuilding::ATWBaseBuilding()
 	NavModifier->SetAreaClass(UNavArea_Null::StaticClass());
 	
 	MeshComponent->SetCanEverAffectNavigation(false);
+	
+	TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
+}
+
+void ATWBaseBuilding::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	
+	if (TeamColorComponent && MeshComponent)
+	{
+		TeamColorComponent->SetUpTargetMesh(MeshComponent);
+	}
 }
 
 void ATWBaseBuilding::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	CacheOriginalMaterial();
-	UpdatePlayerMaterial();
 	
 	if (UWorld* World = GetWorld())
 	{
@@ -230,7 +239,15 @@ void ATWBaseBuilding::HandleDestroyedByDamage()
 
 void ATWBaseBuilding::OnRep_OwnerPlayerSlot()
 {
-	UpdatePlayerMaterial();
+	if (TeamColorComponent)
+	{
+		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+		
+		if (BuildingState == ETWBuildingState::UnderConstruction)
+		{
+			OnRep_BuildingState();
+		}
+	}
 }
 
 void ATWBaseBuilding::OnRep_BuildingState()
@@ -252,48 +269,9 @@ void ATWBaseBuilding::OnRep_BuildingState()
 	}
 	else if (BuildingState == ETWBuildingState::Completed)
 	{
-		for (int32 i = 0; i < MeshComponent->GetNumMaterials(); ++i)
+		if (TeamColorComponent)
 		{
-			if (OriginalMaterials.IsValidIndex(i))
-			{
-				MeshComponent->SetMaterial(i, OriginalMaterials[i]);	
-			}
-		}
-	}
-}
-
-void ATWBaseBuilding::CacheOriginalMaterial()
-{
-	if (bHasCachedMaterials || !MeshComponent)
-	{
-		return;
-	}
-	
-	const int32 NumMats = MeshComponent->GetNumMaterials();
-	for (int32 i = 0; i < NumMats; ++i)
-	{
-		OriginalMaterials.Add(MeshComponent->GetMaterial(i));
-	}
-	
-	bHasCachedMaterials = true;
-}
-
-void ATWBaseBuilding::UpdatePlayerMaterial()
-{
-	CacheOriginalMaterial();
-	
-	if (PlayerMaterialMap.Contains(OwnerPlayerSlot))
-	{
-		UMaterialInterface* PlayerMat = PlayerMaterialMap[OwnerPlayerSlot];
-		
-		if (PlayerMat && OriginalMaterials.IsValidIndex(PlayerMaterialIndex))
-		{
-			OriginalMaterials[PlayerMaterialIndex] = PlayerMat;
-			
-			if (BuildingState == ETWBuildingState::Completed && MeshComponent)
-			{
-				MeshComponent->SetMaterial(PlayerMaterialIndex, PlayerMat);
-			}
+			TeamColorComponent->RestoreOriginalMaterials();
 		}
 	}
 }
@@ -345,7 +323,16 @@ void ATWBaseBuilding::SetOwnerPlayerSlot(int32 InSlot)
 	if (HasAuthority())
 	{
 		OwnerPlayerSlot = InSlot;
-		UpdatePlayerMaterial();
+		
+		if (TeamColorComponent)
+		{
+			TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+			
+			if (BuildingState == ETWBuildingState::UnderConstruction)
+			{
+				OnRep_BuildingState();
+			}
+		}
 	}
 }
 
