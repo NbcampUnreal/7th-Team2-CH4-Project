@@ -122,7 +122,42 @@ void UTWUIHUDCoordinator::HandleHUDCommandClicked(FName InCommandId)
 void UTWUIHUDCoordinator::HandleSelectionChanged()
 {
 	RefreshSelectionPanel();
-	RefreshCommandPanel();
+
+	const TArray<FCommandSlotViewModel> NewCommandViewModels = BuildCommandViewModels();
+
+	const bool bCommandCountChanged = (NewCommandViewModels.Num() != LastBuiltCommandViewModels.Num());
+	bool bCommandStructureChanged = bCommandCountChanged;
+
+	if (!bCommandStructureChanged)
+	{
+		for (int32 Index = 0; Index < NewCommandViewModels.Num(); ++Index)
+		{
+			const FCommandSlotViewModel& NewVM = NewCommandViewModels[Index];
+			const FCommandSlotViewModel& OldVM = LastBuiltCommandViewModels[Index];
+			if (NewVM.CommandId != OldVM.CommandId ||
+				NewVM.SlotIndex != OldVM.SlotIndex ||
+				NewVM.bVisible != OldVM.bVisible ||
+				NewVM.bEnabled != OldVM.bEnabled ||
+				NewVM.bPending != OldVM.bPending ||
+				NewVM.bArmed != OldVM.bArmed ||
+				NewVM.NextContext != OldVM.NextContext ||
+				NewVM.bIsContextCommand != OldVM.bIsContextCommand ||
+				NewVM.bReturnToPreviousContext != OldVM.bReturnToPreviousContext)
+			{
+				bCommandStructureChanged = true;
+				break;
+			}
+		}
+	}
+	if (bCommandStructureChanged)
+	{
+		LastBuiltCommandViewModels = NewCommandViewModels;
+
+		if (HUDRoot)
+		{
+			HUDRoot->SetCommandData(LastBuiltCommandViewModels);
+		}
+	}
 }
 
 void UTWUIHUDCoordinator::HandleResourceChanged()

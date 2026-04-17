@@ -4,6 +4,7 @@
 #include "UObject/Object.h"
 #include "MassCommonTypes.h"
 #include "Subsystems/TWUnitSubsystem.h"
+#include "Component/TWPlayerSelectionVisualComponent.h"
 #include "TWSelectionVisualManager.generated.h"
 
 class ATWPlayerController;
@@ -20,7 +21,8 @@ public:
 	void ApplyUnitSelection(const TArray<FMassNetworkID>& InSelectedUnits);
 	void ApplyBuildingSelection(const TArray<ATWBaseBuilding*>& InSelectedBuildings);
 	void ClearSelectionVisuals();
-
+	void SetPrimarySelectedVisualData(const FTWSelectedVisualData& InData);
+	void SetSelectedUnitRingVisuals(const TArray<FTWUnitRingVisualData>& InData);
 	void Tick(float DeltaSeconds);
 
 protected:
@@ -72,4 +74,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="SelectionVisual")
 	float BuildingSelectionZOffset = 4.f;
+private:
+	UPROPERTY(Transient)
+	FTWSelectedVisualData PrimarySelectedVisualData;
+
+	UPROPERTY(Transient)
+	TArray<FTWUnitRingVisualData> SelectedUnitRingVisuals;
 };
