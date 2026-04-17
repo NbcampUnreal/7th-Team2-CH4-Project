@@ -122,8 +122,8 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 			bMarkItemDirty = true;
 		}
 		
-		const FVector_NetQuantize Velocity = MassVelocityFragments[EntityIdx].Value;
-		if (false == FVector_NetQuantize::PointsAreNear(Velocity, Item->Agent.GetVelocity(), LocationTolerance ))
+		const FVector Velocity = MassVelocityFragments[EntityIdx].Value;
+		if (false == FVector::PointsAreNear(Velocity, Item->Agent.GetVelocity(), LocationTolerance ))
 		{
 			Item->Agent.SetVelocity(Velocity);
 			bMarkItemDirty = true;

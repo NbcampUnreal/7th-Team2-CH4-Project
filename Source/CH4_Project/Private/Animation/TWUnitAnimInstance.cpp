@@ -26,15 +26,26 @@ void UTWUnitAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		
 		if (EntityManager.IsEntityActive(EntityHandle))
 		{
-			if (const FTWClientVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FTWClientVelocityFragment>(EntityHandle))
+			if (GetOwningActor()->GetNetMode()==NM_ListenServer)
 			{
-				GroundSpeed = VelocityFrag->Velocity.Size2D();
-				if (GroundSpeed<10)
+				if (const FMassVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FMassVelocityFragment>(EntityHandle))
 				{
-					UE_LOG(LogTemp,Warning,TEXT("GroundSpeed<10"))
+					GroundSpeed = VelocityFrag->Value.Size2D();
 				}
-				return;
+			}else if (GetOwningActor()->GetNetMode()==ENetMode::NM_Client)
+			{
+				if (const FTWClientVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FTWClientVelocityFragment>(EntityHandle))
+				{
+					GroundSpeed = VelocityFrag->Velocity.Size2D();
+				}				
 			}
+			
+			if (GroundSpeed<10)
+			{
+				UE_LOG(LogTemp,Warning,TEXT("GroundSpeed<10"))
+			}
+			return;
+			
 		}
 	}
 	GroundSpeed = 0.0f;
