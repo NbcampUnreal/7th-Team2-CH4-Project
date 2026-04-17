@@ -160,7 +160,7 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 		return;
 	}
 
-	const int8 bIncreaseSuccess = IncreasePopulationNow();
+	const int32 bIncreaseSuccess = IncreasePopulationNow();
 	if (bIncreaseSuccess == 0)
 	{
 		ResetProductionState();
