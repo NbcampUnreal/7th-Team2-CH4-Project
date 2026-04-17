@@ -5,6 +5,7 @@
 #include "Mass/Fragments/TWTransformOffsetFragment.h"
 #include "Mass/Fragments/TWTransformOffsetParams.h"
 #include "MassReplicationTransformHandlers.h"
+#include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Replication/Agent/TWReplicatedAgent.h"
@@ -14,6 +15,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 	TArrayView<FTWStatusFragment> StatusFragments;
 	TArrayView<FTransformFragment> TransformFragments;
 	TArrayView<FTWUnitFragment> UnitFragments;
+	TArrayView<FTWAttackFragment> AttackFragments;
 	
 	// Add the requirements for the query used to grab all the status fragments
 	auto AddRequirementsForSpawnQuery = [this](FMassEntityQuery& InQuery)
@@ -21,6 +23,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		InQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadWrite);
 		InQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 		InQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadWrite);
+		InQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadWrite);
 	};
 
 	// Cache the status fragments
@@ -30,6 +33,7 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		StatusFragments = InExecContext.GetMutableFragmentView<FTWStatusFragment>();
 		TransformFragments = InExecContext.GetMutableFragmentView<FTransformFragment>();
 		UnitFragments = InExecContext.GetMutableFragmentView<FTWUnitFragment>();
+		AttackFragments = InExecContext.GetMutableFragmentView<FTWAttackFragment>();
 	};
 
 	// Called when a new entity is spawned. Stores the entity status in the status fragment
@@ -52,6 +56,9 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		const FName UnitID = ReplicatedEntity.GetUnitID();
 		UnitFragments[EntityIdx].SetOwner(Owner);
 		UnitFragments[EntityIdx].SetUnitID(UnitID);
+		
+		const float LastAttackTime = ReplicatedEntity.GetLastAttackTime();
+		AttackFragments[EntityIdx].LastAttackTime = LastAttackTime;
 	};
 
 	auto SetModifiedEntityData = [this](const FMassEntityView& EntityView, const FTWReplicatedAgent& Item)
@@ -127,6 +134,10 @@ void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityVie
 	UnitFragment.SetOwner(Owner);
 	UnitFragment.SetUnitID(UnitID);
 	
+	FTWAttackFragment& AttackFragment = EntityView.GetFragmentData<FTWAttackFragment>();
+	
+	const float LastAttackTime = Item.GetLastAttackTime();
+	AttackFragment.LastAttackTime = LastAttackTime;
 	
 }
 

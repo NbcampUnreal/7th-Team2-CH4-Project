@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassCommonFragments.h"
 #include "MassReplicationProcessor.h"
+#include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "TWMassReplicator.generated.h"
@@ -24,6 +25,7 @@ public:
 		EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
 		EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 		EntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly);
+		EntityQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadOnly);
 		
 		
 	}
