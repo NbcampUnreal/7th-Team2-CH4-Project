@@ -64,7 +64,9 @@ void UTWEASyncProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 	
 			FTransform Transform = TransformFragment.GetTransform();
 			Transform.SetLocation(Transform.GetLocation() + TranslationOffset);
-	
+			
+
+			
 			float ServerYawRadian =  FMath::DegreesToRadians(Transform.Rotator().Yaw);
 			FQuat ServerQuat = FQuat(FVector::UpVector, ServerYawRadian);
 	

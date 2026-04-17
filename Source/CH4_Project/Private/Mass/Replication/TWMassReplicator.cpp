@@ -19,6 +19,7 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 	TConstArrayView<FTransformFragment> TransformFragments;
 	TConstArrayView<FTWUnitFragment> UnitFragments;
 	TConstArrayView<FTWAttackFragment> AttackFragments;
+	TConstArrayView<FMassVelocityFragment> MassVelocityFragments;
 	
 	auto CacheViewsCallback = [&] (FMassExecutionContext& InContext)  
 	{  
@@ -26,6 +27,7 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		TransformFragments = InContext.GetFragmentView<FTransformFragment>();  
 		UnitFragments = InContext.GetFragmentView<FTWUnitFragment>();  
 		AttackFragments = InContext.GetFragmentView<FTWAttackFragment>();  
+		MassVelocityFragments = InContext.GetFragmentView<FMassVelocityFragment>();  
 		RepSharedFrag = &InContext.GetMutableSharedFragment<FMassReplicationSharedFragment>();  
 	};
 	
@@ -57,6 +59,9 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		
 		float LastAttackTime = AttackFragments[EntityIdx].LastAttackTime;
 		InReplicatedAgent.SetLastAttackTime(LastAttackTime);
+		
+		FVector_NetQuantize Velocity = MassVelocityFragments[EntityIdx].Value;
+		InReplicatedAgent.SetVelocity(Velocity);
 		
 		// Adds the new agent in the client bubble
 		return BubbleInfo.GetBubbleSerializer().Bubble.AddAgent(InContext.GetEntity(EntityIdx), InReplicatedAgent);  
@@ -114,6 +119,13 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		if (false == FMath::IsNearlyEqual( LastAttackTime , Item->Agent.GetLastAttackTime()))
 		{
 			Item->Agent.SetLastAttackTime(LastAttackTime);
+			bMarkItemDirty = true;
+		}
+		
+		const FVector_NetQuantize Velocity = MassVelocityFragments[EntityIdx].Value;
+		if (false == FVector_NetQuantize::PointsAreNear(Velocity, Item->Agent.GetVelocity(), LocationTolerance ))
+		{
+			Item->Agent.SetVelocity(Velocity);
 			bMarkItemDirty = true;
 		}
 		

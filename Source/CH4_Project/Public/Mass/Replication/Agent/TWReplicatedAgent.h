@@ -41,6 +41,11 @@ struct CH4_PROJECT_API FTWReplicatedAgent : public FReplicatedAgentBase
 	void SetLastAttackTime(const float InLastAttackTime){LastAttackTime = InLastAttackTime;}
 #pragma endregion
 	
+#pragma region Velocity
+	FVector_NetQuantize GetVelocity()const{return Velocity;}
+	void SetVelocity(const FVector_NetQuantize& InVelocity){Velocity = InVelocity;}
+#pragma endregion
+	
 private:  
 	UPROPERTY(Transient)  
 	FTWUnitStatus Status;
@@ -52,5 +57,7 @@ private:
 	FName UnitID;
 	UPROPERTY(Transient)
 	float LastAttackTime=0.0f;
+	UPROPERTY(Transient)
+	FVector_NetQuantize Velocity;
 };
 
