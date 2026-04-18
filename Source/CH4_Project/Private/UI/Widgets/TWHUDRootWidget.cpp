@@ -112,3 +112,14 @@ void UTWHUDRootWidget::SetCursorOverlayVisible(bool bInVisible)
 		CursorOverlayWidget->SetCursorVisible(bInVisible);
 	}
 }
+
+void UTWHUDRootWidget::SetBuildModeNotification(bool bIsBuildMode)
+{
+	if (!NotificationPanel)
+	{
+		return;
+	}
+
+	NotificationPanel->SetModeNotificationVisible(true);
+	NotificationPanel->ShowModeNotification(bIsBuildMode);
+}

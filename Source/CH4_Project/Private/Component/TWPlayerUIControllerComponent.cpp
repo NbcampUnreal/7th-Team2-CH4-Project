@@ -118,6 +118,16 @@ void UTWPlayerUIControllerComponent::RefreshUI()
 	PlayerUIBridge->RefreshAll();
 }
 
+void UTWPlayerUIControllerComponent::RefreshBuildModeNotification()
+{
+	if (!PlayerUIBridge)
+	{
+		return;
+	}
+
+	PlayerUIBridge->RefreshBuildModeNotification();
+}
+
 void UTWPlayerUIControllerComponent::ForceRefreshSelectionBridge()
 {
 	if (PlayerUIBridge)
