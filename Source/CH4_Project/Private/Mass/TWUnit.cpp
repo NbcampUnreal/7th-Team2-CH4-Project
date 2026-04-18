@@ -23,7 +23,7 @@ ATWUnit::ATWUnit()
 	MassAgentComponent = CreateDefaultSubobject<UMassAgentComponent>("MassAgentComponent");
 	SelectionAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("SelectionAnchor"));
 	SelectionAnchor->SetupAttachment(SkeletalMeshComponent);
-
+	
 	HPBarAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("HPBarAnchor"));
 	HPBarAnchor->SetupAttachment(SkeletalMeshComponent);
 

@@ -80,7 +80,12 @@ void UTWUnitSubsystem::Deinitialize()
 {
 	UnitContainers.Empty();
 	CachedUnitTableRows.Empty();
-
+	
+	for (FTimerHandle& TimerHandle : TimerHandles)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle);
+	}
+	TimerHandles.Empty();
 	Super::Deinitialize();
 }
 
@@ -433,6 +438,47 @@ void UTWUnitSubsystem::SpawnUnit(
 
 			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
 		});
+}
+
+void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!EntityManager)
+	{
+		return;
+	}
+	FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit);
+	if (!UnitFragment)
+	{
+		return;
+	}
+	int32 PlayerSlot = UnitFragment->GetOwner();
+	RemoveUnit(PlayerSlot, UnitFragment->GetIdx());
+	
+	FTimerHandle TimerHandle;
+	TWeakObjectPtr<ThisClass> WeakThis = this;
+	
+	GetWorld()->GetTimerManager().SetTimer(
+		TimerHandle, 
+		[TimerHandle, WeakThis, Unit]()
+		{
+			if (false == WeakThis.IsValid())
+			{
+				return;
+			}
+			FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(WeakThis->GetWorld());
+			if (!EntityManager)
+			{
+				return;
+			}
+			EntityManager->Defer().DestroyEntities({Unit});
+			WeakThis->TimerHandles.Remove(TimerHandle);
+		},
+		5.0f,false 
+		);
+	TimerHandles.Add(TimerHandle);
 }
 
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)

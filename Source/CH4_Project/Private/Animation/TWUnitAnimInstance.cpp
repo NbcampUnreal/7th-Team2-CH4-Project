@@ -12,7 +12,11 @@
 void UTWUnitAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
-
+	if (GetOwningActor()->GetNetMode()==ENetMode::NM_DedicatedServer)
+	{
+		return;
+	}
+	
 	if (!MassSubsystem || !MassAgentComponent)
 	{
 		GroundSpeed = 0.0f;
@@ -26,24 +30,21 @@ void UTWUnitAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		
 		if (EntityManager.IsEntityActive(EntityHandle))
 		{
-			if (GetOwningActor()->GetNetMode()==NM_ListenServer)
-			{
-				if (const FMassVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FMassVelocityFragment>(EntityHandle))
-				{
-					GroundSpeed = VelocityFrag->Value.Size2D();
-				}
-			}else if (GetOwningActor()->GetNetMode()==ENetMode::NM_Client)
+			
+			if (GetOwningActor()->GetNetMode()==ENetMode::NM_Client)
 			{
 				if (const FTWClientVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FTWClientVelocityFragment>(EntityHandle))
 				{
 					GroundSpeed = VelocityFrag->Velocity.Size2D();
 				}				
-			}
-			
-			if (GroundSpeed<10)
+			}else
 			{
-				UE_LOG(LogTemp,Warning,TEXT("GroundSpeed<10"))
-			}
+				if (const FMassVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FMassVelocityFragment>(EntityHandle))
+				{
+					GroundSpeed = VelocityFrag->Value.Size2D();
+				}
+			} 
+			
 			return;
 			
 		}

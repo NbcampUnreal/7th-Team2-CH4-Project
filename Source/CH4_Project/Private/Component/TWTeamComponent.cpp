@@ -1,5 +1,7 @@
 #include "Component/TWTeamComponent.h"
 
+#include "MassAgentComponent.h"
+#include "Mass/Fragments/TWUnitFragment.h"
 #include "Net/UnrealNetwork.h"
 
 UTWTeamComponent::UTWTeamComponent()
@@ -11,6 +13,7 @@ UTWTeamComponent::UTWTeamComponent()
 void UTWTeamComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
 }
 
 void UTWTeamComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -25,6 +28,33 @@ void UTWTeamComponent::OnRep_TeamID()
 	{
 		OnTeamChanged.Broadcast(TeamID);
 	}
+}
+
+int32 UTWTeamComponent::GetTeamID()
+{
+	if (TeamID != -1)
+	{
+		return TeamID;
+	}
+	
+	if (false == GetOwner()->HasAuthority())
+	{
+		return TeamID;
+	}
+	UMassAgentComponent* MassAgentComponent = GetOwner()->FindComponentByClass<UMassAgentComponent>();
+	if (false == IsValid(MassAgentComponent))
+	{
+		return TeamID;
+	}
+	FMassEntityManager* MassEntityManager = UE::Mass::Utils::GetEntityManager(this);
+	if (!MassEntityManager)
+	{
+		return TeamID;
+	}
+	int32 NewTeamID = MassEntityManager->GetFragmentDataPtr<FTWUnitFragment>(MassAgentComponent->GetEntityHandle())->GetOwner();
+	SetTeamID(NewTeamID);
+	
+	return NewTeamID;
 }
 
 

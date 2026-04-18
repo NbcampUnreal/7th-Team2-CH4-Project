@@ -27,6 +27,10 @@ struct FTWStatusFragment : public FMassFragment
 	//TODO 이동속도 적용해야함
 	void SetStatus(const FTWUnitStatus& InStatus) { CurrentStatus = InStatus; }
 
+	uint8 GetIsDeath()const { return bIsDeath; }
+	void SetIsDeath(uint8 InIsDeath) { bIsDeath = InIsDeath; }
 protected:
 	FTWUnitStatus CurrentStatus;
+	UPROPERTY(Transient)
+	uint8 bIsDeath = false;
 };

@@ -34,12 +34,13 @@ struct FTWUnitFragment : public FMassFragment
 	FName GetUnitID()const { return UnitID; }
 	void SetUnitID(FName InUnitID) { UnitID = InUnitID; }
 protected:
-	UPROPERTY(Transient)
+	UPROPERTY(Transient) 
 	int32 Owner = -1;
 	//Server Only Member
 	UPROPERTY(Transient)
 	int32 Idx = -1;
 	UPROPERTY(Transient)
 	FName UnitID;
+
 };
 
