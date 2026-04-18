@@ -20,7 +20,7 @@ public:
 	UFUNCTION()
 	void OnRep_TeamID();
 
-	int32 GetTeamID() const {return TeamID;}
+	int32 GetTeamID();
 	void SetTeamID(int32 NewTeamID);
 
 	UPROPERTY(BlueprintAssignable, Category = "Team")

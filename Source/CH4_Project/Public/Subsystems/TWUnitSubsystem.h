@@ -88,6 +88,8 @@ public:
 		ATWPlayerController* PlayerController
 	);
 
+	void OnUnitKilled(FMassEntityHandle& Unit);
+	
 	TMap<EResourceType, int32> GetUpkeep(int32 PlayerSlot);
 	int32 GetCurrentPopulation(int32 PlayerSlot) const;
 

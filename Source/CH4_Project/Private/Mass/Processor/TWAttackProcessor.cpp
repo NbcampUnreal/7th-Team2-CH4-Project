@@ -130,6 +130,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				
 			if (EnemyStatus.Status[static_cast<int32>(ETWStatusType::Health)] < 0.0f)
 			{
+				UnitSubsystem->OnUnitKilled(TargetEntity);
 				EnemyStatus.Status[static_cast<int32>(ETWStatusType::Health)] = 0.0f;
 				AttackList[EntityIdx].bIsTargetSet = false;
 				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);

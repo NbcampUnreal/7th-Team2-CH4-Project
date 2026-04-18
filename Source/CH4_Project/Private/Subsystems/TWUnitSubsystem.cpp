@@ -435,6 +435,67 @@ void UTWUnitSubsystem::SpawnUnit(
 		});
 }
 
+void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
+	if (!EntityManager)
+	{
+		return;
+	}
+	FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit);
+	if (!UnitFragment)
+	{
+		return;
+	}
+	int32 PlayerSlot = UnitFragment->GetOwner();
+	RemoveUnit(PlayerSlot, UnitFragment->GetIdx());
+	
+	FTimerHandle TimerHandle;
+	TWeakObjectPtr<ThisClass> WeakThis = this;
+	
+	GetWorld()->GetTimerManager().SetTimer(
+		TimerHandle, 
+		[WeakThis, Unit]()
+		{
+			if (false == WeakThis.IsValid())
+			{
+				return;
+			}
+			FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(WeakThis->GetWorld());
+			if (!EntityManager)
+			{
+				return;
+			}
+
+			EntityManager->Defer().PushCommand<FMassDeferredDestroyCommand>(
+				[Unit](FMassEntityManager& InOutEntityManager)
+			{
+				UWorld* LocalWorld = InOutEntityManager.GetWorld();
+				if (!LocalWorld)
+				{
+					return;
+				}
+
+				if (false == InOutEntityManager.IsEntityValid(Unit))
+				{
+					return;
+				}
+				UMassSpawnerSubsystem* MassSpawnerSubsystem = LocalWorld->GetSubsystem<UMassSpawnerSubsystem>();
+				if (!MassSpawnerSubsystem)
+				{
+					return;
+				}
+
+				MassSpawnerSubsystem->DestroyEntities({Unit});
+			});
+		},
+		5.0f,false 
+		);
+	
+}
+
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
 {
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
