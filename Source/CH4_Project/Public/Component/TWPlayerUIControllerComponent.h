@@ -49,7 +49,7 @@ public:
 	);
 
 	void HandleUICommandRequested(FName CommandId);
-
+	void RefreshBuildModeNotification();
 	bool IsPointerOverHUD() const;
 	UTWPlayerUIBridge* GetPlayerUIBridge() const { return PlayerUIBridge; }
 

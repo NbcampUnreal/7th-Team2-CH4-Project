@@ -14,13 +14,22 @@ class CH4_PROJECT_API UTWNotificationPanelWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category="Notification")
 	void ShowNotification(const FString& Message, ENotificationType Type);
 
-protected:
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UBorder> NotificationBorder;
+	UFUNCTION(BlueprintCallable, Category="Notification")
+	void SetModeNotificationText(const FText& InText);
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextMessage;
+	UFUNCTION(BlueprintCallable, Category="Notification")
+	void SetModeNotificationVisible(bool bVisible);
+
+	UFUNCTION(BlueprintCallable, Category="Notification")
+	void ShowModeNotification(bool bIsBuildMode);
+
+protected:
+	UPROPERTY(meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextMessage = nullptr;
+
+	UPROPERTY(meta=(BindWidgetOptional))
+	TObjectPtr<UBorder> NotificationBorder = nullptr;
 };

@@ -2171,7 +2171,10 @@ void ATWPlayerController::OnToggleBuildModeAction()
 		ChangeCurrentCommandType(ETWCommandType::None);
 	}
 	UE_LOG(LogTemp, Warning, TEXT("건설 모드: %s"), bBuildShortcutModeActive ? TEXT("ON") : TEXT("OFF"));
-
+	if (PlayerUIControllerComponent)
+	{
+		PlayerUIControllerComponent->RefreshBuildModeNotification();
+	}
 	RefreshDynamicMappingContexts();
 }
 

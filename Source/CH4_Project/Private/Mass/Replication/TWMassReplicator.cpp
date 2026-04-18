@@ -18,12 +18,16 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 	TConstArrayView<FTWStatusFragment> StatusFragments;
 	TConstArrayView<FTransformFragment> TransformFragments;
 	TConstArrayView<FTWUnitFragment> UnitFragments;
+	TConstArrayView<FTWAttackFragment> AttackFragments;
+	TConstArrayView<FMassVelocityFragment> MassVelocityFragments;
 	
 	auto CacheViewsCallback = [&] (FMassExecutionContext& InContext)  
 	{  
 		StatusFragments = InContext.GetFragmentView<FTWStatusFragment>();  
 		TransformFragments = InContext.GetFragmentView<FTransformFragment>();  
 		UnitFragments = InContext.GetFragmentView<FTWUnitFragment>();  
+		AttackFragments = InContext.GetFragmentView<FTWAttackFragment>();  
+		MassVelocityFragments = InContext.GetFragmentView<FMassVelocityFragment>();  
 		RepSharedFrag = &InContext.GetMutableSharedFragment<FMassReplicationSharedFragment>();  
 	};
 	
@@ -52,6 +56,12 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		InReplicatedAgent.SetOwner(Owner);
 		FName UnitID = UnitFragments[EntityIdx].GetUnitID();
 		InReplicatedAgent.SetUnitID(UnitID);
+		
+		float LastAttackTime = AttackFragments[EntityIdx].LastAttackTime;
+		InReplicatedAgent.SetLastAttackTime(LastAttackTime);
+		
+		FVector_NetQuantize Velocity = MassVelocityFragments[EntityIdx].Value;
+		InReplicatedAgent.SetVelocity(Velocity);
 		
 		// Adds the new agent in the client bubble
 		return BubbleInfo.GetBubbleSerializer().Bubble.AddAgent(InContext.GetEntity(EntityIdx), InReplicatedAgent);  
@@ -102,6 +112,20 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		{
 			Item->Agent.SetOwner(Owner);
 			Item->Agent.SetUnitID(UnitID);
+			bMarkItemDirty = true;
+		}
+		
+		const float LastAttackTime = AttackFragments[EntityIdx].LastAttackTime;
+		if (false == FMath::IsNearlyEqual( LastAttackTime , Item->Agent.GetLastAttackTime()))
+		{
+			Item->Agent.SetLastAttackTime(LastAttackTime);
+			bMarkItemDirty = true;
+		}
+		
+		const FVector Velocity = MassVelocityFragments[EntityIdx].Value;
+		if (false == FVector::PointsAreNear(Velocity, Item->Agent.GetVelocity(), LocationTolerance ))
+		{
+			Item->Agent.SetVelocity(Velocity);
 			bMarkItemDirty = true;
 		}
 		

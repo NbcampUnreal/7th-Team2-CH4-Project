@@ -51,6 +51,9 @@ public:
 	void SetDragSelectionStateData(const FUIDragSelectionStateViewModel& InData);
 
 	UFUNCTION(BlueprintCallable)
+	void SetBuildModeNotification(bool bIsBuildMode);
+	
+	UFUNCTION(BlueprintCallable)
 	void SetCursorScreenPosition(const FVector2D& InScreenPosition);
 	FOnHUDCommandClicked& GetOnHUDCommandClickedDelegate()
 	{

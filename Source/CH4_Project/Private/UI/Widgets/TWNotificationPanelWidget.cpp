@@ -29,5 +29,33 @@ void UTWNotificationPanelWidget::ShowNotification(const FString& Message, ENotif
 		}
 
 		NotificationBorder->SetBrushColor(Color);
+		NotificationBorder->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
+
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UTWNotificationPanelWidget::SetModeNotificationText(const FText& InText)
+{
+	ShowNotification(InText.ToString(), ENotificationType::Info);
+}
+
+void UTWNotificationPanelWidget::SetModeNotificationVisible(bool bVisible)
+{
+	SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+
+	if (NotificationBorder)
+	{
+		NotificationBorder->SetVisibility(
+			bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed
+		);
+	}
+}
+
+void UTWNotificationPanelWidget::ShowModeNotification(bool bIsBuildMode)
+{
+	ShowNotification(
+		bIsBuildMode ? TEXT("건설 모드") : TEXT("일반 모드"),
+		ENotificationType::Info
+	);
 }

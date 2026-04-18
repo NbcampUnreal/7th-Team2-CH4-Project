@@ -48,6 +48,17 @@ void ATWUnit::BeginPlay()
 	}
 }
 
+void ATWUnit::PlayAttackMontage()
+{
+	if (SkeletalMeshComponent)
+	{
+		if (UAnimInstance* AnimInstance = SkeletalMeshComponent->GetAnimInstance())
+		{
+			AnimInstance->Montage_Play(AttackMontage);
+		}
+	}
+}
+
 FVector ATWUnit::GetSelectionAnchorWorldLocation() const
 {
 	if (IsValid(SelectionAnchor))

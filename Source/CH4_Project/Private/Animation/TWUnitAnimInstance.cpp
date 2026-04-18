@@ -7,6 +7,7 @@
 #include "MassAgentComponent.h"
 #include "MassMovementFragments.h"
 #include "Evaluation/MovieSceneEvaluationCustomVersion.h"
+#include "Mass/Fragments/TWClientVelocityFragment.h"
 
 void UTWUnitAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
@@ -25,11 +26,26 @@ void UTWUnitAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		
 		if (EntityManager.IsEntityActive(EntityHandle))
 		{
-			if (const FMassVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FMassVelocityFragment>(EntityHandle))
+			if (GetOwningActor()->GetNetMode()==NM_ListenServer)
 			{
-				GroundSpeed = VelocityFrag->Value.Size2D();
-				return;
+				if (const FMassVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FMassVelocityFragment>(EntityHandle))
+				{
+					GroundSpeed = VelocityFrag->Value.Size2D();
+				}
+			}else if (GetOwningActor()->GetNetMode()==ENetMode::NM_Client)
+			{
+				if (const FTWClientVelocityFragment* VelocityFrag = EntityManager.GetFragmentDataPtr<FTWClientVelocityFragment>(EntityHandle))
+				{
+					GroundSpeed = VelocityFrag->Velocity.Size2D();
+				}				
 			}
+			
+			if (GroundSpeed<10)
+			{
+				UE_LOG(LogTemp,Warning,TEXT("GroundSpeed<10"))
+			}
+			return;
+			
 		}
 	}
 	GroundSpeed = 0.0f;

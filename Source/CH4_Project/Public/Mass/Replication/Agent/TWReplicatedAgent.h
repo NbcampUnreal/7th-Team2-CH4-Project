@@ -36,8 +36,15 @@ struct CH4_PROJECT_API FTWReplicatedAgent : public FReplicatedAgentBase
 	void SetUnitID(const FName InUnitID) { UnitID = InUnitID; }  
 #pragma endregion
 	
-private:  
-
+#pragma region Attack
+	float GetLastAttackTime()const{return LastAttackTime;}
+	void SetLastAttackTime(const float InLastAttackTime){LastAttackTime = InLastAttackTime;}
+#pragma endregion
+	
+#pragma region Velocity
+	FVector GetVelocity()const{return Velocity;}
+	void SetVelocity(const FVector& InVelocity){Velocity = InVelocity;}
+#pragma endregion
 	
 private:  
 	UPROPERTY(Transient)  
@@ -48,5 +55,9 @@ private:
 	int32 Owner = -1;
 	UPROPERTY(Transient)
 	FName UnitID;
+	UPROPERTY(Transient)
+	float LastAttackTime=0.0f;
+	UPROPERTY(Transient)
+	FVector Velocity = FVector::ZeroVector;
 };
 
