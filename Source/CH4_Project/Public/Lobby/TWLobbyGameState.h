@@ -16,15 +16,7 @@ class CH4_PROJECT_API ATWLobbyGameState : public AGameState
 	
 public:
 	ATWLobbyGameState();
-	void SetCanStartGame(bool bInCanStart);
 	
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
-	UPROPERTY(ReplicatedUsing = OnRep_CanStartGame)
-	bool bIsCanStartGame;
-	
-	UFUNCTION()
-	void OnRep_CanStartGame();
-	
 };

@@ -16,6 +16,7 @@ ATWLobbyGameMode::ATWLobbyGameMode()
 	GameStateClass = ATWLobbyGameState::StaticClass();
 }
 
+// 수정x
 void ATWLobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId,
 	FString& ErrorMessage)
 {
@@ -30,44 +31,42 @@ void ATWLobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 	}
 }
 
+// 수정 필요
 void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	
 	UE_LOG(LogTemp, Error, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *NewPlayer->GetName());
 	
-	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
-	if (!GS || !NewPlayer) return;
+	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
+	if (!LGS || !NewPlayer) return;
 	
 	if (!IsValid(NewPlayer)) return;
 	
 	if (IsValid(NewPlayer))
 	{
 		ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
-		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		
 		if (LPS)
 		{
 			if (GetNumPlayers() == 1)
 			{
 				UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
-				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost(true) !!!"));
 				LPS->SetIsHost(true);
+				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost :  %d!!!"), LPS->IsHost());
 			}
-		}
-		
-		if (PC && LPS->IsHost() == false)
-		{
-			ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
-			if (LPC && LPC->LobbyWidgetInstance)
+			else
 			{
-				LPC->LobbyWidgetInstance->ShowPlayButton(false);
+				UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
+				LPS->SetIsHost(false);
+				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost :  %d!!!"), LPS->IsHost());
 			}
 		}
 	}
 	CheckStartCondition();
 }
 
+// 수정x
 void ATWLobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
@@ -76,20 +75,26 @@ void ATWLobbyGameMode::Logout(AController* Exiting)
 	CheckStartCondition();
 }
 
-void ATWLobbyGameMode::CheckStartCondition()
+// 수정x
+bool ATWLobbyGameMode::CheckStartCondition()
 {
-	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
-	if (!GS) return;
+	bAllReady = true;
 	
-	if (GS->PlayerArray.Num() < MinPlayersToStart)
+	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
+	if (!LGS)
 	{
-		GS->SetCanStartGame(false);
-		return;
+		return false;
 	}
 	
-	bool bAllReady = true;
+	// 조건 1 : 최소 인원수 (2명)
+	if (LGS->PlayerArray.Num() < MinPlayersToStart)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("To Start Play need at least 2 player"));
+		return false;
+	}
 	
-	for (APlayerState* PS : GS->PlayerArray)
+	// 조건 2 : 방장 제외 전원 준비 완료
+	for (APlayerState* PS : LGS->PlayerArray)
 	{
 		ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
 		if (LPS)
@@ -97,20 +102,23 @@ void ATWLobbyGameMode::CheckStartCondition()
 			if (!LPS->IsHost() && !LPS->IsReady())
 			{
 				bAllReady = false;
-				break;
+				return false;
 			}
 		}
 	}
-	GS->SetCanStartGame(bAllReady);
-	UE_LOG(LogTemp, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("READY TO START") : TEXT("NOT READY"));
+	
+	UE_LOG(LogTemp, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("true") : TEXT("false"));
+	return bAllReady;
 }
 
+// 수정x
 void ATWLobbyGameMode::StartGame()
 {
 	bUseSeamlessTravel = true;
 	GetWorld()->ServerTravel(TEXT("L_Main?listen"));
 }
 
+// 수정 필요
 void ATWLobbyGameMode::AssignNewHost()
 {
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();

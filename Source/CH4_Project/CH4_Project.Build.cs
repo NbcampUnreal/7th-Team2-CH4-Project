@@ -18,6 +18,7 @@ public class CH4_Project : ModuleRules
 			"Niagara",
 			"UMG",
 			"Slate",
+			"SlateCore",
 			"MassEntity",
 			"MassCommon",
 			"MassMovement",
@@ -25,11 +26,14 @@ public class CH4_Project : ModuleRules
 			"MassSpawner",
 			"MassAIBehavior",
 			"MassNavigation",
+			"MassNavMeshNavigation",
 			"MassSignals",
 			"GameplayTags",
 			"MassReplication",
 			"MassEQS",
 			"NetCore", "CommonUI",
+			"NavCorridor"
+			
 			
 		});
 

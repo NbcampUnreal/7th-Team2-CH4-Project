@@ -3,6 +3,7 @@
 
 #include "Lobby/TWLobby_Layout.h"
 #include "Lobby//TWLobbyPlayerController.h"
+#include "Lobby/TWLobbyGameState.h"
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Components/Button.h"
 #include "Components/EditableText.h"
@@ -10,6 +11,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Title/TWTitlePlayerController.h"
 #include "GameFramework/GameStateBase.h"
+#include "Lobby/TWLobbyGameMode.h"
 
 UTWLobby_Layout::UTWLobby_Layout(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
@@ -34,37 +36,44 @@ void UTWLobby_Layout::NativeConstruct()
 
 void UTWLobby_Layout::OnPlayButtonClicked()
 {
-	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
-	if(PC)
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
+	ATWLobbyPlayerState* LPS = LPC->GetPlayerState<ATWLobbyPlayerState>();
+	if (!LPC || !LPS->IsHost()) return;
+	
+	if(LPC)
 	{
-		PC->Server_RequestStartGame();
+		LPC->Server_RequestStartGame();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Can Not Start!!!"));
 	}
 }
 
 void UTWLobby_Layout::OnReadyButtonClicked()
 {
-	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
-	if (PC)
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
+	if (LPC)
 	{
-		PC->Server_SetReady(true);
+		LPC->Server_SetReady(true);
 	}
 }
 
 void UTWLobby_Layout::OnCancelButtonClicked()
 {
-	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
-	if (PC)
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
+	if (LPC)
 	{
-		PC->Server_SetReady(false);
+		LPC->Server_SetReady(false);
 	}
 }
 
 void UTWLobby_Layout::OnLobbyExitButtonClicked()
 {
-	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
-	if (PC)
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
+	if (LPC)
 	{
-		PC->ExitLobby();
+		LPC->ExitLobby();
 	}
 }
 
@@ -77,11 +86,11 @@ void UTWLobby_Layout::UpdateUserList()
 			NickSlot->SetVisibility(ESlateVisibility::Collapsed);
 		}
 		
-		AGameStateBase* GS = GetWorld()->GetGameState();
+		ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
 		
-		if (GS)
+		if (LGS)
 		{
-			for (int32 i = 0; i< GS->PlayerArray.Num(); i++)
+			for (int32 i = 0; i< LGS->PlayerArray.Num(); i++)
 			{
 				if (NickNameSlots.IsValidIndex(i) && NickNameSlots[i])
 				{

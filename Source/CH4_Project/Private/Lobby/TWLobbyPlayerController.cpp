@@ -18,7 +18,7 @@ void ATWLobbyPlayerController::BeginPlay()
 	}
 }
 
-// 준비 상태 설정 RPC
+// --- 준비 상태 설정 요청 RPC ---
 bool ATWLobbyPlayerController::Server_SetReady_Validate(bool bNewReady)
 {
 	return true;
@@ -30,12 +30,6 @@ void ATWLobbyPlayerController::Server_SetReady_Implementation(bool bNewReady)
 	if (LPS)
 	{
 		LPS->SetIsReady(bNewReady);
-	}
-	
-	ATWLobbyGameMode* GM = GetWorld()->GetAuthGameMode<ATWLobbyGameMode>();
-	if (GM)
-	{
-		GM->CheckStartCondition();
 	}
 }
 
@@ -49,10 +43,17 @@ bool ATWLobbyPlayerController::Server_RequestStartGame_Validate()
 
 void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 {
-	ATWLobbyGameMode* GM = GetWorld()->GetAuthGameMode<ATWLobbyGameMode>();
-	if (GM)
+	ATWLobbyGameMode* LGM = GetWorld()->GetAuthGameMode<ATWLobbyGameMode>();
+	if (LGM)
 	{
-		GM->StartGame();
+		if (LGM->CheckStartCondition())
+		{
+			LGM->StartGame();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Can Not Start!!!"));
+		}
 	}
 }
 

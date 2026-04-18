@@ -45,19 +45,6 @@ void ATWLobbyPlayerState::OnRep_IsReady()
 
 void ATWLobbyPlayerState::OnRep_IsHost()
 {
-	if (bIsHost)
-	{
-		UE_LOG(LogTemp, Log, TEXT("Client: I am the Host now!"));
-		
-		APlayerController* PC = GetWorld()->GetFirstPlayerController();
-		if (PC)
-		{
-			ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
-			if (LPC && LPC->LobbyWidgetInstance)
-			{
-				LPC->LobbyWidgetInstance->ShowPlayButton(true);
-			}
-		}
-	}
+	
 }
 
