@@ -180,7 +180,8 @@ protected:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Component")
 	UTWBuildComponent* GetBuildComponent() const { return BuildComponent; }
-
+	UFUNCTION(BlueprintCallable, Category="Input")
+	bool IsBuildShortcutModeActive() const { return bBuildShortcutModeActive; }
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWBuildComponent> BuildComponent = nullptr;

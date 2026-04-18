@@ -20,7 +20,8 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "UI/Data/TWUIInputStateTypes.h"
-#include "UI/Widgets/TWHUDRootWidget.h"
+#include "Building/TWUpgradeBuilding.h"
+#include "Component/TWBuildComponent.h"
 
 namespace TWCommandIds
 {
@@ -285,6 +286,59 @@ namespace TWUIBridgeBuildingHelpers
 
 		return nullptr;
 	}
+	static const FUICommandMetaRow* FindUpgradeCommandMetaByPayload(UDataTable* CommandMetaTable, FName UpgradeId)
+	{
+		if (!CommandMetaTable || UpgradeId.IsNone())
+		{
+			return nullptr;
+		}
+
+		static const FString ContextString(TEXT("TWUIBridgeBuildingHelpers::FindUpgradeCommandMetaByPayload"));
+
+		TArray<FUICommandMetaRow*> AllRows;
+		CommandMetaTable->GetAllRows<FUICommandMetaRow>(ContextString, AllRows);
+
+		for (const FUICommandMetaRow* Row : AllRows)
+		{
+			if (!Row)
+			{
+				continue;
+			}
+
+			if (Row->CommandType != ETWCommandType::Research)
+			{
+				continue;
+			}
+
+			if (Row->PayloadId == UpgradeId)
+			{
+				return Row;
+			}
+		}
+
+		return nullptr;
+	}
+	
+	static TSoftObjectPtr<UTexture2D> ResolveUpgradeQueueItemIcon(
+	UDataTable* CommandMetaTable,
+	FName QueuedUpgradeId)
+	{
+		if (QueuedUpgradeId.IsNone())
+		{
+			return nullptr;
+		}
+
+		if (const FUICommandMetaRow* CommandMeta =
+			FindUpgradeCommandMetaByPayload(CommandMetaTable, QueuedUpgradeId))
+		{
+			if (!CommandMeta->Icon.IsNull())
+			{
+				return CommandMeta->Icon;
+			}
+		}
+
+		return nullptr;
+	}
 
 	static const FUISelectionPresentationRow* FindSelectionPresentationRowByEntityId(
 		UDataTable* SelectionPresentationTable,
@@ -473,7 +527,8 @@ void UTWPlayerUIBridge::RefreshAll()
 
 	RefreshInputState();
 	RefreshDragSelectionState();
-
+	RefreshBuildModeNotification();
+	
 	if (HUDRootWidget)
 	{
 		HUDRootWidget->SetCursorScreenPosition(CursorScreenPosition);
@@ -838,6 +893,10 @@ void UTWPlayerUIBridge::HandlePostCommandSelectionRefreshTick()
 	{
 		bKeepRefreshing = PopulationBuilding->IsProducing() || PopulationBuilding->GetCurrentQueueCount() > 0;
 	}
+	else if (ATWUpgradeBuilding* UpgradeBuilding = Cast<ATWUpgradeBuilding>(SelectedBuilding))
+	{
+		bKeepRefreshing = UpgradeBuilding->IsProducing() || UpgradeBuilding->GetQueuedUpgradeIds().Num() > 0;
+	}
 
 	if (bKeepRefreshing)
 	{
@@ -983,6 +1042,71 @@ void UTWPlayerUIBridge::RefreshSelection()
 			if (!bIsOwnedByMe)
 			{
 				CommandIds.Reset();
+			}
+			else if (ATWUpgradeBuilding* UpgradeBuilding = Cast<ATWUpgradeBuilding>(SelectedBuilding))
+			{
+				TArray<FName> AvailableUpgradeIds;
+				UpgradeBuilding->ResolveAvailableUpgradeIds(AvailableUpgradeIds);
+
+				for (const FName& UpgradeId : AvailableUpgradeIds)
+				{
+					if (const FUICommandMetaRow* CommandMeta =
+						TWUIBridgeBuildingHelpers::FindUpgradeCommandMetaByPayload(CommandMetaTable, UpgradeId))
+					{
+						CommandIds.Add(CommandMeta->CommandId);
+					}
+				}
+
+				VM.bShowProductionPanel = true;
+				VM.Production.bVisible = true;
+				VM.Production.Title = TEXT("업그레이드 중");
+				VM.Production.ProgressRatio = UpgradeBuilding->GetCurrentProductionProgressRatio();
+				VM.Production.ProgressText = UpgradeBuilding->GetCurrentProductionProgressText();
+
+				const TArray<FName>& QueuedUpgradeIds = UpgradeBuilding->GetQueuedUpgradeIds();
+
+				for (int32 Index = 0; Index < QueuedUpgradeIds.Num(); ++Index)
+				{
+					const FName QueuedUpgradeId = QueuedUpgradeIds[Index];
+
+					FProductionQueueItemViewModel QueueItem;
+					QueueItem.PayloadId = QueuedUpgradeId;
+					QueueItem.DisplayName = QueuedUpgradeId.IsNone() ? TEXT("Queued Upgrade") : QueuedUpgradeId.ToString();
+					QueueItem.bIsActive = (Index == 0 && UpgradeBuilding->IsProducing());
+					QueueItem.StackCount = 1;
+					QueueItem.Icon = TWUIBridgeBuildingHelpers::ResolveUpgradeQueueItemIcon(
+						CommandMetaTable,
+						QueuedUpgradeId
+					);
+
+					if (!QueuedUpgradeId.IsNone())
+					{
+						if (const FUICommandMetaRow* QueueCommandMeta =
+							TWUIBridgeBuildingHelpers::FindUpgradeCommandMetaByPayload(CommandMetaTable, QueuedUpgradeId))
+						{
+							if (!QueueCommandMeta->DisplayName.IsEmpty())
+							{
+								QueueItem.DisplayName = QueueCommandMeta->DisplayName.ToString();
+							}
+
+							if (QueueItem.Icon.IsNull() && !QueueCommandMeta->Icon.IsNull())
+							{
+								QueueItem.Icon = QueueCommandMeta->Icon;
+							}
+						}
+					}
+
+					VM.Production.QueueItems.Add(QueueItem);
+				}
+
+				if (UpgradeBuilding->IsProducing() || QueuedUpgradeIds.Num() > 0)
+				{
+					StartProductionSelectionRefresh();
+				}
+				else
+				{
+					StopProductionSelectionRefresh();
+				}
 			}
 			else if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(SelectedBuilding))
 			{
@@ -1299,6 +1423,17 @@ void UTWPlayerUIBridge::RefreshResources()
 	ResourceProvider->DebugSetResources(VM, ElapsedSeconds);
 }
 
+void UTWPlayerUIBridge::RefreshBuildModeNotification()
+{
+	if (!OwnerController || !HUDRootWidget)
+	{
+		return;
+	}
+
+	const bool bIsBuildMode = OwnerController->IsBuildShortcutModeActive();
+	HUDRootWidget->SetBuildModeNotification(bIsBuildMode);
+}
+
 int32 UTWPlayerUIBridge::ResolveBuildingQueueCount(FName CommandId) const
 {
 	if (!OwnerController || CommandId.IsNone())
@@ -1331,6 +1466,33 @@ int32 UTWPlayerUIBridge::ResolveBuildingQueueCount(FName CommandId) const
 		for (const FName& QueuedUnitId : QueuedUnitIds)
 		{
 			if (QueuedUnitId == CommandMeta->PayloadId)
+			{
+				++MatchedCount;
+			}
+		}
+
+		return MatchedCount;
+	}
+	
+	if (const ATWUpgradeBuilding* UpgradeBuilding = Cast<ATWUpgradeBuilding>(SelectedBuilding))
+	{
+		const FUICommandMetaRow* CommandMeta = FindCommandMetaRow(CommandId);
+		if (!CommandMeta)
+		{
+			return 0;
+		}
+
+		if (CommandMeta->CommandType != ETWCommandType::Research)
+		{
+			return 0;
+		}
+
+		int32 MatchedCount = 0;
+		const TArray<FName>& QueuedUpgradeIds = UpgradeBuilding->GetQueuedUpgradeIds();
+
+		for (const FName& QueuedUpgradeId : QueuedUpgradeIds)
+		{
+			if (QueuedUpgradeId == CommandMeta->PayloadId)
 			{
 				++MatchedCount;
 			}

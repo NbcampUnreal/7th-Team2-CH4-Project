@@ -50,7 +50,7 @@ public:
 	void SetDragSelectionState(bool bInVisible, const FVector2D& InStart, const FVector2D& InEnd);
 	void SetCursorScreenPosition(const FVector2D& InScreenPosition);
 	void SetCursorOverlayVisible(bool bInVisible);
-	
+	void RefreshBuildModeNotification();
 	FName GetArmedCommandId() const { return ArmedCommandId; }
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnUICommandRequested, FName);
