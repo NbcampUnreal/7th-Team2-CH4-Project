@@ -41,5 +41,6 @@ protected:
 	int32 Idx = -1;
 	UPROPERTY(Transient)
 	FName UnitID;
+
 };
 
