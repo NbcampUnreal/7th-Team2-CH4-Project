@@ -7,6 +7,7 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UTWTeamComponent;
 class UAnimMontage;
 
 UCLASS()
@@ -28,6 +29,9 @@ protected:
 	TObjectPtr<USkeletalMeshComponent> SkeletalMeshComponent;
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
 	TObjectPtr<UMassAgentComponent> MassAgentComponent;
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
+	TObjectPtr<UTWTeamComponent> TeamComponent;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Anchor")
 	TObjectPtr<USceneComponent> SelectionAnchor = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Anchor")

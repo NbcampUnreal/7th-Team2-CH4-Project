@@ -3,6 +3,8 @@
 
 #include "Mass/TWUnit.h"
 
+#include "Component/TWTeamComponent.h"
+
 
 // Sets default values
 ATWUnit::ATWUnit()
@@ -20,6 +22,9 @@ ATWUnit::ATWUnit()
 	SelectionAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("SelectionAnchor"));
 	SelectionAnchor->SetupAttachment(SkeletalMeshComponent);
 
+	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>("TeamComponent");
+	
+	
 	HPBarAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("HPBarAnchor"));
 	HPBarAnchor->SetupAttachment(SkeletalMeshComponent);
 

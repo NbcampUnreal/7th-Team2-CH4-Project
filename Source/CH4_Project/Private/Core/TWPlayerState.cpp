@@ -404,7 +404,7 @@ FTWUnitStatus ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID) const
 
 int32 ATWPlayerState::GetTeamID() const
 {
-	return TeamComponent ? TeamComponent->TeamID : -1;
+	return TeamComponent ? TeamComponent->GetTeamID() : -1;
 }
 
 void ATWPlayerState::SetTeamID(int32 InTeamID)
