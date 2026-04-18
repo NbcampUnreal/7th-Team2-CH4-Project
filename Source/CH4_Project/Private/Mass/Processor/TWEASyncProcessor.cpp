@@ -8,6 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "MassActorSubsystem.h"
 #include "Mass/Fragments/TWTransformOffsetFragment.h"
+#include "Mass/Traits/TWCommandTrait.h"
 #include "Mass/Traits/TWEASyncTrait.h"
 
 UTWEASyncProcessor::UTWEASyncProcessor()
@@ -46,6 +47,11 @@ void UTWEASyncProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 	EntityQuery.ForEachEntityChunk(Context, [](FMassExecutionContext& Context)
 	{
+		if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+		{
+			return;
+		}
+		
 		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FTWTransformOffsetFragment> MeshOffsetList = Context.GetFragmentView<FTWTransformOffsetFragment>();
 		const TArrayView<FMassActorFragment> ActorList = Context.GetMutableFragmentView<FMassActorFragment>();

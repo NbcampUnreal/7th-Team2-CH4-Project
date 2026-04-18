@@ -80,12 +80,6 @@ void UTWUnitSubsystem::Deinitialize()
 {
 	UnitContainers.Empty();
 	CachedUnitTableRows.Empty();
-	
-	for (FTimerHandle& TimerHandle : TimerHandles)
-	{
-		GetWorld()->GetTimerManager().ClearTimer(TimerHandle);
-	}
-	TimerHandles.Empty();
 	Super::Deinitialize();
 }
 
@@ -172,7 +166,7 @@ bool UTWUnitSubsystem::FindNearestOwnedEntity(
 }
 
 bool UTWUnitSubsystem::FindNearestAnyEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle,
-	float MaxDistance)
+                                            float MaxDistance)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
@@ -203,7 +197,7 @@ bool UTWUnitSubsystem::FindNearestAnyEntity(const FVector& Location, FMassEntity
 			{
 				continue;
 			}
-			
+
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
 			const float DistSq = FVector::DistSquared(Location, EntityPos);
 
@@ -222,11 +216,10 @@ bool UTWUnitSubsystem::FindNearestAnyEntity(const FVector& Location, FMassEntity
 	}
 
 	return false;
-	
 }
 
 bool UTWUnitSubsystem::FindNearestEnemyEntity(
-	const FVector& Location, 
+	const FVector& Location,
 	FMassEntityHandle& OutEntityHandle,
 	int32 OwnerPlayerSlot,
 	float MaxDistance)
@@ -286,7 +279,6 @@ bool UTWUnitSubsystem::FindNearestEnemyEntity(
 	}
 
 	return false;
-	
 }
 
 bool UTWUnitSubsystem::GetEntitiesInRectangle(
@@ -376,7 +368,8 @@ void UTWUnitSubsystem::SpawnUnit(
 	TWeakObjectPtr<ThisClass> WeakThis = this;
 
 	EntityManager.Defer().PushCommand<FMassDeferredCreateCommand>(
-		[Location, EntityTemplate, WeakPlayerController, WeakThis, UnitTableRowBase](FMassEntityManager& InOutEntityManager)
+		[Location, EntityTemplate, WeakPlayerController, WeakThis, UnitTableRowBase](
+		FMassEntityManager& InOutEntityManager)
 		{
 			if (!WeakPlayerController.IsValid() || !WeakThis.IsValid())
 			{
@@ -415,20 +408,23 @@ void UTWUnitSubsystem::SpawnUnit(
 			{
 				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
 				UnitFragment->SetOwner(PlayerState->PlayerSlot);
-				UE_LOG(LogTemp,Warning, TEXT("PlayerSlot :	%d"), PlayerState->PlayerSlot)
+				UE_LOG(LogTemp, Warning, TEXT("PlayerSlot :	%d"), PlayerState->PlayerSlot)
 			}
 
-			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
+			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(
+				SpawnedUnit))
 			{
 				TransformFragment->GetMutableTransform().SetLocation(Location);
 			}
 
-			if (FMassMoveTargetFragment* MoveTargetFragment = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
+			if (FMassMoveTargetFragment* MoveTargetFragment = InOutEntityManager.GetFragmentDataPtr<
+				FMassMoveTargetFragment>(SpawnedUnit))
 			{
 				MoveTargetFragment->Center = Location;
 			}
 
-			if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
+			if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(
+				SpawnedUnit))
 			{
 				const FTWUnitStatus UnitStatus =
 					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
@@ -443,7 +439,7 @@ void UTWUnitSubsystem::SpawnUnit(
 void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-	
+
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
 	if (!EntityManager)
 	{
@@ -456,29 +452,7 @@ void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 	}
 	int32 PlayerSlot = UnitFragment->GetOwner();
 	RemoveUnit(PlayerSlot, UnitFragment->GetIdx());
-	
-	FTimerHandle TimerHandle;
-	TWeakObjectPtr<ThisClass> WeakThis = this;
-	
-	GetWorld()->GetTimerManager().SetTimer(
-		TimerHandle, 
-		[TimerHandle, WeakThis, Unit]()
-		{
-			if (false == WeakThis.IsValid())
-			{
-				return;
-			}
-			FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(WeakThis->GetWorld());
-			if (!EntityManager)
-			{
-				return;
-			}
-			EntityManager->Defer().DestroyEntities({Unit});
-			WeakThis->TimerHandles.Remove(TimerHandle);
-		},
-		5.0f,false 
-		);
-	TimerHandles.Add(TimerHandle);
+
 }
 
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
@@ -722,7 +696,8 @@ bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 		return false;
 	}
 
-	const FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(EntityInfo->Entity);
+	const FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(
+		EntityInfo->Entity);
 	if (!TransformFragment)
 	{
 		return false;

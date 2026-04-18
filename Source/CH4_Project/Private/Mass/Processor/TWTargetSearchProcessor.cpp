@@ -48,6 +48,11 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 	{
 		constexpr float SearchingInterval = 0.1f;
 
+		if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+		{
+			return;
+		}
+		
 		UTWUnitSubsystem* UnitSubsystem = Context.GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 		if (false == IsValid(UnitSubsystem))
 		{

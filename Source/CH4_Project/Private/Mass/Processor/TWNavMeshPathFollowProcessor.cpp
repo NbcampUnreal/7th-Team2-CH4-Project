@@ -54,6 +54,11 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 	
 	auto TickFunc = [EntitySignals, &EntityManager, this](FMassExecutionContext& Context)
 	{
+		
+		if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+		{
+			return;
+		}
 		UMassSignalSubsystem* SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Context.GetWorld());
 		if (false == IsValid(SignalSubsystem))
 		{

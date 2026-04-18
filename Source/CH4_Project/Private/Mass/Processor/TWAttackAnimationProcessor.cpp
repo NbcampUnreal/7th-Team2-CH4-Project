@@ -35,7 +35,10 @@ void UTWAttackAnimationProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 
 void UTWAttackAnimationProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-	Context.Defer().DestroyEntity()
+	if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+	{
+		return;
+	}
 	EntityQuery.ForEachEntityChunk(Context, [&EntityManager](FMassExecutionContext& Context)
 	{
 		const TArrayView<FTWAttackFragment> AttackList = Context.GetMutableFragmentView<FTWAttackFragment>();

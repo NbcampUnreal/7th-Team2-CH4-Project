@@ -46,7 +46,9 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 		}
 		
 		InReplicatedAgent.SetStatus(StatusData);		
- 
+		InReplicatedAgent.SetIsDeath(StatusFragments[EntityIdx].GetIsDeath());
+		InReplicatedAgent.SetDestroyTime(StatusFragments[EntityIdx].GetDestroyTime());
+		
 		FReplicatedAgentPositionYawData PositionYawData;
 		PositionYawData.SetPosition(TransformFragments[EntityIdx].GetTransform().GetLocation());
 		PositionYawData.SetYaw(FRotator::NormalizeAxis( TransformFragments[EntityIdx].GetTransform().Rotator().Yaw));
@@ -89,7 +91,17 @@ void UTWMassReplicator::ProcessClientReplication(FMassExecutionContext& Context,
 				break;
 			}
 		}
-
+		if (Item->Agent.GetDestroyTime() != StatusFragments[EntityIdx].GetDestroyTime())
+		{
+			Item->Agent.SetDestroyTime(StatusFragments[EntityIdx].GetDestroyTime());
+			bMarkItemDirty = true;  
+		}
+		if (Item->Agent.GetIsDeath() != StatusFragments[EntityIdx].GetIsDeath())
+		{
+			Item->Agent.SetIsDeath(StatusFragments[EntityIdx].GetIsDeath());
+			bMarkItemDirty = true;  
+		}
+		
 		const FVector& EntityLocation = TransformFragments[EntityIdx].GetTransform().GetLocation();  
 		constexpr float LocationTolerance = 10.0f;  
 		const float EntityYaw = TransformFragments[EntityIdx].GetTransform().Rotator().Yaw;

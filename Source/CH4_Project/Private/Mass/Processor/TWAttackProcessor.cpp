@@ -45,7 +45,10 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 	EntityQuery.ForEachEntityChunk(Context, [&EntityManager](FMassExecutionContext& Context)
 	{
 		constexpr float SearchingInterval = 0.1f;
-
+		if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+		{
+			return;
+		}
 		UTWUnitSubsystem* UnitSubsystem = Context.GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 		if (false == IsValid(UnitSubsystem))
 		{
@@ -144,9 +147,12 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			{
 				UnitSubsystem->OnUnitKilled(TargetEntity);
 				EnemyStatus.Status[static_cast<int32>(ETWStatusType::Health)] = 0.0f;
-
+				EnemyStatusFragment->SetDestroyTime(TimeSeconds + 3.0f);
 				EnemyStatusFragment->SetIsDeath(true);
-
+				EntityManager.Defer().AddTag<FTWMassDeadTag>(TargetEntity);
+				
+				
+				
 				AttackList[EntityIdx].bIsTargetSet = false;
 				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
 				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);

@@ -175,5 +175,4 @@ private:
 	FMassEntityQuery FindNearestEntityQuery;
 	TMap<FName, FTWUnitTableRowBase*> CachedUnitTableRows;
 	
-	TSet<FTimerHandle> TimerHandles;
 };
