@@ -31,10 +31,15 @@ struct FTWStatusFragment : public FMassFragment
 	void SetIsDeath(uint8 InIsDeath) { bIsDeath = InIsDeath; }
 	float GetDestroyTime()const { return DestroyTime; }
 	void SetDestroyTime(float InDestroyTime) { DestroyTime = InDestroyTime; }
+	uint8 GetDeathAnimationPlayed()const { return bDeathAnimationPlayed; }
+	void SetDeathAnimationPlayed(uint8 InDeathAnimationPlayed) { bDeathAnimationPlayed = InDeathAnimationPlayed; }
+	
 protected:
 	FTWUnitStatus CurrentStatus;
 	UPROPERTY(Transient)
 	uint8 bIsDeath = false;
 	UPROPERTY(Transient)
 	float DestroyTime = FLT_MAX;
+	UPROPERTY(Transient)
+	uint8 bDeathAnimationPlayed = false;	
 };

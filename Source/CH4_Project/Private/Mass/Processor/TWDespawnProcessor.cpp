@@ -51,15 +51,21 @@ void UTWDespawnProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 		{
 			FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 
-
-			if (StatusList[EntityIdx].GetStatus().Status[static_cast<int32>(ETWStatusType::Health)] <= 0.0f &&
-				StatusList[EntityIdx].GetIsDeath() == false
-			)
+			if (StatusList[EntityIdx].GetIsDeath()  &&
+				StatusList[EntityIdx].GetDeathAnimationPlayed() == false)
 			{
+				StatusList[EntityIdx].SetDeathAnimationPlayed(true);
 				if (ATWUnit* Unit = Cast<ATWUnit> (ActorList[EntityIdx].GetMutable()))
 				{
 					Unit->PlayDeathMontage();
 				}
+			}
+
+			if (Context.GetWorld()->GetAuthGameMode() &&
+				StatusList[EntityIdx].GetStatus().Status[static_cast<int32>(ETWStatusType::Health)] <= 0.0f &&
+				StatusList[EntityIdx].GetIsDeath() == false
+			)
+			{
 				UnitSubsystem->OnUnitKilled(Entity);
 				StatusList[EntityIdx].GetMutableStatus().Status[static_cast<int32>(ETWStatusType::Health)] = 0.0f;
 				StatusList[EntityIdx].SetDestroyTime(TimeSeconds + 3.0f);

@@ -9,6 +9,7 @@
 #include "MassNavMeshNavigationFragments.h"
 #include "NavigationSystem.h"
 #include "NavCorridor.h"
+#include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/StateTree/TWStateTreeCommandTask.h"
 #include "Mass/Traits/TWCommandTrait.h"
 
@@ -113,10 +114,12 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
 					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToTarget)
 				{
-					if (CommandFragments[EntityIdx].GetTarget().IsValid())
+					if (CommandFragments[EntityIdx].GetTarget().IsValid() && 
+						!EntityManager.GetFragmentDataPtr<FTWStatusFragment>(CommandFragments[EntityIdx].GetTarget())->GetIsDeath())
 					{
 						TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
-					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()))
+					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()) 
+						&& !CommandFragments[EntityIdx].GetTargetBuilding()->IsDead())
 					{
 						TargetLocation = CommandFragments[EntityIdx].GetTargetBuilding()->GetTransform().GetLocation();
 					}
