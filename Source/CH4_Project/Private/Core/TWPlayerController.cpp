@@ -393,6 +393,7 @@ void ATWPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	check(IsValid(LeftMouseAction));
 	check(IsValid(RightMouseAction));
+	check(IsValid(ToggleMenuAction));
 
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
@@ -420,6 +421,7 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
 	EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
+	EnhancedInputComponent->BindAction(ToggleMenuAction, ETriggerEvent::Started, this, &ThisClass::OnToggleMenuAction);
 
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
@@ -626,6 +628,11 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 	}
 }
 #pragma endregion
+
+void ATWPlayerController::OnToggleMenuAction()
+{
+	// 메뉴 화면 띄우기
+}
 
 #pragma region 유닛 명령
 void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
