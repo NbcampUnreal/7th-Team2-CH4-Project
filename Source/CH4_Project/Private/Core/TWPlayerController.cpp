@@ -223,11 +223,11 @@ namespace
 }
 
 ATWPlayerController::ATWPlayerController()
-	: CurrentCommandType(ETWCommandType::None)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	ServerSelectedEntities.Empty();
 	ClientSelectedEntities.Empty();
+	ArmedCommandId = NAME_None;
 
 	BuildComponent = CreateDefaultSubobject<UTWBuildComponent>(TEXT("BuildComponent"));
 	PlayerUIControllerComponent = CreateDefaultSubobject<UTWPlayerUIControllerComponent>(TEXT("PlayerUIControllerComponent"));
@@ -298,7 +298,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		bWasEdgeScrollingLastFrame = bIsEdgeScrollingNow;
 	}
 
-	if (bIsLeftMousePressed && CurrentCommandType == ETWCommandType::None && (!BuildComponent || !BuildComponent->GetBuildMode()))
+	if (bIsLeftMousePressed && ArmedCommandId.IsNone() && (!BuildComponent || !BuildComponent->GetBuildMode()))
 	{
 		UpdateDragSelectionOverlay();
 	}
@@ -480,35 +480,43 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 
 	ClickLocation = HitResult.Location;
 
-	if (CurrentCommandType != ETWCommandType::None)
+	if (!ArmedCommandId.IsNone())
 	{
 		if (!CanControlCurrentUnitSelection(this))
 		{
-			ChangeCurrentCommandType(ETWCommandType::None);
+			ClearArmedCommandId();
 			bConsumeLeftMouseRelease = true;
 			return;
 		}
 
-		if (CurrentCommandType == ETWCommandType::Move)
+		const FUICommandMetaRow* ArmedMeta = FindCommandMetaRowFromTable(ArmedCommandId);
+		if (!ArmedMeta)
+		{
+			ClearArmedCommandId();
+			bConsumeLeftMouseRelease = true;
+			return;
+		}
+
+		if (ArmedMeta->CommandType == ETWCommandType::Move)
 		{
 			ServerHandleMoveCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
+			ClearArmedCommandId();
 			bConsumeLeftMouseRelease = true;
 			return;
 		}
 
-		if (CurrentCommandType == ETWCommandType::Attack)
+		if (ArmedMeta->CommandType == ETWCommandType::Attack)
 		{
 			ServerHandleAttackCommand(ClickLocation);
-			ChangeCurrentCommandType(ETWCommandType::None);
+			ClearArmedCommandId();
 			bConsumeLeftMouseRelease = true;
 			return;
 		}
 
-		if (CurrentCommandType == ETWCommandType::Hold)
+		if (ArmedMeta->CommandType == ETWCommandType::Hold)
 		{
 			ServerHandleHoldCommand();
-			ChangeCurrentCommandType(ETWCommandType::None);
+			ClearArmedCommandId();
 			bConsumeLeftMouseRelease = true;
 			return;
 		}
@@ -531,7 +539,7 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 
 void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputActionValue)
 {
-	ChangeCurrentCommandType(ETWCommandType::None);
+	ClearArmedCommandId();
 
 	bIsLeftMousePressed = false;
 	bIsDraggingSelectionVisual = false;
@@ -598,9 +606,9 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 		return;
 	}
 
-	if (CurrentCommandType != ETWCommandType::None)
+	if (!ArmedCommandId.IsNone())
 	{
-		ChangeCurrentCommandType(ETWCommandType::None);
+		ClearArmedCommandId();
 		return;
 	}
 
@@ -619,31 +627,19 @@ void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActio
 #pragma endregion
 
 #pragma region 유닛 명령
-inline void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
+void ATWPlayerController::OnMoveCommandAction(const FInputActionValue& InputActionValue)
 {
-	if (!CanControlCurrentUnitSelection(this))
-	{
-		return;
-	}
-	ChangeCurrentCommandType(ETWCommandType::Move);
+	HandleCommandById(TEXT("Move"));
 }
 
 void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputActionValue)
 {
-	if (!CanControlCurrentUnitSelection(this))
-	{
-		return;
-	}
-	ChangeCurrentCommandType(ETWCommandType::Attack);
+	HandleCommandById(TEXT("Attack"));
 }
 
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
 {
-	if (!CanControlCurrentUnitSelection(this))
-	{
-		return;
-	}
-	ServerHandleHoldCommand();
+	HandleCommandById(TEXT("Hold"));
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
@@ -764,6 +760,65 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 	       *NavCommandLocation.ToString());
 }
 
+bool ATWPlayerController::TryFindAttackableBuildingCandidate(
+	const FVector& CommandLocation,
+	int32 MyPlayerSlot,
+	ATWBaseBuilding*& OutTargetBuilding,
+	FVector& OutResolvedTargetLocation
+)
+{
+	OutTargetBuilding = nullptr;
+	OutResolvedTargetLocation = CommandLocation;
+
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+
+	FTWAttackableBuildingCandidate Candidate;
+	if (!UnitSubsystem->FindNearestEnemyBuildingCandidate(CommandLocation, MyPlayerSlot, Candidate, 1200.0f))
+	{
+		return false;
+	}
+
+	OutTargetBuilding = Candidate.Building.Get();
+	OutResolvedTargetLocation = Candidate.TargetLocation;
+	return IsValid(OutTargetBuilding);
+}
+
+bool ATWPlayerController::TryResolveAttackableTargetPreview(
+	const FVector& CommandLocation,
+	int32 MyPlayerSlot,
+	FMassEntityHandle& OutTargetEntity,
+	ATWBaseBuilding*& OutTargetBuilding,
+	FVector& OutResolvedTargetLocation
+)
+{
+	OutTargetEntity = FMassEntityHandle();
+	OutTargetBuilding = nullptr;
+	OutResolvedTargetLocation = CommandLocation;
+
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+	
+	if (UnitSubsystem->FindNearestEnemyEntity(CommandLocation, OutTargetEntity, MyPlayerSlot, 1000.0f))
+	{
+		OutResolvedTargetLocation = CommandLocation;
+		return true;
+	}
+	
+	if (TryFindAttackableBuildingCandidate(CommandLocation, MyPlayerSlot, OutTargetBuilding, OutResolvedTargetLocation))
+	{
+		return true;
+	}
+
+	return false;
+}
+
 void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector& CommandLocation)
 {
 	checkf(HasAuthority(), TEXT("Server Logic Called!"));
@@ -817,17 +872,38 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 				return;
 			}
 
-			ETWMassCommand CommandType = ETWMassCommand::None;
-			FVector TargetLocation = FVector::ZeroVector;
+			ETWMassCommand CommandType = ETWMassCommand::AttackToLocation;
+			FVector TargetLocation = NavCommandLocation;
 			FMassEntityHandle TargetEntity;
-			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
+			ATWBaseBuilding* TargetBuilding = nullptr;
+
+			const bool bHasAnyAttackableTarget =
+				ThisWeakPtr->TryResolveAttackableTargetPreview(
+					NavCommandLocation,
+					MyPlayerSlot,
+					TargetEntity,
+					TargetBuilding,
+					TargetLocation
+				);
+
+			if (bHasAnyAttackableTarget)
 			{
-				CommandType = ETWMassCommand::AttackToUnit;
-			}
-			else
-			{
-				CommandType = ETWMassCommand::AttackToLocation;
-				TargetLocation = NavCommandLocation;
+				if (TargetEntity.IsSet())
+				{
+					CommandType = ETWMassCommand::AttackToUnit;
+				}
+				else if (IsValid(TargetBuilding))
+				{
+					CommandType = ETWMassCommand::AttackToLocation;
+
+					UE_LOG(
+						LogTemp,
+						Log,
+						TEXT("[AttackPreview] Building target candidate found: %s / Location=%s"),
+						*GetNameSafe(TargetBuilding),
+						*TargetLocation.ToString()
+					);
+				}
 			}
 
 			TArray<FMassEntityHandle> ValidEntities;
@@ -1274,11 +1350,7 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 
 	return bIsEdgeScrollingNow;
 }
-void ATWPlayerController::ChangeCurrentCommandType(ETWCommandType CommandType)
-{
-	CurrentCommandType = CommandType;
-	UpdateInputOverlayState();
-}
+
 
 #pragma region UI
 void ATWPlayerController::InitializeUIBridge()
@@ -1342,6 +1414,42 @@ void ATWPlayerController::RefreshSelectionVisualManager()
 		ClientSelectedEntities,
 		SelectedBuilding,
 		LocalSelectedOwnerPlayerSlot
+	);
+}
+
+void ATWPlayerController::NotifyRecentCombatUnitDamaged(
+	const FMassNetworkID& InUnitNetId,
+	int32 InOwnerPlayerSlot,
+	float InVisibleTime
+)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!PlayerSelectionVisualComponent)
+	{
+		return;
+	}
+
+	PlayerSelectionVisualComponent->NotifyRecentCombatUnitDamaged(
+		InUnitNetId,
+		InOwnerPlayerSlot,
+		InVisibleTime
+	);
+}
+
+void ATWPlayerController::ClientNotifyRecentCombatUnitDamaged_Implementation(
+	const FMassNetworkID& InUnitNetId,
+	int32 InOwnerPlayerSlot,
+	float InVisibleTime
+)
+{
+	NotifyRecentCombatUnitDamaged(
+		InUnitNetId,
+		InOwnerPlayerSlot,
+		InVisibleTime
 	);
 }
 
@@ -1601,235 +1709,6 @@ void ATWPlayerController::ClientForceRefreshSelectionBridge_Implementation()
 	}
 }
 
-void ATWPlayerController::HandleUICommandRequested(FName CommandId)
-{
-	UE_LOG(LogTemp, Log, TEXT("[UI Click] HandleUICommandRequested: %s"), *CommandId.ToString());
-
-	if (CommandId.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Click] Ignored: CommandId is None"));
-		return;
-	}
-
-	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
-
-	if (!CommandMeta)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Click] CommandMeta not found: %s"), *CommandId.ToString());
-		return;
-	}
-
-	if (bBuildShortcutModeActive)
-	{
-		const bool bBlockedInBuildShortcutMode =
-			CommandMeta->CommandType == ETWCommandType::Move ||
-			CommandMeta->CommandType == ETWCommandType::Attack ||
-			CommandMeta->CommandType == ETWCommandType::Hold ||
-			CommandMeta->CommandType == ETWCommandType::ProduceUnit ||
-			CommandMeta->CommandType == ETWCommandType::BuildStructure ||
-			CommandMeta->CommandType == ETWCommandType::Research;
-
-		if (bBlockedInBuildShortcutMode)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[UI Click] Blocked by build shortcut mode: %s"),
-				*CommandId.ToString()
-			);
-			return;
-		}
-	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[UI Click] Resolved CommandMeta: CommandId=%s / Type=%d / Route=%d / PayloadId=%s"),
-		*CommandId.ToString(),
-		static_cast<int32>(CommandMeta->CommandType),
-		static_cast<int32>(CommandMeta->CommandRoute),
-		*CommandMeta->PayloadId.ToString()
-	);
-
-	switch (CommandMeta->CommandType)
-	{
-	case ETWCommandType::Move:
-		ChangeCurrentCommandType(ETWCommandType::Move);
-		UE_LOG(LogTemp, Log, TEXT("[UI Click] Move command armed"));
-		return;
-
-	case ETWCommandType::Attack:
-		ChangeCurrentCommandType(ETWCommandType::Attack);
-		UE_LOG(LogTemp, Log, TEXT("[UI Click] Attack command armed"));
-		return;
-
-	case ETWCommandType::Hold:
-		UE_LOG(LogTemp, Log, TEXT("[UI Click] Hold command -> server"));
-		ServerHandleHoldCommand();
-		return;
-
-	case ETWCommandType::ProduceUnit:
-	case ETWCommandType::BuildStructure:
-	case ETWCommandType::Research:
-		UE_LOG(LogTemp, Log, TEXT("[UI Click] Gameplay command -> server: %s"), *CommandId.ToString());
-		ServerHandleUICommandRequested(CommandId);
-		return;
-
-	default:
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[UI Click] Unsupported command type: CommandId=%s / Type=%d"),
-			*CommandId.ToString(),
-			static_cast<int32>(CommandMeta->CommandType)
-		);
-		return;
-	}
-}
-
-void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName CommandId)
-{
-	if (CommandId.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: CommandId is None"));
-		return;
-	}
-
-	ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding();
-	if (!IsValid(CurrentSelectedBuilding))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: SelectedBuilding is invalid / CommandId=%s"), *CommandId.ToString());
-		return;
-	}
-
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: PlayerState is invalid"));
-		return;
-	}
-
-	if (CurrentSelectedBuilding->OwnerPlayerSlot != TWPS->PlayerSlot)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[UI Produce] Rejected: enemy building selected / Building=%s / MySlot=%d / OwnerSlot=%d"),
-			*CurrentSelectedBuilding->GetName(),
-			TWPS->PlayerSlot,
-			CurrentSelectedBuilding->OwnerPlayerSlot
-		);
-		return;
-	}
-	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
-	if (!CommandMeta)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[UI Produce] Server ignored: CommandMeta not found / CommandId=%s"), *CommandId.ToString());
-		return;
-	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[UI Produce] ServerHandleUICommandRequested: Building=%s / CommandId=%s / Type=%d / PayloadId=%s"),
-		*CurrentSelectedBuilding->GetName(),
-		*CommandId.ToString(),
-		static_cast<int32>(CommandMeta->CommandType),
-		*CommandMeta->PayloadId.ToString()
-	);
-
-	switch (CommandMeta->CommandType)
-	{
-	case ETWCommandType::ProduceUnit:
-	{
-		if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(CurrentSelectedBuilding))
-		{
-			if (PopulationBuilding->RequestEnqueuePopulation())
-			{
-				RefreshUIBridge();
-				ClientForceRefreshSelectionBridge();
-				return;
-			}
-
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[UI Produce] Population enqueue failed: Building=%s / CommandId=%s"),
-				*PopulationBuilding->GetName(),
-				*CommandId.ToString()
-			);
-			return;
-		}
-			
-		bool bProduced = false;
-
-		if (TryInvokeBuildingProduceById(CurrentSelectedBuilding, CommandMeta->PayloadId))
-		{
-			bProduced = true;
-
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("[UI Produce] ProduceById success: Building=%s / PayloadId=%s"),
-				*CurrentSelectedBuilding->GetName(),
-				*CommandMeta->PayloadId.ToString()
-			);
-		}
-		else if (TryInvokeBuildingProduceFallback(CurrentSelectedBuilding))
-		{
-			bProduced = true;
-
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("[UI Produce] ProduceFallback success: Building=%s / CommandId=%s"),
-				*CurrentSelectedBuilding->GetName(),
-				*CommandId.ToString()
-			);
-		}
-
-		if (bProduced)
-		{
-			RefreshUIBridge();
-			ClientForceRefreshSelectionBridge();
-			return;
-		}
-
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[UI Produce] Enqueue failed on building: %s / CommandId=%s / PayloadId=%s / Class=%s"),
-			*CurrentSelectedBuilding->GetName(),
-			*CommandId.ToString(),
-			*CommandMeta->PayloadId.ToString(),
-			*CurrentSelectedBuilding->GetClass()->GetName()
-		);
-		return;
-	}
-
-	case ETWCommandType::BuildStructure:
-	case ETWCommandType::Research:
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[UI Produce] Command type reached server but implementation is not completed: CommandId=%s / Type=%d"),
-			*CommandId.ToString(),
-			static_cast<int32>(CommandMeta->CommandType)
-		);
-		return;
-
-	default:
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[UI Produce] Unsupported server command type: CommandId=%s / Type=%d"),
-			*CommandId.ToString(),
-			static_cast<int32>(CommandMeta->CommandType)
-		);
-		return;
-	}
-}
-
 bool ATWPlayerController::TryInvokeBuildingProduceById(ATWBaseBuilding* TargetBuilding, FName UnitId) const
 {
 	if (!IsValid(TargetBuilding) || UnitId.IsNone())
@@ -2005,6 +1884,444 @@ FName ATWPlayerController::ResolveBuildingSelectionId(const ATWBaseBuilding* InB
 
 	return InBuilding->GetClass()->GetFName();
 }
+
+bool ATWPlayerController::CanExecuteCommand(const FUICommandMetaRow* CommandMeta, FName CommandId) const
+{
+	if (!CommandMeta)
+	{
+		return false;
+	}
+
+	switch (CommandMeta->CommandType)
+	{
+	case ETWCommandType::Move:
+	case ETWCommandType::Attack:
+	case ETWCommandType::Hold:
+		{
+			return CanControlCurrentUnitSelection(this);
+		}
+
+	case ETWCommandType::BuildStructure:
+		{
+			// 건설은 빌드 단축키 모드에서만 받도록 제한
+			return bBuildShortcutModeActive;
+		}
+
+	case ETWCommandType::ProduceUnit:
+		{
+			ATWBaseBuilding* Selected = GetSelectedBuilding();
+			if (!IsValid(Selected))
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command] Produce blocked: no selected building | CommandId=%s"),
+					*CommandId.ToString()
+				);
+				return false;
+			}
+
+			// 인구 증가 전용
+			if (CommandId == TEXT("IncreasePopulation"))
+			{
+				const bool bValidPopulationBuilding = (Cast<ATWPopulationBuilding>(Selected) != nullptr);
+				if (!bValidPopulationBuilding)
+				{
+					UE_LOG(
+						LogTemp,
+						Warning,
+						TEXT("[Command] Produce blocked: IncreasePopulation requires ATWPopulationBuilding")
+					);
+				}
+				return bValidPopulationBuilding;
+			}
+
+			// 일반 병력 생산 전용
+			const bool bValidTroopBuilding = (Cast<ATWTroopSpawnBuilding>(Selected) != nullptr);
+			if (!bValidTroopBuilding)
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command] Produce blocked: troop production requires ATWTroopSpawnBuilding | CommandId=%s"),
+					*CommandId.ToString()
+				);
+			}
+			return bValidTroopBuilding;
+		}
+
+	case ETWCommandType::Research:
+		{
+			const bool bValidUpgradeBuilding = (Cast<ATWUpgradeBuilding>(GetSelectedBuilding()) != nullptr);
+			if (!bValidUpgradeBuilding)
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command] Research blocked: selected building is not ATWUpgradeBuilding | CommandId=%s"),
+					*CommandId.ToString()
+				);
+			}
+			return bValidUpgradeBuilding;
+		}
+
+	default:
+		return true;
+	}
+}
+bool ATWPlayerController::TryHandleImmediateCommand(const FUICommandMetaRow* CommandMeta, FName CommandId)
+{
+	if (!CommandMeta)
+	{
+		return false;
+	}
+
+	if (CommandMeta->CommandType == ETWCommandType::OpenContext)
+	{
+		if (CommandId == TEXT("BuildMenu"))
+		{
+			bBuildShortcutModeActive = !bBuildShortcutModeActive;
+
+			if (!bBuildShortcutModeActive)
+			{
+				if (BuildComponent && BuildComponent->GetBuildMode())
+				{
+					BuildComponent->EndBuildMode();
+				}
+
+				ClearArmedCommandId();
+			}
+
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("건설 모드: %s"),
+				bBuildShortcutModeActive ? TEXT("ON") : TEXT("OFF")
+			);
+
+			if (PlayerUIControllerComponent)
+			{
+				PlayerUIControllerComponent->RefreshBuildModeNotification();
+			}
+
+			RefreshDynamicMappingContexts();
+			return true;
+		}
+	}
+
+	if (CommandMeta->CommandType == ETWCommandType::Back)
+	{
+		if (BuildComponent && BuildComponent->GetBuildMode())
+		{
+			BuildComponent->EndBuildMode();
+		}
+
+		bBuildShortcutModeActive = false;
+		ClearArmedCommandId();
+
+		if (PlayerUIControllerComponent)
+		{
+			PlayerUIControllerComponent->RefreshBuildModeNotification();
+		}
+
+		RefreshDynamicMappingContexts();
+		return true;
+	}
+
+	return false;
+}
+
+bool ATWPlayerController::TryHandleArmedCommand(const FUICommandMetaRow* CommandMeta, FName CommandId)
+{
+	if (!CommandMeta)
+	{
+		return false;
+	}
+
+	switch (CommandMeta->CommandType)
+	{
+	case ETWCommandType::Move:
+	case ETWCommandType::Attack:
+		if (!CanControlCurrentUnitSelection(this))
+		{
+			return true;
+		}
+
+		SetArmedCommandId(CommandId);
+		return true;
+
+	case ETWCommandType::Hold:
+		if (!CanControlCurrentUnitSelection(this))
+		{
+			return true;
+		}
+
+		ServerHandleHoldCommand();
+		ClearArmedCommandId();
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+bool ATWPlayerController::TryHandleServerRoutedCommand(const FUICommandMetaRow* CommandMeta, FName CommandId)
+{
+	if (!CommandMeta)
+	{
+		return false;
+	}
+
+	switch (CommandMeta->CommandType)
+	{
+	case ETWCommandType::BuildStructure:
+		{
+			EBuildingCategory Category = EBuildingCategory::None;
+			if (!TryResolveBuildingCategoryFromPayload(CommandMeta->PayloadId, Category))
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command] Build payload resolve failed: %s"),
+					*CommandMeta->PayloadId.ToString()
+				);
+				return true;
+			}
+
+			if (BuildComponent)
+			{
+				BuildComponent->SelectBuildingToConstruct(Category);
+				RefreshDynamicMappingContexts();
+			}
+			return true;
+		}
+
+	case ETWCommandType::ProduceUnit:
+	case ETWCommandType::Research:
+		ServerHandleCommandById(CommandId);
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+bool ATWPlayerController::TryResolveBuildingCategoryFromPayload(
+	FName PayloadId,
+	EBuildingCategory& OutCategory
+) const
+{
+	OutCategory = EBuildingCategory::None;
+
+	if (PayloadId == TEXT("Wood") || PayloadId == TEXT("WoodResourceProduction"))
+	{
+		OutCategory = EBuildingCategory::WoodResourceProduction;
+		return true;
+	}
+
+	if (PayloadId == TEXT("Stone") || PayloadId == TEXT("StoneResourceProduction"))
+	{
+		OutCategory = EBuildingCategory::StoneResourceProduction;
+		return true;
+	}
+
+	if (PayloadId == TEXT("Population") || PayloadId == TEXT("PopulationProduction"))
+	{
+		OutCategory = EBuildingCategory::PopulationProduction;
+		return true;
+	}
+
+	if (PayloadId == TEXT("Troop") || PayloadId == TEXT("TroopProduction"))
+	{
+		OutCategory = EBuildingCategory::TroopProduction;
+		return true;
+	}
+
+	if (PayloadId == TEXT("Upgrade"))
+	{
+		OutCategory = EBuildingCategory::Upgrade;
+		return true;
+	}
+
+	if (PayloadId == TEXT("Blocking"))
+	{
+		OutCategory = EBuildingCategory::Blocking;
+		return true;
+	}
+
+	return false;
+}
+
+void ATWPlayerController::SetArmedCommandId(FName InCommandId)
+{
+	ArmedCommandId = InCommandId;
+	UpdateInputOverlayState();
+}
+
+void ATWPlayerController::ClearArmedCommandId()
+{
+	ArmedCommandId = NAME_None;
+	UpdateInputOverlayState();
+}
+
+void ATWPlayerController::HandleCommandById(FName CommandId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[Command] HandleCommandById: %s"), *CommandId.ToString());
+
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
+	if (!CommandMeta)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Command] CommandMeta not found: %s"), *CommandId.ToString());
+		return;
+	}
+
+	if (!CanExecuteCommand(CommandMeta, CommandId))
+	{
+		return;
+	}
+
+	if (TryHandleImmediateCommand(CommandMeta, CommandId))
+	{
+		return;
+	}
+
+	if (TryHandleArmedCommand(CommandMeta, CommandId))
+	{
+		return;
+	}
+
+	if (TryHandleServerRoutedCommand(CommandMeta, CommandId))
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[Command] Unhandled command: %s / Type=%d / Route=%d"),
+		*CommandId.ToString(),
+		static_cast<int32>(CommandMeta->CommandType),
+		static_cast<int32>(CommandMeta->CommandRoute)
+	);
+}
+
+void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId)
+{
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
+	if (!CommandMeta)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Command][Server] CommandMeta not found: %s"), *CommandId.ToString());
+		return;
+	}
+
+	switch (CommandMeta->CommandType)
+	{
+	case ETWCommandType::ProduceUnit:
+	{
+		ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding();
+		if (!IsValid(CurrentSelectedBuilding))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[Command][Server] Produce failed: no selected building"));
+			return;
+		}
+
+		if (ATWPopulationBuilding* PopulationBuilding = Cast<ATWPopulationBuilding>(CurrentSelectedBuilding))
+		{
+			const int8 bEnqueueSuccess = PopulationBuilding->RequestEnqueuePopulation();
+			if (bEnqueueSuccess != 0)
+			{
+				RefreshUIBridge();
+				ClientForceRefreshSelectionBridge();
+			}
+			return;
+		}
+
+		bool bProduced = false;
+
+		if (TryInvokeBuildingProduceById(CurrentSelectedBuilding, CommandMeta->PayloadId))
+		{
+			bProduced = true;
+		}
+		else if (TryInvokeBuildingProduceFallback(CurrentSelectedBuilding))
+		{
+			bProduced = true;
+		}
+
+		if (bProduced)
+		{
+			RefreshUIBridge();
+			ClientForceRefreshSelectionBridge();
+		}
+		return;
+	}
+	
+	case ETWCommandType::Research:
+		{
+			ATWUpgradeBuilding* TargetUpgradeBuilding = Cast<ATWUpgradeBuilding>(GetSelectedBuilding());
+			if (!TargetUpgradeBuilding)
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command][Server] Research failed: selected building is not ATWUpgradeBuilding | CommandId=%s"),
+					*CommandId.ToString()
+				);
+				return;
+			}
+
+			if (CommandMeta->PayloadId.IsNone() || CommandMeta->PayloadId == TEXT("None"))
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command][Server] Research failed: invalid payload for %s"),
+					*CommandId.ToString()
+				);
+				return;
+			}
+
+			const int8 bStarted = TargetUpgradeBuilding->RequestStartUpgrade(CommandMeta->PayloadId);
+			if (bStarted != 0)
+			{
+				RefreshUIBridge();
+				ClientForceRefreshSelectionBridge();
+			}
+			else
+			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[Command][Server] Research request rejected | CommandId=%s | Payload=%s"),
+					*CommandId.ToString(),
+					*CommandMeta->PayloadId.ToString()
+				);
+			}
+			return;
+		}
+
+	default:
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[Command][Server] Unsupported type: %s / Type=%d"),
+			*CommandId.ToString(),
+			static_cast<int32>(CommandMeta->CommandType)
+		);
+		return;
+	}
+	}
+}
 #pragma endregion
 
 #pragma region 병력 스폰 대기열
@@ -2159,71 +2476,37 @@ void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
 #pragma region 건설
 void ATWPlayerController::OnToggleBuildModeAction()
 {
-	bBuildShortcutModeActive = !bBuildShortcutModeActive;
-
-	if (!bBuildShortcutModeActive)
-	{
-		if (BuildComponent->GetBuildMode())
-		{
-			BuildComponent->EndBuildMode();
-		}
-
-		ChangeCurrentCommandType(ETWCommandType::None);
-	}
-	UE_LOG(LogTemp, Warning, TEXT("건설 모드: %s"), bBuildShortcutModeActive ? TEXT("ON") : TEXT("OFF"));
-	if (PlayerUIControllerComponent)
-	{
-		PlayerUIControllerComponent->RefreshBuildModeNotification();
-	}
-	RefreshDynamicMappingContexts();
+	HandleCommandById(TEXT("BuildMenu"));
 }
 
 void ATWPlayerController::OnSelectWoodBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::WoodResourceProduction);
-	}
+	HandleCommandById(TEXT("BuildWood"));
 }
 
 void ATWPlayerController::OnSelectStoneBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::StoneResourceProduction);
-	}
+	HandleCommandById(TEXT("BuildStone"));
 }
 
 void ATWPlayerController::OnSelectPopulationBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::PopulationProduction);
-	}
+	HandleCommandById(TEXT("BuildPopulation"));
 }
 
 void ATWPlayerController::OnSelectTroopBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::TroopProduction);
-	}
+	HandleCommandById(TEXT("BuildTroop"));
 }
 
 void ATWPlayerController::OnSelectUpgradeBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::Upgrade);
-	}
+	HandleCommandById(TEXT("BuildUpgrade"));
 }
 
 void ATWPlayerController::OnSelectBlockingBuildingCommandAction()
 {
-	if (BuildComponent)
-	{
-		BuildComponent->SelectBuildingToConstruct(EBuildingCategory::Blocking);
-	}
+	HandleCommandById(TEXT("BuildBlocking"));
 }
 
 void ATWPlayerController::NotifyResourceStateChanged()
@@ -2280,7 +2563,6 @@ void ATWPlayerController::UpdateInputOverlayState()
 		return;
 	}
 
-	const FName ArmedCommandId = ConvertCommandTypeToCommandId(CurrentCommandType);
 	PlayerUIControllerComponent->UpdateInputOverlayState(ArmedCommandId);
 }
 
@@ -2341,18 +2623,4 @@ void ATWPlayerController::UpdateCursorOverlayPosition()
 	}
 }
 
-FName ATWPlayerController::ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const
-{
-	switch (InCommandType)
-	{
-	case ETWCommandType::Move:
-		return TEXT("Move");
-
-	case ETWCommandType::Attack:
-		return TEXT("Attack");
-
-	default:
-		return NAME_None;
-	}
-}
 #pragma endregion

@@ -356,19 +356,22 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 		FTWUnitStatus& BonusStatus = UnitUpgradeBonusMap.FindOrAdd(Pair.Key);
 
 		const float CurrentValue = BonusStatus.GetStatus(UpgradeRow.TargetStatus);
+		const float AddValue = static_cast<float>(Pair.Value);
+
 		BonusStatus.SetStatus(
 			UpgradeRow.TargetStatus,
-			CurrentValue + static_cast<float>(Pair.Value)
+			CurrentValue + AddValue
 		);
 
 		UE_LOG(
 			LogTemp,
 			Log,
-			TEXT("[플레이어 상태] 업그레이드 적용 | UpgradeID: %s | UnitID: %s | StatusType: %s | 증가값: %d"),
+			TEXT("[플레이어 상태] 업그레이드 적용 | UpgradeID: %s | UnitID: %s | StatusType: %s | 증가값: %d | 누적값: %.2f"),
 			*UpgradeRow.UpgradeID.ToString(),
 			*Pair.Key.ToString(),
 			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
-			Pair.Value
+			Pair.Value,
+			CurrentValue + AddValue
 		);
 	}
 
@@ -379,6 +382,24 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 		*UpgradeRow.UpgradeID.ToString(),
 		UpgradeLevel
 	);
+
+	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
+	if (IsValid(UnitSubsystem))
+	{
+		for (const TPair<FName, int32>& Pair : UpgradeRow.TargetUnits)
+		{
+			UnitSubsystem->ApplyStatus(Pair.Key, PlayerSlot);
+
+			UE_LOG(
+				LogTemp,
+				Log,
+				TEXT("[플레이어 상태] 기존 유닛 재적용 요청 | UpgradeID: %s | UnitID: %s | PlayerSlot: %d"),
+				*UpgradeRow.UpgradeID.ToString(),
+				*Pair.Key.ToString(),
+				PlayerSlot
+			);
+		}
+	}
 }
 
 float ATWPlayerState::GetUnitUpgradeBonus(const FName UnitID, const ETWStatusType StatusType) const

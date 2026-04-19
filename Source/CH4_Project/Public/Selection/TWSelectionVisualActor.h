@@ -55,8 +55,11 @@ private:
 	void SyncHPBarISM();
 
 	int32 ResolveLocalPlayerSlot() const;
-	FLinearColor ResolveSlotBaseColor(int32 InOwnerPlayerSlot) const;
-	FLinearColor ApplyRelationTint(const FLinearColor& InBaseColor, int32 InOwnerPlayerSlot) const;
+	int32 ResolveLocalTeamID() const;
+	bool TryResolveTeamIDFromPlayerSlot(int32 InPlayerSlot, int32& OutTeamID) const;
+
+	FLinearColor ResolveTeamBaseColor(int32 InTeamID) const;
+	FLinearColor ApplyRelationTintByTeam(const FLinearColor& InBaseColor, int32 InOwnerPlayerSlot) const;
 	FLinearColor ResolveFinalOwnerColor(int32 InOwnerPlayerSlot) const;
 
 private:
@@ -90,9 +93,10 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FTWHPBarVisualData> SelectedHPBarVisuals;
-	
+
 	UPROPERTY(Transient)
 	TArray<FTWHPBarVisualData> RecentCombatHPBarVisuals;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMesh> UnitRingMesh = nullptr;
@@ -135,10 +139,10 @@ private:
 
 protected:
 	UPROPERTY(EditAnywhere, Category="SelectionVisual|Color")
-	TMap<int32, FLinearColor> PlayerSlotColorMap;
+	TMap<int32, FLinearColor> TeamColorMap;
 
 	UPROPERTY(EditAnywhere, Category="SelectionVisual|Color")
-	FLinearColor DefaultSlotColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
+	FLinearColor DefaultTeamColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
 
 	UPROPERTY(EditAnywhere, Category="SelectionVisual|Color")
 	FLinearColor NeutralColor = FLinearColor(0.65f, 0.65f, 0.65f, 1.f);

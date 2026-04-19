@@ -94,6 +94,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Building|Visual")
 	FVector GetSelectionHPBarWorldLocation() const;
 	
+	UFUNCTION(BlueprintCallable, Category="Building|Combat")
+	virtual bool CanBeAttacked() const
+	{
+		return CurrentHP > 0.0f && BuildingState != ETWBuildingState::None;
+	}
+
+	UFUNCTION(BlueprintCallable, Category="Building|Combat")
+	virtual bool IsDead() const
+	{
+		return CurrentHP <= 0.0f;
+	}
+
+	UFUNCTION(BlueprintCallable, Category="Building|Combat")
+	virtual FVector GetAttackTargetLocation() const
+	{
+		return GetActorLocation();
+	}
+	
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;

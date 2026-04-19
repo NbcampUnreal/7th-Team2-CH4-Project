@@ -15,31 +15,47 @@ class ATWUnit;
 struct FMassEntityHandle;
 struct FMassReplicationEntityInfo;
 class UDataTable;
+class ATWBaseBuilding;
 
 USTRUCT(BlueprintType)
 struct CH4_PROJECT_API FTWUnitSelectionVisualStyle
 {
 	GENERATED_BODY()
-
-	/** 선택 링 반지름 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
 	float SelectionCircleRadius = 54.f;
-
-	/** 선택 링 두께 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
 	float CircleThickness = 2.2f;
-
-	/** 선택 표시 위치 보간 속도 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
 	float LocationInterpSpeed = 35.f;
-
-	/** 너무 멀면 즉시 스냅 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
 	float LocationSnapDistance = 78.f;
-
-	/** 거리 클수록 보간 가속 */
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SelectionVisual")
 	float LocationMaxInterpSpeedMultiplier = 5.0f;
+};
+
+USTRUCT(BlueprintType)
+struct CH4_PROJECT_API FTWAttackableBuildingCandidate
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<ATWBaseBuilding> Building = nullptr;
+
+	UPROPERTY()
+	FVector TargetLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	float DistSquared = TNumericLimits<float>::Max();
+
+	bool IsValid() const
+	{
+		return Building.IsValid();
+	}
 };
 
 UCLASS()
@@ -64,17 +80,20 @@ public:
 		int32 OwnerPlayerSlot,
 		float MaxDistance = 100.0f
 	);
+
 	bool FindNearestAnyEntity(
 		const FVector& Location,
 		FMassEntityHandle& OutEntityHandle,
 		float MaxDistance = 100.0f
 	);
+
 	bool FindNearestEnemyEntity(
 		const FVector& Location,
 		FMassEntityHandle& OutEntityHandle,
 		int32 OwnerPlayerSlot,
 		float MaxDistance = 100.0f
 	);
+
 	bool GetEntitiesInRectangle(
 		const FVector& StartLocation,
 		const FVector& EndLocation,
@@ -89,9 +108,23 @@ public:
 	);
 
 	void OnUnitKilled(FMassEntityHandle& Unit);
-	
+
 	TMap<EResourceType, int32> GetUpkeep(int32 PlayerSlot);
 	int32 GetCurrentPopulation(int32 PlayerSlot) const;
+	
+	bool FindNearestEnemyBuilding(
+	const FVector& Location,
+	ATWBaseBuilding*& OutBuilding,
+	int32 OwnerPlayerSlot,
+	float MaxDistance = 1200.0f
+);
+
+	bool FindNearestEnemyBuildingCandidate(
+		const FVector& Location,
+		int32 OwnerPlayerSlot,
+		FTWAttackableBuildingCandidate& OutCandidate,
+		float MaxDistance = 1200.0f
+	);
 
 private:
 	void AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit);
@@ -113,26 +146,20 @@ public:
 
 #pragma endregion
 
-
-
 #ifdef WITH_CLIENT_CODE
 public:
-	/** 선택 링용 월드 위치 */
 	bool TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const;
-
-	/** HP 바용 월드 위치 */
+	
 	bool TryGetUnitHPBarWorldLocation(const FMassNetworkID& UnitNetID, FVector& OutLocation) const;
-
-	/** 현재 HP */
+	
 	bool TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutCurrentHP) const;
-
-	/** 최대 HP */
+	
 	bool TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutMaxHP) const;
-
-	/** 유닛 타입 ID */
+	
 	bool TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutUnitID) const;
-
-	/** 선택 비주얼 스타일 */
+	
+	bool TryGetUnitOwnerPlayerSlot(const FMassNetworkID& UnitNetID, int32& OutOwnerPlayerSlot) const;
+	
 	bool TryGetUnitSelectionVisualStyle(
 		const FMassNetworkID& UnitNetID,
 		FTWUnitSelectionVisualStyle& OutStyle
@@ -174,5 +201,4 @@ private:
 
 	FMassEntityQuery FindNearestEntityQuery;
 	TMap<FName, FTWUnitTableRowBase*> CachedUnitTableRows;
-	
 };
