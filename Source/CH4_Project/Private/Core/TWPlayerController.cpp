@@ -1734,13 +1734,15 @@ void ATWPlayerController::ToggleMenu()
 		{
 			MenuWidgetInstance->AddToViewport();
 			
-			FInputModeUIOnly InputMode;
+			FInputModeGameAndUI InputMode;
+			InputMode.SetWidgetToFocus(MenuWidgetInstance->GetCachedWidget());
 			SetInputMode(InputMode);
 			SetShowMouseCursor(true);
 		}
 		else
 		{
 			MenuWidgetInstance->RemoveFromParent();
+			MenuWidgetInstance = nullptr;
 			
 			FInputModeGameAndUI InputMode;
 			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);

@@ -13,7 +13,8 @@ void UTWSystemMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	
-	ExitButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnExitButtonClicked);
+	ExitButton->OnClicked.RemoveAll(this);
+	ExitButton->OnClicked.AddDynamic(this, &ThisClass::OnExitButtonClicked);
 }
 
 void UTWSystemMenuWidget::OnExitButtonClicked()
