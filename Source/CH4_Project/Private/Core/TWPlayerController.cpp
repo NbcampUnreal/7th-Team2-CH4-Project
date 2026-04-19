@@ -41,6 +41,7 @@
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "DrawDebugHelpers.h"
+#include "Core/TWGameMode.h"
 
 namespace
 {
@@ -1717,6 +1718,7 @@ void ATWPlayerController::Client_ShowGameResult_Implementation(int32 GameResult)
 	SetInputMode(InputMode);
 	bShowMouseCursor = true;
 }
+
 
 void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName CommandId)
 {
