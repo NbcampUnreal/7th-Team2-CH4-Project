@@ -8,6 +8,8 @@
 #include "GameFramework/Actor.h"
 #include "MassActorSubsystem.h"
 #include "MassSignalSubsystem.h"
+#include "Quaternion.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
@@ -19,6 +21,7 @@
 #include "Core/TWPlayerController.h"
 #include "EngineUtils.h"
 #include "MassReplicationFragments.h"
+#include "Runtime/Engine/Internal/Kismet/BlueprintTypeConversions.h"
 
 namespace
 {
@@ -138,7 +141,7 @@ UTWAttackProcessor::UTWAttackProcessor()
 void UTWAttackProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
 	EntityQuery.AddRequirement<FTWCommandFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadWrite);
 
@@ -172,13 +175,13 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 		}
 
 		const TArrayView<FTWCommandFragment> CommandList = Context.GetMutableFragmentView<FTWCommandFragment>();
-		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
+		const TArrayView<FTransformFragment> TransformList = Context.GetMutableFragmentView<FTransformFragment>();
 		const TConstArrayView<FTWStatusFragment> StatusList = Context.GetFragmentView<FTWStatusFragment>();
 		const TArrayView<FTWAttackFragment> AttackList = Context.GetMutableFragmentView<FTWAttackFragment>();
 
 		const double TimeSeconds = Context.GetWorld()->GetTimeSeconds();
 
-		TArray<FMassEntityHandle> EntitiesToSignalAttackComplete;
+		TSet<FMassEntityHandle> EntitiesToSignalAttackComplete;
 
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
@@ -192,20 +195,16 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 			if (!EntityManager.IsEntityValid(TargetEntity))
 			{
-				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 				AttackList[EntityIdx].bIsTargetSet = false;
-				CommandList[EntityIdx].SetType(ETWMassCommand::None);
+				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
 			}
 
 			FTWStatusFragment* EnemyStatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(TargetEntity);
 			if (!EnemyStatusFragment || EnemyStatusFragment->GetIsDeath())
 			{
-				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 				AttackList[EntityIdx].bIsTargetSet = false;
-				CommandList[EntityIdx].SetType(ETWMassCommand::None);
+
 				continue;
 			}
 
@@ -217,10 +216,8 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				EntityManager.GetFragmentDataPtr<FTransformFragment>(TargetEntity);
 			if (!TargetTransformFragment)
 			{
-				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 				AttackList[EntityIdx].bIsTargetSet = false;
-				CommandList[EntityIdx].SetType(ETWMassCommand::None);
+				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
 			}
 
@@ -270,7 +267,8 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			const float NewHealth = FMath::Max(0.0f, OldHealth - DamageAmount);
 			EnemyStatus.Status[HealthIndex] = NewHealth;
 			AttackList[EntityIdx].LastAttackTime = TimeSeconds;
-
+			TransformList[EntityIdx].GetMutableTransform().SetRotation(UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
+			
 			if (NewHealth < OldHealth)
 			{
 				FMassNetworkID TargetNetId;
@@ -295,18 +293,10 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				}
 			}
 
-			if (EnemyStatus.Status[HealthIndex] <= 0.0f)
+			if (	TransformList[EntityIdx].GetMutableTransform().SetRotation(UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
+			)
 			{
-				FMassEntityHandle MutableTarget = TargetEntity;
-				UnitSubsystem->OnUnitKilled(MutableTarget);
-				EnemyStatus.Status[HealthIndex] = 0.0f;
-				EnemyStatusFragment->SetDestroyTime(TimeSeconds + 3.0f);
-				EnemyStatusFragment->SetIsDeath(true);
-				EntityManager.Defer().AddTag<FTWMassDeadTag>(TargetEntity);
-
 				AttackList[EntityIdx].bIsTargetSet = false;
-				Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-				Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 				EntitiesToSignalAttackComplete.Add(Entity);
 
 				UE_LOG(LogTemp, Warning, TEXT("Target Entity Dead!"));
@@ -317,7 +307,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 		if (EntitiesToSignalAttackComplete.Num())
 		{
-			SignalSubsystem->SignalEntities(AttackCompleteSignal, EntitiesToSignalAttackComplete);
+			SignalSubsystem->SignalEntities(AttackCompleteSignal, EntitiesToSignalAttackComplete.Array());
 		}
 	});
 }

@@ -150,6 +150,7 @@ void UTWUnitSubsystem::AddPlayer(int32 PlayerSlot)
 	UnitContainers.Add(PlayerSlot, NewContainer);
 }
 
+// TODO FMassEntityHandle을 이 시스템에서 별도로 관리하고 Spatial Hasing적용해서 순회해야함
 bool UTWUnitSubsystem::FindNearestOwnedEntity(
 	const FVector& Location,
 	FMassEntityHandle& OutEntityHandle,
@@ -439,6 +440,8 @@ bool UTWUnitSubsystem::GetEntitiesInRectangle(
 			}
 
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
+			// const double DotResult = FVector::DotProduct(StartLocation - EntityPos, EndLocation - EntityPos);
+			// if (DotResult < 0.0)
 			if (EntityPos.X >= MinX && EntityPos.X <= MaxX &&
 				EntityPos.Y >= MinY && EntityPos.Y <= MaxY)
 			{
@@ -536,6 +539,7 @@ void UTWUnitSubsystem::SpawnUnit(
 				const FTWUnitStatus UnitStatus =
 					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
 				StatusFragment->SetStatus(UnitStatus);
+				//TODO Apply Move Speed;
 			}
 
 			WeakThis->AddUnit(PlayerState->PlayerSlot, SpawnedUnit);
@@ -544,7 +548,10 @@ void UTWUnitSubsystem::SpawnUnit(
 
 void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
 	if (!EntityManager)
@@ -601,8 +608,10 @@ void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 
 void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
 	{
 		return;

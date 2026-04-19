@@ -23,6 +23,7 @@ public:
 	void BeginPlay();
 
 	void PlayAttackMontage();
+	void PlayDeathMontage();
 protected:
 	
 	virtual void PostInitializeComponents() override;
