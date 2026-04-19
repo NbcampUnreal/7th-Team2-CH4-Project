@@ -17,6 +17,7 @@ class UTWBuildComponent;
 class UTWHUDRootWidget;
 class UTWPlayerUIControllerComponent;
 class UTWPlayerSelectionVisualComponent;
+class UUserWidget;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -275,6 +276,18 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleUICommandRequested(FName CommandId);
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> VictoryWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> DefeatWidgetClass;
+	
+public:
+	UFUNCTION(Client, Reliable)
+	void Client_ShowGameResult(int32 GameResult);
+
 #pragma endregion
 
 public:

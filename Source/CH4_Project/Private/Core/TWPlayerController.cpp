@@ -13,6 +13,7 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWidget.h"
+#include "Blueprint/UserWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -1685,6 +1686,36 @@ void ATWPlayerController::HandleUICommandRequested(FName CommandId)
 		);
 		return;
 	}
+}
+
+void ATWPlayerController::Client_ShowGameResult_Implementation(int32 GameResult)
+{
+	TSubclassOf<UUserWidget> CurrentWidget = nullptr;
+	
+	if (GameResult == 1)
+	{
+		CurrentWidget = VictoryWidgetClass;
+	}
+	else if (GameResult == 0)
+	{
+		CurrentWidget = DefeatWidgetClass;
+	}
+	else
+	{
+		return;
+	}
+	
+	if (CurrentWidget)
+	{
+		UUserWidget* ResultUI = CreateWidget<UUserWidget>(this, CurrentWidget);
+		if (ResultUI)
+		{
+			ResultUI->AddToViewport();
+		}
+	}
+	FInputModeUIOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
 }
 
 void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName CommandId)

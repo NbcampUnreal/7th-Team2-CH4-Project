@@ -150,6 +150,16 @@ public:
 	void SetTeamID(int32 InTeamID);
 #pragma endregion
 	
+#pragma region 승/패 판정
+protected:
+	UPROPERTY(Replicated)
+	int32 GameResult;
+	
+public:
+	void SetGameResult(int32 InResult) {GameResult = InResult;}
+	FORCEINLINE int32 GetGameResult() const {return GameResult;}
+#pragma endregion
+	
 private:
 	void NotifyUIResourceStateChanged();
 
