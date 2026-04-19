@@ -234,10 +234,10 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 				case ETWMassCommand::MoveToUnit:
 					break;
 				case ETWMassCommand::AttackToLocation:
-					// Context.Defer().AddTag<FTWMassMovingTag>(Entity);
-					// Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
-					// Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
-					//TODO Navigation Init
+					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					EntitiesToSignalPathInit.Add(Entity);
 					break;
 				case ETWMassCommand::AttackToUnit:
 					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);

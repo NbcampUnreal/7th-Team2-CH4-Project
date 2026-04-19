@@ -22,7 +22,7 @@ UTWDespawnProcessor::UTWDespawnProcessor()
 {
 	ExecutionFlags = (int32)EProcessorExecutionFlags::AllNetModes;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Tasks;
-	
+
 	bRequiresGameThreadExecution = true;
 }
 
@@ -36,6 +36,12 @@ void UTWDespawnProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 {
 	EntityQuery.ForEachEntityChunk(Context, [&EntityManager](FMassExecutionContext& Context)
 	{
+		UTWUnitSubsystem* UnitSubsystem = Context.GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+		if (false == IsValid(UnitSubsystem))
+		{
+			return;
+		}
+
 		const TArrayView<FTWStatusFragment> StatusList = Context.GetMutableFragmentView<FTWStatusFragment>();
 		const TArrayView<FMassActorFragment> ActorList = Context.GetMutableFragmentView<FMassActorFragment>();
 		double TimeSeconds = Context.GetWorld()->GetTimeSeconds();
@@ -43,16 +49,33 @@ void UTWDespawnProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
-			
 			FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
+
+
+			if (StatusList[EntityIdx].GetStatus().Status[static_cast<int32>(ETWStatusType::Health)] < 0.0f &&
+				StatusList[EntityIdx].GetIsDeath() == false
+			)
+			{
+				if (ATWUnit* Unit = Cast<ATWUnit> (ActorList[EntityIdx].GetMutable()))
+				{
+					Unit->PlayDeathMontage();
+				}
+				UnitSubsystem->OnUnitKilled(Entity);
+				StatusList[EntityIdx].GetMutableStatus().Status[static_cast<int32>(ETWStatusType::Health)] = 0.0f;
+				StatusList[EntityIdx].SetDestroyTime(TimeSeconds + 3.0f);
+				StatusList[EntityIdx].SetIsDeath(true);
+				EntityManager.Defer().AddTag<FTWMassDeadTag>(Entity);
+
+				UE_LOG(LogTemp, Warning, TEXT("Entity Dead!"))
+			}
+
+
 			if (StatusList[EntityIdx].GetDestroyTime() < TimeSeconds)
 			{
 				EntitiesToDestroy.Add(Entity);
 				//Context.Defer().RemoveTag<FTWMassDeadTag>(Entity);
-				
 			}
 		}
 		Context.Defer().DestroyEntities(EntitiesToDestroy);
-		
 	});
 }

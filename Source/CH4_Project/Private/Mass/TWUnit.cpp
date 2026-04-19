@@ -3,6 +3,7 @@
 
 #include "Mass/TWUnit.h"
 
+#include "Animation/TWUnitAnimInstance.h"
 #include "Component/TWTeamColorComponent.h"
 #include "Component/TWTeamComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -85,6 +86,21 @@ void ATWUnit::PlayAttackMontage()
 		if (UAnimInstance* AnimInstance = SkeletalMeshComponent->GetAnimInstance())
 		{
 			AnimInstance->Montage_Play(AttackMontage);
+		}
+	}
+}
+
+void ATWUnit::PlayDeathMontage()
+{
+	if (SkeletalMeshComponent)
+	{
+		if (UAnimInstance* AnimInstance = SkeletalMeshComponent->GetAnimInstance())
+		{
+			AnimInstance->Montage_Play(DeadMontage);
+			if (UTWUnitAnimInstance* UnitAnimInstance = Cast<UTWUnitAnimInstance>(AnimInstance))
+			{
+				UnitAnimInstance->SetIsDead();
+			}
 		}
 	}
 }

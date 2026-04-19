@@ -438,6 +438,10 @@ void UTWUnitSubsystem::SpawnUnit(
 
 void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 {
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
@@ -494,8 +498,10 @@ void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 
 void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
 	{
 		return;
@@ -656,6 +662,11 @@ bool UTWUnitSubsystem::TryGetUnitVisualActor(
 		return false;
 	}
 
+	if (!EntityManager->IsEntityValid(EntityInfo->Entity))
+	{
+		return false;
+	}
+	
 	const FMassActorFragment* ActorFragment = EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
 	if (!ActorFragment || !ActorFragment->IsValid())
 	{
@@ -692,6 +703,10 @@ bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
 	if (!EntityManager)
+	{
+		return false;
+	}
+	if (!EntityManager->IsEntityValid(EntityInfo->Entity))
 	{
 		return false;
 	}

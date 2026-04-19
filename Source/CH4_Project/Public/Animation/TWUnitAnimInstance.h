@@ -19,11 +19,13 @@ class CH4_PROJECT_API UTWUnitAnimInstance : public UAnimInstance
 public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 	virtual void NativeInitializeAnimation() override;
-	
+	UFUNCTION()
+	void SetIsDead(){bIdDead = true;}
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement")
 	float GroundSpeed;
-	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	bool bIdDead = false;
 private:
 	UPROPERTY()
 	TObjectPtr<UMassEntitySubsystem> MassSubsystem;
