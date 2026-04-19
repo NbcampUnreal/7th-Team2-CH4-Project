@@ -52,7 +52,7 @@ void UTWDespawnProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 			FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 
 
-			if (StatusList[EntityIdx].GetStatus().Status[static_cast<int32>(ETWStatusType::Health)] < 0.0f &&
+			if (StatusList[EntityIdx].GetStatus().Status[static_cast<int32>(ETWStatusType::Health)] <= 0.0f &&
 				StatusList[EntityIdx].GetIsDeath() == false
 			)
 			{

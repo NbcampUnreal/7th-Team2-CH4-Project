@@ -185,13 +185,15 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
+			const FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
+			const FMassEntityHandle TargetEntity = AttackList[EntityIdx].TargetEntity;
+			
 			if (false == AttackList[EntityIdx].bIsTargetSet)
 			{
+				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
 			}
 
-			const FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-			const FMassEntityHandle TargetEntity = AttackList[EntityIdx].TargetEntity;
 
 			if (!EntityManager.IsEntityValid(TargetEntity))
 			{
@@ -204,6 +206,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			if (!EnemyStatusFragment || EnemyStatusFragment->GetIsDeath())
 			{
 				AttackList[EntityIdx].bIsTargetSet = false;
+				EntitiesToSignalAttackComplete.Add(Entity);
 
 				continue;
 			}
@@ -292,15 +295,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					);
 				}
 			}
-
-			if (	TransformList[EntityIdx].GetMutableTransform().SetRotation(UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
-			)
-			{
-				AttackList[EntityIdx].bIsTargetSet = false;
-				EntitiesToSignalAttackComplete.Add(Entity);
-
-				UE_LOG(LogTemp, Warning, TEXT("Target Entity Dead!"));
-			}
+			
 
 			UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), EnemyStatus.Status[HealthIndex]);
 		}

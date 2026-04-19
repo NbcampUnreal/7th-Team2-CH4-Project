@@ -179,7 +179,15 @@ bool UTWNavMeshPathFollowProcessor::RequestPath(
 		return false;
 	}
 		
-	FPathFindingQuery Query(NavMeshSubsystem, *NavData, AgentNavLocation, TargetLocation);
+	FNavLocation ProjectedLocation;
+	FVector NavTargetLocation = FVector::ZeroVector;
+	if (NavMeshSubsystem && NavMeshSubsystem->ProjectPointToNavigation(TargetLocation, ProjectedLocation, FVector(500.f, 500.f, 500.f)))
+	{
+		NavTargetLocation = ProjectedLocation.Location;
+	}
+	
+	
+	FPathFindingQuery Query(NavMeshSubsystem, *NavData, AgentNavLocation, NavTargetLocation);
 
 	// Why fix it after if there is none??
 	if (!Query.NavData.IsValid())

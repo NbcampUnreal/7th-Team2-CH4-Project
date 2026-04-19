@@ -102,6 +102,12 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					EntitiesToSignalPathInit.Add(Entity);
 					break;
 				case ETWMassCommand::AttackToLocation:
+					{
+						UE::Math::TVector<double> MyLocation = TransformFragments[EntityIdx].GetTransform().GetLocation();
+						UE::Math::TVector<double> TargetLocation = CommandFragments[EntityIdx].GetLocation();
+						UE_LOG(LogTemp, Warning, TEXT("%lf, %lf, %lf -> %lf, %lf, %lf"),MyLocation.X,MyLocation.Y,MyLocation.Z,TargetLocation.X,TargetLocation.Y,TargetLocation.Z )
+					}
+
 					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
 					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
