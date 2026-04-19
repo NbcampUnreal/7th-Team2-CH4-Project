@@ -38,17 +38,12 @@ void ATWHeroUnitAreaEffect::BeginPlay()
 		
 		if (SkillData)
 		{
-			// 1. 사거리 가이드 크기 조절 (반지름 50 메시 기준)
-			// 만약 SkillRange가 500이면 Scale은 10이 되어 반지름 500인 원이 됩니다.
 			float RangeScale = SkillData->SkillRange / 50.f;
 			SkillRangeMesh->SetRelativeScale3D(FVector(RangeScale, RangeScale, 1.f));
            
-			// 2. 다이나믹 머티리얼 생성 및 할당
-			// 반투명하거나 테두리만 있는 사거리 전용 머티리얼을 인스턴스 0번에 넣어두세요.
 			UMaterialInstanceDynamic* DynMaterial = SkillRangeMesh->CreateDynamicMaterialInstance(0);
 			if (DynMaterial)
 			{
-				// 필요하다면 여기서 사거리 원의 색상을 별도로 지정할 수 있습니다.
 				DynMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::White);
 			}
 		}
@@ -63,7 +58,6 @@ void ATWHeroUnitAreaEffect::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	// IndicatorRadius 변수가 수정되었을 때 실시간으로 메시 크기 변경
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(ATWHeroUnitAreaEffect, IndicatorRadius))
 	{
 		UpdateMeshScale();
@@ -75,7 +69,6 @@ void ATWHeroUnitAreaEffect::UseSkill()
 {
 	if (TryStartCooldown())
 	{
-		// FVector SkillLocation = CurrentTargetLocation;
 		
 		if (DynamicIndicatorMaterial)
 		{
