@@ -187,7 +187,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 		{
 			const FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 			const FMassEntityHandle TargetEntity = AttackList[EntityIdx].TargetEntity;
-			
+			ATWBaseBuilding* TargetBuilding = AttackList[EntityIdx].TargetBuilding.Get();
 			if (false == AttackList[EntityIdx].bIsTargetSet)
 			{
 				EntitiesToSignalAttackComplete.Add(Entity);
@@ -195,109 +195,176 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			}
 
 
-			if (!EntityManager.IsEntityValid(TargetEntity))
+			bool bIsEntityValid = EntityManager.IsEntityValid(TargetEntity);
+			bool bIsBuildingValid = AttackList[EntityIdx].TargetBuilding.IsValid();
+			
+			if (!bIsEntityValid && !bIsBuildingValid)
 			{
 				AttackList[EntityIdx].bIsTargetSet = false;
 				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
 			}
-
-			FTWStatusFragment* EnemyStatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(TargetEntity);
-			if (!EnemyStatusFragment || EnemyStatusFragment->GetIsDeath())
+			if (bIsEntityValid)
 			{
-				AttackList[EntityIdx].bIsTargetSet = false;
-				EntitiesToSignalAttackComplete.Add(Entity);
-
-				continue;
-			}
-
-			FTWUnitStatus& EnemyStatus = EnemyStatusFragment->GetMutableStatus();
-
-			const FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
-
-			const FTransformFragment* TargetTransformFragment =
-				EntityManager.GetFragmentDataPtr<FTransformFragment>(TargetEntity);
-			if (!TargetTransformFragment)
-			{
-				AttackList[EntityIdx].bIsTargetSet = false;
-				EntitiesToSignalAttackComplete.Add(Entity);
-				continue;
-			}
-
-			const FVector EnemyLocation = TargetTransformFragment->GetTransform().GetLocation();
-
-			if (FVector::DistSquared(EntityLocation, EnemyLocation) >
-				FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Entity %d Lose Target!"), EntityIdx);
-
-				if (CommandList[EntityIdx].GetType() != ETWMassCommand::AttackToUnit)
+				FTWStatusFragment* EnemyStatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(
+					TargetEntity);
+				if (!EnemyStatusFragment || EnemyStatusFragment->GetIsDeath())
 				{
 					AttackList[EntityIdx].bIsTargetSet = false;
-					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
-					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					EntitiesToSignalAttackComplete.Add(Entity);
+					continue;
 				}
 
-				if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToUnit ||
-					CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
+
+				FTWUnitStatus& EnemyStatus = EnemyStatusFragment->GetMutableStatus();
+
+				const FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
+
+				const FTransformFragment* TargetTransformFragment =
+					EntityManager.GetFragmentDataPtr<FTransformFragment>(TargetEntity);
+				if (!TargetTransformFragment)
 				{
-					SignalSubsystem->SignalEntity(PathInitSignal, Entity);
+					AttackList[EntityIdx].bIsTargetSet = false;
+					EntitiesToSignalAttackComplete.Add(Entity);
+					continue;
 				}
 
-				if (CommandList[EntityIdx].GetType() != ETWMassCommand::Hold &&
-					CommandList[EntityIdx].GetType() != ETWMassCommand::None)
+				const FVector EnemyLocation = TargetTransformFragment->GetTransform().GetLocation();
+
+				if (FVector::DistSquared(EntityLocation, EnemyLocation) >
+					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
-					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					UE_LOG(LogTemp, Warning, TEXT("Entity %d Lose Target!"), EntityIdx);
+
+					if (CommandList[EntityIdx].GetType() != ETWMassCommand::AttackToTarget)
+					{
+						AttackList[EntityIdx].bIsTargetSet = false;
+						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+						Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					}
+
+					if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
+						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
+					{
+						SignalSubsystem->SignalEntity(PathInitSignal, Entity);
+					}
+
+					if (CommandList[EntityIdx].GetType() != ETWMassCommand::Hold &&
+						CommandList[EntityIdx].GetType() != ETWMassCommand::None)
+					{
+						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					}
+					continue;
 				}
-				continue;
+
+				// TODO Divide Optimization
+				if (TimeSeconds - AttackList[EntityIdx].LastAttackTime <
+					(1 / StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::AttackSpeed)))
+				{
+					continue;
+				}
+
+				UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
+
+				const int32 HealthIndex = static_cast<int32>(ETWStatusType::Health);
+				const float OldHealth = EnemyStatus.Status[HealthIndex];
+				const float DamageAmount = StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Damage);
+
+				UE_LOG(LogTemp, Warning, TEXT("Before Target Health : %f"), OldHealth);
+
+				const float NewHealth = FMath::Max(0.0f, OldHealth - DamageAmount);
+				EnemyStatus.Status[HealthIndex] = NewHealth;
+				AttackList[EntityIdx].LastAttackTime = TimeSeconds;
+				TransformList[EntityIdx].GetMutableTransform().SetRotation(
+					UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
+
+				if (NewHealth < OldHealth)
+				{
+					FMassNetworkID TargetNetId;
+					int32 TargetOwnerPlayerSlot = INDEX_NONE;
+					int32 AttackerOwnerPlayerSlot = INDEX_NONE;
+
+					const bool bHasTargetInfo =
+						TryGetTargetNetIdAndOwnerSlot(EntityManager, TargetEntity, TargetNetId, TargetOwnerPlayerSlot);
+
+					const bool bHasAttackerOwner =
+						TryGetEntityOwnerSlot(EntityManager, Entity, AttackerOwnerPlayerSlot);
+
+					if (bHasTargetInfo)
+					{
+						NotifyRelevantPlayerControllersRecentCombatDamage(
+							Context.GetWorld(),
+							TargetNetId,
+							bHasAttackerOwner ? AttackerOwnerPlayerSlot : INDEX_NONE,
+							TargetOwnerPlayerSlot,
+							1.25f
+						);
+					}
+				}
+
+
+				UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), EnemyStatus.Status[HealthIndex]);
 			}
-
-			// TODO Divide Optimization
-			if (TimeSeconds - AttackList[EntityIdx].LastAttackTime <
-				(1 / StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::AttackSpeed)))
+			else if (bIsBuildingValid)
 			{
-				continue;
-			}
-
-			UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
-
-			const int32 HealthIndex = static_cast<int32>(ETWStatusType::Health);
-			const float OldHealth = EnemyStatus.Status[HealthIndex];
-			const float DamageAmount = StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Damage);
-
-			UE_LOG(LogTemp, Warning, TEXT("Before Target Health : %f"), OldHealth);
-
-			const float NewHealth = FMath::Max(0.0f, OldHealth - DamageAmount);
-			EnemyStatus.Status[HealthIndex] = NewHealth;
-			AttackList[EntityIdx].LastAttackTime = TimeSeconds;
-			TransformList[EntityIdx].GetMutableTransform().SetRotation(UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
-			
-			if (NewHealth < OldHealth)
-			{
-				FMassNetworkID TargetNetId;
-				int32 TargetOwnerPlayerSlot = INDEX_NONE;
-				int32 AttackerOwnerPlayerSlot = INDEX_NONE;
-
-				const bool bHasTargetInfo =
-					TryGetTargetNetIdAndOwnerSlot(EntityManager, TargetEntity, TargetNetId, TargetOwnerPlayerSlot);
-
-				const bool bHasAttackerOwner =
-					TryGetEntityOwnerSlot(EntityManager, Entity, AttackerOwnerPlayerSlot);
-
-				if (bHasTargetInfo)
+				if (TargetBuilding->IsDead())
 				{
-					NotifyRelevantPlayerControllersRecentCombatDamage(
-						Context.GetWorld(),
-						TargetNetId,
-						bHasAttackerOwner ? AttackerOwnerPlayerSlot : INDEX_NONE,
-						TargetOwnerPlayerSlot,
-						1.25f
-					);
+					AttackList[EntityIdx].bIsTargetSet = false;
+					EntitiesToSignalAttackComplete.Add(Entity);
+					continue;
 				}
-			}
-			
 
-			UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), EnemyStatus.Status[HealthIndex]);
+				const FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
+				const FVector EnemyLocation = TargetBuilding->GetTransform().GetLocation();
+
+				if (FVector::DistSquared(EntityLocation, EnemyLocation) >
+					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("Entity %d Lose Target!"), EntityIdx);
+
+					if (CommandList[EntityIdx].GetType() != ETWMassCommand::AttackToTarget)
+					{
+						AttackList[EntityIdx].bIsTargetSet = false;
+						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
+						Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					}
+
+					if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
+						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
+					{
+						SignalSubsystem->SignalEntity(PathInitSignal, Entity);
+					}
+
+					if (CommandList[EntityIdx].GetType() != ETWMassCommand::Hold &&
+						CommandList[EntityIdx].GetType() != ETWMassCommand::None)
+					{
+						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					}
+					continue;
+				}
+
+				// TODO Divide Optimization
+				if (TimeSeconds - AttackList[EntityIdx].LastAttackTime <
+					(1 / StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::AttackSpeed)))
+				{
+					continue;
+				}
+
+				UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
+
+				const float DamageAmount = StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Damage);
+
+				UE_LOG(LogTemp, Warning, TEXT("Before Target Health : %f"), TargetBuilding->GetCurrentHP());
+				
+				TargetBuilding->ApplyDamageToBuilding(DamageAmount);
+
+				AttackList[EntityIdx].LastAttackTime = TimeSeconds;
+				TransformList[EntityIdx].GetMutableTransform().SetRotation(
+					UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
+				
+
+				UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), TargetBuilding->GetCurrentHP());
+			}
 		}
 
 		if (EntitiesToSignalAttackComplete.Num())

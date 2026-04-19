@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityElementTypes.h"
 #include "MassEntityHandle.h"
+#include "Building/TWBaseBuilding.h"
 #include "TWAttackFragment.generated.h"
 
 USTRUCT()
@@ -12,6 +13,7 @@ struct FTWAttackFragment : public FMassFragment
 	
 	FTWAttackFragment() = default;
 	FMassEntityHandle TargetEntity;
+	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
 	float LastSearchTime = 0.0f;
 	float LastAttackTime = 0.0f;
 	float LastAttackAnimationTime = 0.0f;

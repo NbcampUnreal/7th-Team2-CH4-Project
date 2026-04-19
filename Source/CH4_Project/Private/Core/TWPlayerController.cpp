@@ -700,7 +700,7 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 			FMassEntityHandle TargetEntity;
 			if (UnitSubsystem->FindNearestAnyEntity(NavCommandLocation, TargetEntity))
 			{
-				CommandType = ETWMassCommand::MoveToUnit;
+				CommandType = ETWMassCommand::MoveToTarget;
 			}
 			else
 			{
@@ -777,7 +777,7 @@ bool ATWPlayerController::TryFindAttackableBuildingCandidate(
 	}
 
 	FTWAttackableBuildingCandidate Candidate;
-	if (!UnitSubsystem->FindNearestEnemyBuildingCandidate(CommandLocation, MyPlayerSlot, Candidate, 1200.0f))
+	if (!UnitSubsystem->FindNearestEnemyBuildingCandidate(CommandLocation, MyPlayerSlot, Candidate, 200.0f))
 	{
 		return false;
 	}
@@ -805,7 +805,7 @@ bool ATWPlayerController::TryResolveAttackableTargetPreview(
 		return false;
 	}
 	
-	if (UnitSubsystem->FindNearestEnemyEntity(CommandLocation, OutTargetEntity, MyPlayerSlot, 1000.0f))
+	if (UnitSubsystem->FindNearestEnemyEntity(CommandLocation, OutTargetEntity, MyPlayerSlot, 100.0f))
 	{
 		OutResolvedTargetLocation = CommandLocation;
 		return true;
@@ -890,11 +890,11 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 			{
 				if (TargetEntity.IsSet())
 				{
-					CommandType = ETWMassCommand::AttackToUnit;
+					CommandType = ETWMassCommand::AttackToTarget;
 				}
 				else if (IsValid(TargetBuilding))
 				{
-					CommandType = ETWMassCommand::AttackToLocation;
+					CommandType = ETWMassCommand::AttackToTarget;
 
 					UE_LOG(
 						LogTemp,
@@ -934,6 +934,7 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 					CommandFragment->SetType(CommandType);
 					CommandFragment->SetLocation(TargetLocation);
 					CommandFragment->SetTarget(TargetEntity);
+					CommandFragment->SetTargetBuilding(TargetBuilding);
 				}
 
 				if (FMassMoveTargetFragment* MoveTarget = InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(Entity))

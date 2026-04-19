@@ -110,10 +110,16 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 			if (Signals.Contains(PathInitSignal))
 			{
 				FVector TargetLocation = CommandFragments[EntityIdx].GetLocation();
-				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToUnit ||
-					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToUnit)
+				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
+					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToTarget)
 				{
-					TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
+					if (CommandFragments[EntityIdx].GetTarget().IsValid())
+					{
+						TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
+					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()))
+					{
+						TargetLocation = CommandFragments[EntityIdx].GetTargetBuilding()->GetTransform().GetLocation();
+					}
 				}
 				
 				if (!RequestPath(
