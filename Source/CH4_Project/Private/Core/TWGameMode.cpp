@@ -2,6 +2,7 @@
 #include "Core/TWPlayerState.h"
 #include "Building/TWResourceBuilding.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 
 void ATWGameMode::PostLogin(APlayerController* NewPlayer)
@@ -104,6 +105,7 @@ void ATWGameMode::TryBindBuilding(ATWBaseBuilding* InBuilding)
 
 void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 {
+	int32 CurrentPlayerCount = GameState->PlayerArray.Num();
 	int32 WinnerPlayerSlot = -1;
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -119,11 +121,14 @@ void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 		{
 			continue;
 		}
-
-		if (PS->PlayerSlot != DefeatedPlayerSlot)
+		
+		if (CurrentPlayerCount == 2)
 		{
-			WinnerPlayerSlot = PS->PlayerSlot;
-			break;
+			if (PS->PlayerSlot != DefeatedPlayerSlot)
+			{
+				WinnerPlayerSlot = PS->PlayerSlot;
+				break;
+			}
 		}
 	}
 
