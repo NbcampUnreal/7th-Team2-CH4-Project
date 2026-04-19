@@ -155,13 +155,15 @@ void ATWSelectionVisualActor::SetVisualData(
 	const FTWSelectedVisualData& InPrimarySelectedVisualData,
 	const TArray<FTWUnitRingVisualData>& InSelectedUnitRingVisuals,
 	const TArray<FTWBuildingSelectionVisualData>& InSelectedBuildingVisuals,
-	const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals
+	const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals,
+	const TArray<FTWHPBarVisualData>& InRecentCombatHPBarVisuals
 )
 {
 	PrimarySelectedVisualData = InPrimarySelectedVisualData;
 	SelectedUnitRingVisuals = InSelectedUnitRingVisuals;
 	SelectedBuildingVisuals = InSelectedBuildingVisuals;
 	SelectedHPBarVisuals = InSelectedHPBarVisuals;
+	RecentCombatHPBarVisuals = InRecentCombatHPBarVisuals;
 }
 
 void ATWSelectionVisualActor::ClearVisuals()
@@ -170,6 +172,7 @@ void ATWSelectionVisualActor::ClearVisuals()
 	SelectedUnitRingVisuals.Empty();
 	SelectedBuildingVisuals.Empty();
 	SelectedHPBarVisuals.Empty();
+	RecentCombatHPBarVisuals.Empty();
 
 	if (UnitRingISM)
 	{
@@ -363,62 +366,101 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 	HPBarISM->ClearInstances();
 	HPBarISM->NumCustomDataFloats = HPBAR_NUM_CUSTOMDATA_FLOATS;
 
-	if (SelectedHPBarVisuals.Num() <= 0)
+	TArray<FTWHPBarVisualData> CombinedHPBars;
+	CombinedHPBars.Reserve(SelectedHPBarVisuals.Num() + RecentCombatHPBarVisuals.Num());
+
+	for (const FTWHPBarVisualData& Data : SelectedHPBarVisuals)
+	{
+		if (Data.bValid)
+		{
+			CombinedHPBars.Add(Data);
+		}
+	}
+
+	for (const FTWHPBarVisualData& Data : RecentCombatHPBarVisuals)
+	{
+		if (Data.bValid)
+		{
+			CombinedHPBars.Add(Data);
+		}
+	}
+
+	if (CombinedHPBars.Num() <= 0)
 	{
 		HPBarISM->MarkRenderStateDirty();
 		return;
 	}
 
 	FRotator FacingRotation = FRotator::ZeroRotator;
-	if (UWorld* World = GetWorld())
+
+	if (const UWorld* World = GetWorld())
 	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
+		if (const APlayerController* PC = World->GetFirstPlayerController())
 		{
-			if (PC->PlayerCameraManager)
+			if (const APlayerCameraManager* CameraManager = PC->PlayerCameraManager)
 			{
-				const FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
-				if (SelectedHPBarVisuals.Num() > 0)
+				const FVector CameraLocation = CameraManager->GetCameraLocation();
+
+				for (int32 Index = 0; Index < CombinedHPBars.Num(); ++Index)
 				{
-					FacingRotation = UKismetMathLibrary::FindLookAtRotation(
-						SelectedHPBarVisuals[0].WorldLocation,
-						CameraLocation
+					const FTWHPBarVisualData& HPBarData = CombinedHPBars[Index];
+
+					const FVector ToCamera = (CameraLocation - HPBarData.WorldLocation).GetSafeNormal();
+					FacingRotation = UKismetMathLibrary::MakeRotFromX(ToCamera);
+
+					const FTransform InstanceTransform(
+						FacingRotation,
+						HPBarData.WorldLocation,
+						HPBarData.WorldScale
 					);
-					FacingRotation.Pitch = 0.f;
-					FacingRotation.Roll = 0.f;
+
+					const int32 InstanceIndex = HPBarISM->AddInstance(InstanceTransform, true);
+
+					const FLinearColor FinalColor = ResolveFinalOwnerColor(HPBarData.OwnerPlayerSlot);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_HEALTH_PERCENT,
+						HPBarData.HealthPercent,
+						false
+					);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_COLOR_R,
+						FinalColor.R,
+						false
+					);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_COLOR_G,
+						FinalColor.G,
+						false
+					);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_COLOR_B,
+						FinalColor.B,
+						false
+					);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_IS_BUILDING,
+						HPBarData.bIsBuilding ? 1.0f : 0.0f,
+						false
+					);
 				}
+
+				HPBarISM->SetHiddenInGame(false);
+				HPBarISM->SetVisibility(true, true);
+				HPBarISM->MarkRenderStateDirty();
+				return;
 			}
 		}
 	}
 
-	for (const FTWHPBarVisualData& HPBarData : SelectedHPBarVisuals)
-	{
-		if (!HPBarData.bValid)
-		{
-			continue;
-		}
-
-		const FTransform HPBarTransform(
-			FacingRotation,
-			HPBarData.WorldLocation,
-			HPBarData.WorldScale
-		);
-
-		const int32 InstanceIndex = HPBarISM->AddInstance(HPBarTransform, true);
-		if (InstanceIndex == INDEX_NONE)
-		{
-			continue;
-		}
-
-		const FLinearColor FinalColor = ResolveFinalOwnerColor(HPBarData.OwnerPlayerSlot);
-
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_HEALTH_PERCENT, FMath::Clamp(HPBarData.HealthPercent, 0.f, 1.f), false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_R, FinalColor.R, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_G, FinalColor.G, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_B, FinalColor.B, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_IS_BUILDING, HPBarData.bIsBuilding ? 1.f : 0.f, false);
-	}
-
-	HPBarISM->SetHiddenInGame(false);
-	HPBarISM->SetVisibility(true, true);
 	HPBarISM->MarkRenderStateDirty();
 }

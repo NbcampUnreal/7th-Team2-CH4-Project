@@ -52,6 +52,9 @@ void UTWPlayerSelectionVisualComponent::ClearSelectionVisuals()
 	LastSelectedBuilding = nullptr;
 	LastSelectedOwnerPlayerSlot = INDEX_NONE;
 
+	RecentCombatHPBars.Empty();
+	RecentCombatHPBarVisuals.Empty();
+
 	ClearCachedVisualData();
 	HideAllRenderers();
 }
@@ -68,6 +71,9 @@ void UTWPlayerSelectionVisualComponent::TickVisuals(float DeltaSeconds)
 		LastSelectedBuilding.Get(),
 		LastSelectedOwnerPlayerSlot
 	);
+
+	TickRecentCombatHPBars(DeltaSeconds);
+	BuildRecentCombatHPBarVisualData();
 
 	SyncRenderBackendFromCachedData();
 }
@@ -97,6 +103,7 @@ void UTWPlayerSelectionVisualComponent::ClearCachedVisualData()
 	SelectedUnitRingVisuals.Empty();
 	SelectedBuildingVisuals.Empty();
 	SelectedHPBarVisuals.Empty();
+	RecentCombatHPBarVisuals.Empty();
 }
 
 bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
@@ -260,6 +267,143 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedBuildingVisualData(ATWBaseB
 	return true;
 }
 
+void UTWPlayerSelectionVisualComponent::NotifyRecentCombatUnitDamaged(
+	const FMassNetworkID& InUnitNetId,
+	int32 InOwnerPlayerSlot,
+	float InVisibleTime
+)
+{
+	if (!InUnitNetId.IsValid())
+	{
+		return;
+	}
+
+	const float SafeVisibleTime =
+		(InVisibleTime > 0.f)
+		? InVisibleTime
+		: RecentCombatHPBarVisibleTime;
+
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		if (Item.UnitNetId == InUnitNetId)
+		{
+			Item.OwnerPlayerSlot = InOwnerPlayerSlot;
+			Item.RemainingTime = SafeVisibleTime;
+			Item.bValid = true;
+			return;
+		}
+	}
+
+	FTWRecentCombatHPBarData NewItem;
+	NewItem.UnitNetId = InUnitNetId;
+	NewItem.OwnerPlayerSlot = InOwnerPlayerSlot;
+	NewItem.RemainingTime = SafeVisibleTime;
+	NewItem.bValid = true;
+	RecentCombatHPBars.Add(NewItem);
+}
+
+void UTWPlayerSelectionVisualComponent::TickRecentCombatHPBars(float DeltaSeconds)
+{
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		Item.RemainingTime -= DeltaSeconds;
+	}
+
+	RemoveExpiredRecentCombatHPBars();
+}
+
+void UTWPlayerSelectionVisualComponent::RemoveExpiredRecentCombatHPBars()
+{
+	for (int32 Index = RecentCombatHPBars.Num() - 1; Index >= 0; --Index)
+	{
+		if (!RecentCombatHPBars[Index].bValid || RecentCombatHPBars[Index].RemainingTime <= 0.f)
+		{
+			RecentCombatHPBars.RemoveAt(Index);
+		}
+	}
+}
+
+void UTWPlayerSelectionVisualComponent::BuildRecentCombatHPBarVisualData()
+{
+	if (!OwnerController)
+	{
+		return;
+	}
+
+	UWorld* World = OwnerController->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return;
+	}
+
+	if (RecentCombatHPBars.Num() <= 0)
+	{
+		return;
+	}
+
+	RecentCombatHPBarVisuals.Reserve(FMath::Min(RecentCombatHPBars.Num(), MaxRecentCombatHPBarCount));
+
+	int32 AddedCount = 0;
+
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		if (AddedCount >= MaxRecentCombatHPBarCount)
+		{
+			break;
+		}
+
+		FVector HPBarLocation = FVector::ZeroVector;
+		if (!UnitSubsystem->TryGetUnitHPBarWorldLocation(Item.UnitNetId, HPBarLocation))
+		{
+			FVector UnitLocation = FVector::ZeroVector;
+			if (!UnitSubsystem->TryGetUnitVisualLocation(Item.UnitNetId, UnitLocation))
+			{
+				continue;
+			}
+
+			HPBarLocation = UnitLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+		}
+
+		float CurrentHP = 0.f;
+		float MaxHP = 0.f;
+
+		const bool bHasCurrentHP =
+			UnitSubsystem->TryGetUnitCurrentHP(Item.UnitNetId, Item.OwnerPlayerSlot, CurrentHP);
+
+		const bool bHasMaxHP =
+			UnitSubsystem->TryGetUnitMaxHP(Item.UnitNetId, Item.OwnerPlayerSlot, MaxHP);
+
+		if (!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		Item.CachedWorldLocation = HPBarLocation;
+		Item.CachedCurrentHP = CurrentHP;
+		Item.CachedMaxHP = MaxHP;
+		Item.CachedHealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
+
+		FTWHPBarVisualData HPBarData;
+		HPBarData.bValid = true;
+		HPBarData.bIsBuilding = false;
+		HPBarData.OwnerPlayerSlot = Item.OwnerPlayerSlot;
+		HPBarData.WorldLocation = Item.CachedWorldLocation;
+		HPBarData.CurrentHP = Item.CachedCurrentHP;
+		HPBarData.MaxHP = Item.CachedMaxHP;
+		HPBarData.HealthPercent = Item.CachedHealthPercent;
+		HPBarData.WorldScale = HPBarWorldScale;
+
+		RecentCombatHPBarVisuals.Add(HPBarData);
+		++AddedCount;
+	}
+}
+
 void UTWPlayerSelectionVisualComponent::InitializeRenderBackend()
 {
 	if (!OwnerController)
@@ -367,7 +511,8 @@ void UTWPlayerSelectionVisualComponent::SyncRenderBackendFromCachedData()
 		PrimarySelectedVisualData,
 		SelectedUnitRingVisuals,
 		SelectedBuildingVisuals,
-		SelectedHPBarVisuals
+		SelectedHPBarVisuals,
+		RecentCombatHPBarVisuals
 	);
 	SelectionVisualActor->SyncVisuals();
 }

@@ -1274,19 +1274,20 @@ void UTWPlayerUIBridge::RefreshSelection()
 		{
 			if (FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(VM.SelectionId))
 			{
-				BaseStatus = UnitRow->BaseStatus;
-				bHasBaseStatus = true;
-
 				if (!UnitRow->UnitID.IsNone())
 				{
 					VM.DisplayName = UnitRow->UnitID.ToString();
 				}
+			}
 
-				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-				if (MaxHP > 0.f)
-				{
-					bHasAnyHP = true;
-				}
+			const int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
+			BaseStatus = UnitSubsystem->GetUnitDefaultStatus(VM.SelectionId, OwnerPlayerSlot);
+			bHasBaseStatus = true;
+
+			MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
+			if (MaxHP > 0.f)
+			{
+				bHasAnyHP = true;
 			}
 		}
 
@@ -1316,7 +1317,7 @@ void UTWPlayerUIBridge::RefreshSelection()
 		if (bHasAnyHP)
 		{
 			VM.CurrentHP = CurrentHP;
-			VM.MaxHP = MaxHP;
+			VM.MaxHP = FMath::Max(MaxHP, VM.CurrentHP);
 			VM.HPText = FString::Printf(TEXT("%.0f / %.0f"), VM.CurrentHP, VM.MaxHP);
 		}
 		else

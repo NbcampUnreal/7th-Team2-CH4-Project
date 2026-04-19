@@ -39,7 +39,8 @@ public:
 		const FTWSelectedVisualData& InPrimarySelectedVisualData,
 		const TArray<FTWUnitRingVisualData>& InSelectedUnitRingVisuals,
 		const TArray<FTWBuildingSelectionVisualData>& InSelectedBuildingVisuals,
-		const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals
+		const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals,
+		const TArray<FTWHPBarVisualData>& InRecentCombatHPBarVisuals
 	);
 
 	void ClearVisuals();
@@ -89,7 +90,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FTWHPBarVisualData> SelectedHPBarVisuals;
-
+	
+	UPROPERTY(Transient)
+	TArray<FTWHPBarVisualData> RecentCombatHPBarVisuals;
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMesh> UnitRingMesh = nullptr;

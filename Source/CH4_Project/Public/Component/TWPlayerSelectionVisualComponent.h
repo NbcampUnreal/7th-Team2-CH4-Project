@@ -142,6 +142,47 @@ struct CH4_PROJECT_API FTWHPBarVisualData
 		WorldScale = FVector(1.f, 0.2f, 0.08f);
 	}
 };
+USTRUCT()
+struct CH4_PROJECT_API FTWRecentCombatHPBarData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FMassNetworkID UnitNetId;
+
+	UPROPERTY()
+	int32 OwnerPlayerSlot = INDEX_NONE;
+
+	UPROPERTY()
+	float RemainingTime = 0.f;
+
+	UPROPERTY()
+	FVector CachedWorldLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	float CachedHealthPercent = 1.f;
+
+	UPROPERTY()
+	float CachedCurrentHP = 0.f;
+
+	UPROPERTY()
+	float CachedMaxHP = 0.f;
+
+	UPROPERTY()
+	bool bValid = false;
+
+	void Reset()
+	{
+		UnitNetId = FMassNetworkID();
+		OwnerPlayerSlot = INDEX_NONE;
+		RemainingTime = 0.f;
+		CachedWorldLocation = FVector::ZeroVector;
+		CachedHealthPercent = 1.f;
+		CachedCurrentHP = 0.f;
+		CachedMaxHP = 0.f;
+		bValid = false;
+	}
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class CH4_PROJECT_API UTWPlayerSelectionVisualComponent : public UActorComponent
@@ -167,7 +208,11 @@ public:
 		ATWBaseBuilding* InSelectedBuilding,
 		int32 InSelectedOwnerPlayerSlot
 	);
-
+	void NotifyRecentCombatUnitDamaged(
+		const FMassNetworkID& InUnitNetId,
+		int32 InOwnerPlayerSlot,
+		float InVisibleTime = 1.25f
+	);
 	const FTWSelectedVisualData& GetPrimarySelectedVisualData() const { return PrimarySelectedVisualData; }
 	const TArray<FTWUnitRingVisualData>& GetSelectedUnitRingVisuals() const { return SelectedUnitRingVisuals; }
 	const TArray<FTWBuildingSelectionVisualData>& GetSelectedBuildingVisuals() const { return SelectedBuildingVisuals; }
@@ -182,7 +227,9 @@ private:
 	);
 
 	bool BuildSelectedBuildingVisualData(ATWBaseBuilding* InSelectedBuilding);
-
+	void TickRecentCombatHPBars(float DeltaSeconds);
+	void BuildRecentCombatHPBarVisualData();
+	void RemoveExpiredRecentCombatHPBars();
 private:
 	void InitializeRenderBackend();
 	void SpawnRenderActorIfNeeded();
@@ -202,7 +249,11 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FTWUnitRingVisualData> SelectedUnitRingVisuals;
+	UPROPERTY(Transient)
+	TArray<FTWHPBarVisualData> RecentCombatHPBarVisuals;
 
+	UPROPERTY(Transient)
+	TArray<FTWRecentCombatHPBarData> RecentCombatHPBars;
 	UPROPERTY(Transient)
 	TArray<FTWBuildingSelectionVisualData> SelectedBuildingVisuals;
 
@@ -279,4 +330,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SelectionVisual|HPBar")
 	FVector HPBarWorldScale = FVector(1.0f, 0.2f, 0.08f);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SelectionVisual|CombatFeedback", meta=(ClampMin="0.0"))
+	float RecentCombatHPBarVisibleTime = 1.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="SelectionVisual|CombatFeedback", meta=(ClampMin="1"))
+	int32 MaxRecentCombatHPBarCount = 24;
 };
