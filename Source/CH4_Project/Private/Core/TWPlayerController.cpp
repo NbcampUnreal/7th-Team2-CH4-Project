@@ -2005,6 +2005,7 @@ bool ATWPlayerController::TryHandleImmediateCommand(const FUICommandMetaRow* Com
 			}
 
 			RefreshDynamicMappingContexts();
+			RefreshUIBridge();
 			return true;
 		}
 	}
@@ -2025,6 +2026,7 @@ bool ATWPlayerController::TryHandleImmediateCommand(const FUICommandMetaRow* Com
 		}
 
 		RefreshDynamicMappingContexts();
+		RefreshUIBridge();
 		return true;
 	}
 
