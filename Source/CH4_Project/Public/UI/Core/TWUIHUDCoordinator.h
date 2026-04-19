@@ -58,6 +58,7 @@ public:
 	{
 		return OnCommandRequested;
 	}
+
 	void SetArmedCommandId(FName InCommandId);
 
 protected:
@@ -108,6 +109,7 @@ protected:
 	TArray<FCommandSlotViewModel> LastBuiltCommandViewModels;
 	
 	FName CurrentArmedCommandId = NAME_None;
+
 private:
 	FTWOnCommandRequested OnCommandRequested;
 };

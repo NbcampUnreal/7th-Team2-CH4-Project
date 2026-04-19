@@ -18,6 +18,7 @@
 #include "Data/TWUnitStatus.h"
 #include "UObject/UnrealType.h"
 #include "TimerManager.h"
+#include "HeroUnit/TWHeroUnitBase.h"
 #include "Engine/World.h"
 
 namespace TWCommandIds
@@ -28,6 +29,7 @@ namespace TWCommandIds
 	static const FName BuildMenu(TEXT("BuildMenu"));
 	static const FName Back(TEXT("Back"));
 	static const FName IncreasePopulation(TEXT("IncreasePopulation"));
+	static const FName HeroSkill(TEXT("HeroSkill"));
 }
 
 namespace TWUIBridgeText
@@ -1142,8 +1144,18 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	{
 		return false;
 	}
+	const bool bHasHeroSelected =
+	OwnerController &&
+	OwnerController->IsOwnedHeroCurrentlySelected();
 
-	StopSelectionRefreshTimer();
+	if (bHasHeroSelected)
+	{
+		StartSelectionRefreshTimer(0.0f);
+	}
+	else
+	{
+		StopSelectionRefreshTimer();
+	}
 
 	const int32 LocalSelectedUnitCount = OwnerController->GetLocalSelectedUnitCount();
 	if (LocalSelectedUnitCount <= 0)
@@ -1266,6 +1278,11 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 			TWCommandIds::Hold,
 			TWCommandIds::BuildMenu
 		};
+
+		if (OwnerController && OwnerController->IsOwnedHeroCurrentlySelected())
+		{
+			OutCommandIds.AddUnique(TWCommandIds::HeroSkill);
+		}
 	}
 
 	return true;
@@ -1284,6 +1301,25 @@ void UTWPlayerUIBridge::ApplyCommandQueueCounts(const TArray<FName>& CommandIds)
 	{
 		const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
 		SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
+	}
+	if (OwnerController && OwnerController->IsOwnedHeroCurrentlySelected())
+	{
+		ATWHeroUnitBase* OwnedHero = OwnerController->GetOwnedHeroUnit();
+		if (OwnedHero && SelectionProvider)
+		{
+			const float Remaining = OwnedHero->GetRemainingCooldownTime();
+			const bool bReady = (Remaining <= KINDA_SMALL_NUMBER);
+
+			SelectionProvider->SetRuntimeCommandEnabled(
+				TWCommandIds::HeroSkill,
+				bReady
+			);
+
+			SelectionProvider->SetRuntimeCommandDescription(
+				TWCommandIds::HeroSkill,
+				bReady ? TEXT("") : FString::Printf(TEXT("%.1fs"), Remaining)
+			);
+		}
 	}
 }
 

@@ -3,6 +3,7 @@
 #include "Engine/DataTable.h"
 #include "UI/Core/TWResourceDataProvider.h"
 #include "UI/Core/TWSelectionDataProvider.h"
+#include "UI/Core/TWUISelectionProvider.h"
 #include "UI/Widgets/TWHUDRootWidget.h"
 
 void UTWUIHUDCoordinator::Initialize(
@@ -142,13 +143,17 @@ void UTWUIHUDCoordinator::HandleSelectionChanged()
 				NewVM.bArmed != OldVM.bArmed ||
 				NewVM.NextContext != OldVM.NextContext ||
 				NewVM.bIsContextCommand != OldVM.bIsContextCommand ||
-				NewVM.bReturnToPreviousContext != OldVM.bReturnToPreviousContext)
+				NewVM.bReturnToPreviousContext != OldVM.bReturnToPreviousContext ||
+				NewVM.Description != OldVM.Description ||
+				NewVM.QueueCount != OldVM.QueueCount ||
+				NewVM.DisableReason != OldVM.DisableReason)
 			{
 				bCommandStructureChanged = true;
 				break;
 			}
 		}
 	}
+
 	if (bCommandStructureChanged)
 	{
 		LastBuiltCommandViewModels = NewCommandViewModels;
@@ -338,6 +343,7 @@ FCommandSlotViewModel UTWUIHUDCoordinator::BuildCommandSlotViewModel(
 	VM.bReturnToPreviousContext = false;
 	VM.NextContext = NAME_None;
 	VM.bArmed = (CommandId == CurrentArmedCommandId);
+
 	if (CommandMetaTable)
 	{
 		static const FString Context = TEXT("CommandMetaLookup");
@@ -366,6 +372,23 @@ FCommandSlotViewModel UTWUIHUDCoordinator::BuildCommandSlotViewModel(
 			VM.NextContext = Row->NextContext;
 			VM.bIsContextCommand = Row->bIsContextCommand;
 			VM.bReturnToPreviousContext = Row->bReturnToPreviousContext;
+		}
+	}
+
+	if (const UTWUISelectionProvider* ConcreteSelectionProvider = Cast<UTWUISelectionProvider>(SelectionProvider))
+	{
+		VM.QueueCount = ConcreteSelectionProvider->GetRuntimeCommandQueueCount(CommandId);
+
+		bool bRuntimeEnabled = true;
+		if (ConcreteSelectionProvider->GetRuntimeCommandEnabled(CommandId, bRuntimeEnabled))
+		{
+			VM.bEnabled = bRuntimeEnabled;
+		}
+
+		FString RuntimeDescription;
+		if (ConcreteSelectionProvider->GetRuntimeCommandDescription(CommandId, RuntimeDescription))
+		{
+			VM.Description = RuntimeDescription;
 		}
 	}
 
