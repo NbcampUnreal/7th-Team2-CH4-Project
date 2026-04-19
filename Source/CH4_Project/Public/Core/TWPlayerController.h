@@ -288,6 +288,22 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_ShowGameResult(int32 GameResult);
 
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> IA_Menu = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> MenuWidgetClass;
+	
+	UPROPERTY()
+	UUserWidget* MenuWidgetInstance;
+	
+	void ToggleMenu();
+	
+public:
+	UFUNCTION(Client, Reliable)
+	void Client_ShowMenu(bool Open);
+
 #pragma endregion
 
 public:

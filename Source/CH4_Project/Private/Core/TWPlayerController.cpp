@@ -438,6 +438,8 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(IA_TestIncreasePopulation, ETriggerEvent::Started, this, &ThisClass::HandleTestIncreasePopulation);
 	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
 	EnhancedInputComponent->BindAction(IA_TestUpgrade, ETriggerEvent::Started, this, &ThisClass::HandleTestUpgrade);
+	
+	EnhancedInputComponent->BindAction(IA_Menu, ETriggerEvent::Started, this, &ATWPlayerController::ToggleMenu);
 }
 
 #pragma region 마우스
@@ -1719,6 +1721,47 @@ void ATWPlayerController::Client_ShowGameResult_Implementation(int32 GameResult)
 	bShowMouseCursor = true;
 }
 
+void ATWPlayerController::ToggleMenu()
+{
+	if (!MenuWidgetInstance && MenuWidgetClass)
+	{
+		MenuWidgetInstance = CreateWidget<UUserWidget>(this, MenuWidgetClass);
+	}
+	
+	if (MenuWidgetInstance)
+	{
+		if (!MenuWidgetInstance->IsInViewport())
+		{
+			MenuWidgetInstance->AddToViewport();
+			
+			FInputModeUIOnly InputMode;
+			SetInputMode(InputMode);
+			SetShowMouseCursor(true);
+		}
+		else
+		{
+			MenuWidgetInstance->RemoveFromParent();
+			
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			SetShowMouseCursor(false);
+
+			InitializeSelectionVisualManager();
+			RefreshSelectionVisualManager();
+
+			InitializeUIBridge();
+			RefreshUIBridge();
+			RefreshDynamicMappingContexts();
+		}
+	}
+}
+
+void ATWPlayerController::Client_ShowMenu_Implementation(bool Open)
+{
+	
+}
 
 void ATWPlayerController::ServerHandleUICommandRequested_Implementation(FName CommandId)
 {
