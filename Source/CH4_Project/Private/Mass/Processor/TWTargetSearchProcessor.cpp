@@ -72,10 +72,6 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
-			if (AttackList[EntityIdx].bIsTargetSet)
-			{
-				continue;
-			}
 			if (TimeSeconds - AttackList[EntityIdx].LastSearchTime < SearchingInterval)
 			{
 				continue;
@@ -87,7 +83,10 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 				EntityLocation,
 				Target,
 				UnitList[EntityIdx].GetOwner(),
-				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
+				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range))
+				&&Context.GetEntityManagerChecked().IsEntityValid(Target)
+				&&!Context.GetEntityManagerChecked().GetFragmentDataPtr<FTWStatusFragment>(Target)->GetIsDeath()
+				)
 			{
 				FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 				AttackList[EntityIdx].bIsTargetSet = true;
