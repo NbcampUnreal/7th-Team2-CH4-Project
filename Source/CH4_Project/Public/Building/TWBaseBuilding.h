@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "TWBaseBuilding.generated.h"
 
+class UTWTeamColorComponent;
 class UTWBuildingDataAsset;
 class ATWPlayerState;
 class USceneComponent;
@@ -27,6 +28,7 @@ class CH4_PROJECT_API ATWBaseBuilding : public AActor
 public:
 	ATWBaseBuilding();
 
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void Destroyed() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -41,9 +43,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<UTWBuildingDataAsset> BuildingData = nullptr;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building|Component")
+	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
+	
 	// 0 = Player1, 1 = Player2 ... [테스트]
 	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
-	int32 OwnerPlayerSlot = 0;
+	int32 OwnerPlayerSlot = -1;
 	
 	UFUNCTION(BlueprintCallable, Category="Building")
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
@@ -109,12 +114,6 @@ protected:
 	void OnRep_BuildingState();
 	
 	UPROPERTY(EditAnywhere, Category="Building|Visual")
-	TMap<int32, TObjectPtr<UMaterialInterface>> PlayerMaterialMap;
-	
-	UPROPERTY(EditAnywhere, Category="Building|Visual")
-	int32 PlayerMaterialIndex = 0;
-	
-	UPROPERTY(EditAnywhere, Category="Building|Visual")
 	TObjectPtr<UMaterialInterface> ConstructionMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building|Visual")
@@ -126,9 +125,6 @@ protected:
 	UPROPERTY(Transient)
 	bool bSelectionVisualActive = false;
 	
-	UPROPERTY()
-	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
-	
 	FTimerHandle ConstructionTimerHandle;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Building|Construction")
@@ -136,11 +132,6 @@ protected:
 	
 	float CurrentBuildTime = 0.0f;
 	float MaxBuildTime = 0.0f;
-	
-	uint8 bHasCachedMaterials : 1;
-	
-	void CacheOriginalMaterial();
-	void UpdatePlayerMaterial();
 	
 	void StartConstruction();
 	void UpdateConstruction();

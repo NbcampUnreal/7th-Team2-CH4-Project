@@ -3,6 +3,10 @@
 
 #include "Mass/TWUnit.h"
 
+#include "Component/TWTeamColorComponent.h"
+#include "Component/TWTeamComponent.h"
+#include "Net/UnrealNetwork.h"
+
 
 // Sets default values
 ATWUnit::ATWUnit()
@@ -19,10 +23,14 @@ ATWUnit::ATWUnit()
 	MassAgentComponent = CreateDefaultSubobject<UMassAgentComponent>("MassAgentComponent");
 	SelectionAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("SelectionAnchor"));
 	SelectionAnchor->SetupAttachment(SkeletalMeshComponent);
-
+	
 	HPBarAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("HPBarAnchor"));
 	HPBarAnchor->SetupAttachment(SkeletalMeshComponent);
 
+	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
+	
+	TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
+	
 	// 기본값
 	SelectionAnchor->SetRelativeLocation(FVector(0.f, 0.f, 4.f));
 	HPBarAnchor->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
@@ -46,6 +54,28 @@ void ATWUnit::BeginPlay()
 	{
 		AutoPlaceAnchors();
 	}
+	
+	if (TeamColorComponent)
+	{
+		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+	}
+}
+
+void ATWUnit::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	
+	if (TeamColorComponent && SkeletalMeshComponent)
+	{
+		TeamColorComponent->SetUpTargetMesh(SkeletalMeshComponent);
+	}
+}
+
+void ATWUnit::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
+	DOREPLIFETIME(ATWUnit, OwnerPlayerSlot);
 }
 
 void ATWUnit::PlayAttackMontage()
@@ -109,6 +139,27 @@ FTransform ATWUnit::GetHPBarAnchorWorldTransform() const
 	}
 
 	return FTransform(GetActorRotation(), GetHPBarAnchorWorldLocation(), FVector::OneVector);
+}
+
+void ATWUnit::OnRep_OwnerPlayerSlot()
+{
+	if (TeamColorComponent)
+	{
+		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+	}
+}
+
+void ATWUnit::SetOwnerPlayerSlot(int32 InSlot)
+{
+	if (HasAuthority())
+	{
+		OwnerPlayerSlot = InSlot;
+		
+		if (TeamColorComponent)
+		{
+			TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+		}
+	}
 }
 
 void ATWUnit::AutoPlaceAnchors()

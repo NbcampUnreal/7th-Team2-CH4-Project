@@ -18,8 +18,12 @@ struct CH4_PROJECT_API FTWReplicatedAgent : public FReplicatedAgentBase
 	
 #pragma region Status
 	const FTWUnitStatus& GetStatus() const { return Status; }  
- 
 	void SetStatus(const FTWUnitStatus& InStatus) { Status = InStatus; }  
+	
+	uint8 GetIsDeath()const{return bIsDeath;}
+	void SetIsDeath(const uint8& InbIsDeath){bIsDeath = InbIsDeath;}
+	float GetDestroyTime()const{return DestroyTime;}
+	void SetDestroyTime(const float& InDestroyTime){DestroyTime = InDestroyTime;}
 #pragma endregion
 	
 #pragma region Transform
@@ -45,6 +49,7 @@ struct CH4_PROJECT_API FTWReplicatedAgent : public FReplicatedAgentBase
 	FVector GetVelocity()const{return Velocity;}
 	void SetVelocity(const FVector& InVelocity){Velocity = InVelocity;}
 #pragma endregion
+
 	
 private:  
 	UPROPERTY(Transient)  
@@ -59,5 +64,9 @@ private:
 	float LastAttackTime=0.0f;
 	UPROPERTY(Transient)
 	FVector Velocity = FVector::ZeroVector;
+	UPROPERTY(Transient)
+	uint8 bIsDeath = false;
+	UPROPERTY(Transient)
+	float DestroyTime = FLT_MAX;
 };
 

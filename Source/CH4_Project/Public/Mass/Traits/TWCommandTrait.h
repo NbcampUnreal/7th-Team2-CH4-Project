@@ -38,6 +38,14 @@ struct FTWMassHoldTag : public FMassTag
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct FTWMassDeadTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+
+
 UCLASS()
 class CH4_PROJECT_API UTWCommandTrait : public UMassEntityTraitBase
 {

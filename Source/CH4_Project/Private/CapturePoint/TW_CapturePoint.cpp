@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Data/TWResourceBuildingDataAsset.h"
 #include "TimerManager.h"
+#include "Component/TWTeamColorComponent.h"
 #include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -24,6 +25,8 @@ ATW_CapturePoint::ATW_CapturePoint()
     MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
     MeshComp->SetupAttachment(RootComponent);
    
+    TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
+    
     if (MyVisionComp)
     {
         MyVisionComp->VisionRadius = VisionRad;
@@ -38,6 +41,16 @@ void ATW_CapturePoint::BeginPlay()
     {
         CaptureArea->OnComponentBeginOverlap.AddDynamic(this, &ATW_CapturePoint::OnOverlapBegin);
         CaptureArea->OnComponentEndOverlap.AddDynamic(this, &ATW_CapturePoint::OnOverlapEnd);
+    }
+}
+
+void ATW_CapturePoint::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+    
+    if (TeamColorComponent && MeshComp)
+    {
+        TeamColorComponent->SetUpTargetMesh(MeshComp);
     }
 }
 
@@ -193,6 +206,7 @@ void ATW_CapturePoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ATW_CapturePoint, CurrentGauge);
     DOREPLIFETIME(ATW_CapturePoint, OwningPlayerState);
+    DOREPLIFETIME(ATW_CapturePoint, OwnerPlayerSlot);
 }
 
 void ATW_CapturePoint::SetOwningPlayer(ATWPlayerState* NewPlayerState)
@@ -208,6 +222,8 @@ void ATW_CapturePoint::SetOwningPlayer(ATWPlayerState* NewPlayerState)
     {
         OwningPlayerState = NewPlayerState;
         StartMithrilProduction();
+        
+        SetOwnerPlayerSlot(OwningPlayerState->PlayerSlot);
     }
     
 }
@@ -261,4 +277,25 @@ void ATW_CapturePoint::HandleMithrilResource()
         ResourceDataAsset->ProducedResourceType,
         ResourceDataAsset->ProductionAmount
     );
+}
+
+void ATW_CapturePoint::SetOwnerPlayerSlot(int32 InSlot)
+{
+    if (HasAuthority())
+    {
+        OwnerPlayerSlot = InSlot;
+        
+        if (TeamColorComponent)
+        {
+            TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+        }
+    }
+}
+
+void ATW_CapturePoint::OnRep_OwnerPlayerSlot()
+{
+    if (TeamColorComponent)
+    {
+        TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+    }
 }

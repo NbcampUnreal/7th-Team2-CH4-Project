@@ -52,6 +52,8 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 		{
 			StatusFragments[EntityIdx].GetMutableStatus().Status[i] = StatusData.Status[i];
 		}
+		StatusFragments[EntityIdx].SetIsDeath(ReplicatedEntity.GetIsDeath());
+		StatusFragments[EntityIdx].SetDestroyTime(ReplicatedEntity.GetDestroyTime());
 		
 		
 		const FReplicatedAgentPositionYawData& PositionYawData = ReplicatedEntity.GetPositionYawData();
@@ -101,6 +103,9 @@ void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityVie
 	{
 		StatusFragment.GetMutableStatus().Status[i] = StatusData.Status[i];
 	}
+	StatusFragment.SetIsDeath(Item.GetIsDeath());
+	StatusFragment.SetDestroyTime(Item.GetDestroyTime());
+	
 	
 	FTransformFragment& TransformFragment = EntityView.GetFragmentData<FTransformFragment>();
   	

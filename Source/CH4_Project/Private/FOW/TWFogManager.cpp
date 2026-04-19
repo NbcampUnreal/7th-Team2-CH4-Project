@@ -113,7 +113,7 @@ void ATWFogManager::UpdateFog()
         }
         
         UTWTeamComponent* TeamComp = VC->GetOwner()->FindComponentByClass<UTWTeamComponent>();
-        if (TeamComp && TeamComp->TeamID == MyLocalTeamSlot)
+        if (TeamComp && TeamComp->GetTeamID() == MyLocalTeamSlot)
         {
             FVector2D UV = WorldToUV(VC->GetVisionLocation());
             DrawMID->SetVectorParameterValue(TEXT("VisionPos"), FLinearColor(UV.X, UV.Y, 0, 0));
@@ -165,7 +165,7 @@ void ATWFogManager::UpdateEnemyVisibility()
         if (!IsValid(UnitActor)) continue;
 
         UTWTeamComponent* TeamComp = UnitActor->FindComponentByClass<UTWTeamComponent>();
-        if (TeamComp && TeamComp->TeamID == LocalPlayerTeamID)
+        if (TeamComp && TeamComp->GetTeamID() == LocalPlayerTeamID)
         {
             if (UnitActor->IsHidden()) UnitActor->SetActorHiddenInGame(false);
             continue;

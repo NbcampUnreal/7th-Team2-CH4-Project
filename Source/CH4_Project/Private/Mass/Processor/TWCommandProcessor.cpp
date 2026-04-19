@@ -48,6 +48,11 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 {
 	auto TickFunc = [&EntitySignals, &EntityManager](FMassExecutionContext& Context)
 	{
+		if (Context.DoesArchetypeHaveTag<FTWMassDeadTag>())
+		{
+			return;
+		}
+		
 		UMassSignalSubsystem* SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Context.GetWorld());
 		if (false == IsValid(SignalSubsystem))
 		{
