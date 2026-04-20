@@ -42,6 +42,7 @@
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "DrawDebugHelpers.h"
 #include "HeroUnit/TWHeroUnitBase.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -240,6 +241,11 @@ void ATWPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (IsLocalController())
+	{
+		EnableCheats();
+	}
+	
 	if (!IsLocalController())
 	{
 		return;
@@ -3172,5 +3178,43 @@ void ATWPlayerController::UpdateCursorOverlayPosition()
 		);
 	}
 }
+
+#pragma endregion
+
+#pragma region Cheat
+
+void ATWPlayerController::Server_CheatAddResource_Implementation(EResourceType ResourceType, int32 Amount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	if (ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>())
+	{
+		TWPS->AddResource(ResourceType, Amount);
+	}
+}
+
+bool ATWPlayerController::Server_CheatAddResource_Validate(EResourceType ResourceType, int32 Amount)
+{
+	return true;
+}
+
+
+void ATWPlayerController::Server_CheatTimeScale_Implementation(float TimeMultiplier)
+{
+	if (UWorld* World = GetWorld())
+	{
+		float SafeMultiplier = FMath::Max(TimeMultiplier, 0.1f);
+		UGameplayStatics::SetGlobalTimeDilation(World, SafeMultiplier);
+	}
+}
+
+bool ATWPlayerController::Server_CheatTimeScale_Validate(float TimeMultiplier)
+{
+	return true;
+}
+
 
 #pragma endregion
