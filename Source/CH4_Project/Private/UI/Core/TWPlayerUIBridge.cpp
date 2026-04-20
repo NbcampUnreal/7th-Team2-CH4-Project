@@ -668,6 +668,19 @@ bool UTWPlayerUIBridge::TryResolveCommandIdFromHotkey(const FKey& InKey, FName& 
 	return false;
 }
 
+bool UTWPlayerUIBridge::TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const
+{
+	OutCommandId = NAME_None;
+
+	if (!CurrentVisibleCommandIds.IsValidIndex(Index))
+	{
+		return false;
+	}
+
+	OutCommandId = CurrentVisibleCommandIds[Index];
+	return !OutCommandId.IsNone();
+}
+
 void UTWPlayerUIBridge::ResetContext()
 {
 	// no-op

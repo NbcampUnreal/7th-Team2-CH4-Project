@@ -48,7 +48,8 @@ public:
 
 	const FUICommandMetaRow* FindCommandMetaRow(FName CommandId) const;
 	bool TryResolveCommandIdFromHotkey(const FKey& InKey, FName& OutCommandId) const;
-
+	bool TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const;
+	
 	// 기존 외부 호환용 no-op
 	void ResetContext();
 	void PushContext(FName InContextId);

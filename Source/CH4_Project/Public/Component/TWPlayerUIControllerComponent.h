@@ -52,6 +52,8 @@ public:
 	void RefreshBuildModeNotification();
 	bool IsPointerOverHUD() const;
 	UTWPlayerUIBridge* GetPlayerUIBridge() const { return PlayerUIBridge; }
+	
+	bool TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const;
 
 protected:
 	UPROPERTY()
