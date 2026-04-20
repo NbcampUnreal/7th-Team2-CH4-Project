@@ -16,6 +16,7 @@ struct FTWAttackFragment : public FMassFragment
 	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
 	float LastSearchTime = 0.0f;
 	float LastAttackTime = 0.0f;
+	float LastChasingTime = 0.0f;
 	float LastAttackAnimationTime = 0.0f;
 	uint8 bIsTargetSet = false;
 	

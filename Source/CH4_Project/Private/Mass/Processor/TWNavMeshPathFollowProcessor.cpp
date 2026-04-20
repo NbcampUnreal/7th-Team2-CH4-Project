@@ -110,23 +110,8 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 			//MassNavMeshPathFollowTask::EnterState
 			if (Signals.Contains(PathInitSignal))
 			{
-				FVector TargetLocation = CommandFragments[EntityIdx].GetLocation();
-				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
-					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToTarget)
-				{
-					if (CommandFragments[EntityIdx].GetTarget().IsValid() && 
-						!EntityManager.GetFragmentDataPtr<FTWStatusFragment>(CommandFragments[EntityIdx].GetTarget())->GetIsDeath())
-					{
-						TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
-					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()) 
-						&& !CommandFragments[EntityIdx].GetTargetBuilding()->IsDead())
-					{
-						TargetLocation = CommandFragments[EntityIdx].GetTargetBuilding()->GetTransform().GetLocation();
-					}
-				}
-				
 				if (!RequestPath(
-					TargetLocation,
+					MoveTargetFragments[EntityIdx].Center,
 					Context.GetWorld(),
 					RadiusFragments[EntityIdx],
 					TransformFragments[EntityIdx].GetTransform().GetLocation(),

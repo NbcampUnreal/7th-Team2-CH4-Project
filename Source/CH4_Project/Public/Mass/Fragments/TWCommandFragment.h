@@ -65,3 +65,4 @@ protected:
 	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
 };
 
+
