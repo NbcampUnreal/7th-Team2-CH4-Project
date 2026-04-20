@@ -231,28 +231,25 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 				const FVector EnemyLocation = TargetTransformFragment->GetTransform().GetLocation();
 
+				//사거리 이탈
 				if (FVector::DistSquared(EntityLocation, EnemyLocation) >
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("Entity %d Lose Target!"), EntityIdx);
-
-					if (CommandList[EntityIdx].GetType() != ETWMassCommand::AttackToTarget)
+					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					
+					if (CommandList[EntityIdx].GetType() == ETWMassCommand::Hold)
 					{
 						AttackList[EntityIdx].bIsTargetSet = false;
 						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
-						Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-					}
-
-					if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
-						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
-					{
-						SignalSubsystem->SignalEntity(PathInitSignal, Entity);
-					}
-
-					if (CommandList[EntityIdx].GetType() != ETWMassCommand::Hold &&
-						CommandList[EntityIdx].GetType() != ETWMassCommand::None)
+						
+					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
 					{
 						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
+					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget)
+					{
+						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
 					}
 					continue;
 				}
@@ -320,25 +317,21 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				if (FVector::DistSquared(EntityLocation, EnemyLocation) >
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("Entity %d Lose Target!"), EntityIdx);
-
-					if (CommandList[EntityIdx].GetType() != ETWMassCommand::AttackToTarget)
+					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
+					
+					if (CommandList[EntityIdx].GetType() == ETWMassCommand::Hold)
 					{
 						AttackList[EntityIdx].bIsTargetSet = false;
 						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
-						Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-					}
-
-					if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
-						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
-					{
-						SignalSubsystem->SignalEntity(PathInitSignal, Entity);
-					}
-
-					if (CommandList[EntityIdx].GetType() != ETWMassCommand::Hold &&
-						CommandList[EntityIdx].GetType() != ETWMassCommand::None)
+						
+					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
 					{
 						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
+					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget)
+					{
+						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
 					}
 					continue;
 				}
