@@ -62,9 +62,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> RightMouseAction = nullptr;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> ToggleMenuAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveCommandAction = nullptr;
@@ -87,8 +84,7 @@ protected:
 	void OnStartLeftMouseAction(const FInputActionValue& InputActionValue);
 	void OnEndLeftMouseAction(const FInputActionValue& InputActionValue);
 	void OnRightMouseAction(const FInputActionValue& InputActionValue);
-	void OnToggleMenuAction(); 
-	
+
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
 	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
