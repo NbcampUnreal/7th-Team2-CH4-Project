@@ -23,7 +23,7 @@ ATWPlayerState::ATWPlayerState()
 	Resources.SetNum(static_cast<int32>(EResourceType::Count));
 	for (int32& Resource : Resources)
 	{
-		Resource = 0;
+		Resource = 10000;	// 건설비 없어서 임시 수정
 	}
 	
 	PendingPopulation = 0;
