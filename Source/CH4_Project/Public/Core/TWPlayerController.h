@@ -223,6 +223,16 @@ public:
 		int32 InOwnerPlayerSlot,
 		float InVisibleTime
 	);
+	void NotifyRecentCombatBuildingDamaged(
+	ATWBaseBuilding* InBuilding,
+	float InVisibleTime = 1.25f
+);
+
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyRecentCombatBuildingDamaged(
+		ATWBaseBuilding* InBuilding,
+		float InVisibleTime
+	);
 #pragma endregion
 
 #pragma region UI

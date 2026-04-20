@@ -1534,6 +1534,38 @@ void ATWPlayerController::ClientNotifyRecentCombatUnitDamaged_Implementation(
 	);
 }
 
+void ATWPlayerController::NotifyRecentCombatBuildingDamaged(
+	ATWBaseBuilding* InBuilding,
+	float InVisibleTime
+)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!PlayerSelectionVisualComponent)
+	{
+		return;
+	}
+
+	PlayerSelectionVisualComponent->NotifyRecentCombatBuildingDamaged(
+		InBuilding,
+		InVisibleTime
+	);
+}
+
+void ATWPlayerController::ClientNotifyRecentCombatBuildingDamaged_Implementation(
+	ATWBaseBuilding* InBuilding,
+	float InVisibleTime
+)
+{
+	NotifyRecentCombatBuildingDamaged(
+		InBuilding,
+		InVisibleTime
+	);
+}
+
 void ATWPlayerController::ClearLocalSelectionCache()
 {
 	SelectedBuilding = nullptr;

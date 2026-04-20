@@ -131,6 +131,8 @@ protected:
 	UFUNCTION()
 	void OnRep_BuildingState();
 	
+	void NotifyRecentCombatBuildingDamaged(float InVisibleTime = 1.25f);
+	
 	UPROPERTY(EditAnywhere, Category="Building|Visual")
 	TObjectPtr<UMaterialInterface> ConstructionMaterial;
 
