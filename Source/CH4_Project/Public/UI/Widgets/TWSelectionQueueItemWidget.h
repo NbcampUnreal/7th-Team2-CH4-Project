@@ -22,6 +22,9 @@ public:
 protected:
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
 
+	float CalculateCurveOffsetY(int32 QueueIndex, int32 TotalCount) const;
+	void ApplyCurveVisual(int32 QueueIndex, int32 TotalCount);
+
 protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> QueueIconImage = nullptr;

@@ -104,7 +104,7 @@ void UTWPlayerUIControllerComponent::InitializeUI(
 	PlayerUIBridge->GetOnUICommandRequestedDelegate().RemoveAll(this);
 	PlayerUIBridge->GetOnUICommandRequestedDelegate().AddUObject(
 		this,
-		&UTWPlayerUIControllerComponent::HandleUICommandRequested
+		&UTWPlayerUIControllerComponent::HandleCommandRequested
 	);
 }
 
@@ -189,14 +189,14 @@ void UTWPlayerUIControllerComponent::UpdateCursorOverlayPosition(
 	PlayerUIBridge->SetEdgeScrollingActive(bEdgeScrollingActive);
 }
 
-void UTWPlayerUIControllerComponent::HandleUICommandRequested(FName CommandId)
+void UTWPlayerUIControllerComponent::HandleCommandRequested(FName CommandId)
 {
 	if (!OwnerController)
 	{
 		return;
 	}
 
-	OwnerController->HandleUICommandRequested(CommandId);
+	OwnerController->HandleCommandById(CommandId);
 }
 
 bool UTWPlayerUIControllerComponent::IsPointerOverHUD() const
@@ -214,3 +214,4 @@ bool UTWPlayerUIControllerComponent::IsPointerOverHUD() const
 
 	return HUDRoot->IsHovered();
 }
+

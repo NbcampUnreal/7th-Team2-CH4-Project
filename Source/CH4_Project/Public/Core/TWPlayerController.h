@@ -17,6 +17,7 @@ class UTWBuildComponent;
 class UTWHUDRootWidget;
 class UTWPlayerUIControllerComponent;
 class UTWPlayerSelectionVisualComponent;
+class ATWHeroUnitBase;
 class UUserWidget;
 
 UCLASS()
@@ -181,8 +182,10 @@ protected:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Component")
 	UTWBuildComponent* GetBuildComponent() const { return BuildComponent; }
+
 	UFUNCTION(BlueprintCallable, Category="Input")
 	bool IsBuildShortcutModeActive() const { return bBuildShortcutModeActive; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWBuildComponent> BuildComponent = nullptr;
@@ -207,6 +210,30 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWPlayerSelectionVisualComponent> PlayerSelectionVisualComponent = nullptr;
+
+public:
+	void NotifyRecentCombatUnitDamaged(
+		const FMassNetworkID& InUnitNetId,
+		int32 InOwnerPlayerSlot,
+		float InVisibleTime = 1.25f
+	);
+
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyRecentCombatUnitDamaged(
+		const FMassNetworkID& InUnitNetId,
+		int32 InOwnerPlayerSlot,
+		float InVisibleTime
+	);
+	void NotifyRecentCombatBuildingDamaged(
+	ATWBaseBuilding* InBuilding,
+	float InVisibleTime = 1.25f
+);
+
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyRecentCombatBuildingDamaged(
+		ATWBaseBuilding* InBuilding,
+		float InVisibleTime
+	);
 #pragma endregion
 
 #pragma region UI
@@ -233,8 +260,21 @@ protected:
 	FName DefaultMultiSelectedUnitId = NAME_None;
 
 	int32 LocalSelectedOwnerPlayerSlot = INDEX_NONE;
-
 private:
+	bool TryFindAttackableBuildingCandidate(
+		const FVector& CommandLocation,
+		int32 MyPlayerSlot,
+		ATWBaseBuilding*& OutTargetBuilding,
+		FVector& OutResolvedTargetLocation
+	);
+
+	bool TryResolveAttackableTargetPreview(
+		const FVector& CommandLocation,
+		int32 MyPlayerSlot,
+		FMassEntityHandle& OutTargetEntity,
+		ATWBaseBuilding*& OutTargetBuilding,
+		FVector& OutResolvedTargetLocation
+	);
 	void InitializeUIBridge();
 	void RefreshUIBridge();
 	void InitializeSelectionVisualManager();
@@ -246,12 +286,22 @@ private:
 		const TArray<FMassEntityHandle>& InSelectedEntities,
 		TArray<FMassNetworkID>& OutUnitIds,
 		float& OutPrimaryHealth,
-		bool& bOutHasPrimaryHealth);
+		bool& bOutHasPrimaryHealth
+	);
 
 	void RefreshLocalSelectionRuntimeData();
 	bool RefreshLocalPrimarySelectedUnitStatus();
 
 	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
+
+	bool CanExecuteCommand(const FUICommandMetaRow* CommandMeta, FName CommandId) const;
+	bool TryHandleImmediateCommand(const FUICommandMetaRow* CommandMeta, FName CommandId);
+	bool TryHandleArmedCommand(const FUICommandMetaRow* CommandMeta, FName CommandId);
+	bool TryHandleServerRoutedCommand(const FUICommandMetaRow* CommandMeta, FName CommandId);
+	bool TryResolveBuildingCategoryFromPayload(FName PayloadId, EBuildingCategory& OutCategory) const;
+
+	void SetArmedCommandId(FName InCommandId);
+	void ClearArmedCommandId();
 
 	UFUNCTION(Client, Reliable)
 	void ClientApplyUnitSelection(
@@ -272,10 +322,13 @@ private:
 
 public:
 	UFUNCTION()
-	void HandleUICommandRequested(FName CommandId);
+	void HandleCommandById(FName CommandId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerHandleUICommandRequested(FName CommandId);
+	void ServerHandleCommandById(FName CommandId);
+public:
+	ATWHeroUnitBase* GetOwnedHeroUnit() const;
+	bool IsOwnedHeroCurrentlySelected() const;
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -322,12 +375,9 @@ public:
 	void ClientForceRefreshSelectionBridge();
 
 private:
-	void ChangeCurrentCommandType(ETWCommandType CommandType);
-
 	void UpdateInputOverlayState();
 	void UpdateDragSelectionOverlay();
 	void UpdateCursorOverlayPosition();
-	FName ConvertCommandTypeToCommandId(ETWCommandType InCommandType) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	float DragSelectionScreenThreshold = 8.f;
@@ -339,8 +389,8 @@ private:
 	FVector2D DragStartScreenPosition = FVector2D::ZeroVector;
 	FVector2D CurrentMouseScreenPosition = FVector2D::ZeroVector;
 
-private:
-	ETWCommandType CurrentCommandType = ETWCommandType::None;
+	UPROPERTY(Transient)
+	FName ArmedCommandId = NAME_None;
 
 	UPROPERTY(Transient)
 	TArray<FMassEntityHandle> ServerSelectedEntities;
@@ -367,17 +417,12 @@ private:
 	TArray<FSelectionSummaryItemViewModel> LocalSelectionSummaryItems;
 
 	FVector ClickStartLocation = FVector::ZeroVector;
-
-	bool bHasValidMousePositionThisFrame = false;
 	FVector2D LastValidMouseScreenPosition = FVector2D::ZeroVector;
 	FVector2D CurrentFrameMouseScreenPosition = FVector2D::ZeroVector;
+	bool bHasValidMousePositionThisFrame = false;
 
-	bool bHasValidRawMousePositionThisFrame = false;
+	FVector2D LastValidRawMousePosition = FVector2D::ZeroVector;
 	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;
+	bool bHasValidRawMousePositionThisFrame = false;
 	bool bWasEdgeScrollingLastFrame = false;
-
-	bool bEdgeScrollLeftActive = false;
-	bool bEdgeScrollRightActive = false;
-	bool bEdgeScrollTopActive = false;
-	bool bEdgeScrollBottomActive = false;
 };

@@ -64,4 +64,5 @@ void UTWUnitAnimInstance::NativeInitializeAnimation()
 	{
 		MassAgentComponent = OwningActor->FindComponentByClass<UMassAgentComponent>();
 	}
+	bIdDead = false;
 }

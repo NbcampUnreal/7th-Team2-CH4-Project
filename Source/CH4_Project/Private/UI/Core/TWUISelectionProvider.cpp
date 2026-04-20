@@ -362,6 +362,8 @@ void UTWUISelectionProvider::RefreshFromSourceIfNeeded() const
 void UTWUISelectionProvider::ClearRuntimeCommandData()
 {
 	RuntimeCommandQueueCounts.Empty();
+	RuntimeCommandEnabledMap.Empty();
+	RuntimeCommandDescriptionMap.Empty();
 }
 
 void UTWUISelectionProvider::SetRuntimeCommandQueueCount(FName CommandId, int32 QueueCount)
@@ -388,4 +390,52 @@ int32 UTWUISelectionProvider::GetRuntimeCommandQueueCount(FName CommandId) const
 	}
 
 	return 0;
+}
+
+void UTWUISelectionProvider::SetRuntimeCommandEnabled(FName CommandId, bool bEnabled)
+{
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	RuntimeCommandEnabledMap.Add(CommandId, bEnabled);
+}
+
+bool UTWUISelectionProvider::GetRuntimeCommandEnabled(FName CommandId, bool& OutEnabled) const
+{
+	if (const bool* Found = RuntimeCommandEnabledMap.Find(CommandId))
+	{
+		OutEnabled = *Found;
+		return true;
+	}
+
+	return false;
+}
+
+void UTWUISelectionProvider::SetRuntimeCommandDescription(FName CommandId, const FString& InDescription)
+{
+	if (CommandId.IsNone())
+	{
+		return;
+	}
+
+	if (InDescription.IsEmpty())
+	{
+		RuntimeCommandDescriptionMap.Remove(CommandId);
+		return;
+	}
+
+	RuntimeCommandDescriptionMap.Add(CommandId, InDescription);
+}
+
+bool UTWUISelectionProvider::GetRuntimeCommandDescription(FName CommandId, FString& OutDescription) const
+{
+	if (const FString* Found = RuntimeCommandDescriptionMap.Find(CommandId))
+	{
+		OutDescription = *Found;
+		return true;
+	}
+
+	return false;
 }

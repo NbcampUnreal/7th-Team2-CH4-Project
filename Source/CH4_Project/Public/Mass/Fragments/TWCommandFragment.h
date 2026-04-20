@@ -8,8 +8,10 @@
 #include "MassEntityTraitBase.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "StructUtils/SharedStruct.h"
+#include "Building/TWBaseBuilding.h"
 #include "TWCommandFragment.generated.h"
 
+class ATWBaseBuilding;
 /**
  * 
  */
@@ -18,9 +20,9 @@ enum class ETWMassCommand:uint8
 {
 	None,
 	MoveToLocation,
-	MoveToUnit,
+	MoveToTarget,
 	AttackToLocation,
-	AttackToUnit,
+	AttackToTarget,
 	Hold
 };
 const FName CommandSignal = FName(TEXT("CommandSignal"));
@@ -49,6 +51,8 @@ struct CH4_PROJECT_API FTWCommandFragment : public FMassFragment
 	void SetLocation(const FVector& InLocation) { Location = InLocation; }
 	FMassEntityHandle GetTarget() const { return Target; }
 	void SetTarget(const FMassEntityHandle& InTarget) { Target = InTarget; }
+	ATWBaseBuilding* GetTargetBuilding() const { return TargetBuilding.Get(); }
+	void SetTargetBuilding(ATWBaseBuilding* InTargetBuilding) { TargetBuilding = InTargetBuilding; }
 	
 protected:
 	UPROPERTY(Transient)
@@ -57,5 +61,7 @@ protected:
 	FVector Location = {0,0,0};
 	UPROPERTY(Transient)
 	FMassEntityHandle Target;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
 };
 

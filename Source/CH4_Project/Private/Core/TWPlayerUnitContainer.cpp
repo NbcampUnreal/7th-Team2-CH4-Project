@@ -63,6 +63,7 @@ void UTWPlayerUnitContainer::ApplyStatus(FName UnitID, const FTWUnitStatus& Unit
 	{
 		return;
 	}
+
 	for (const FMassEntityHandle& Unit : Units)
 	{
 		FTWUnitFragment* UnitFragment = MassEntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit);
@@ -73,16 +74,17 @@ void UTWPlayerUnitContainer::ApplyStatus(FName UnitID, const FTWUnitStatus& Unit
 				FTWStatusFragment* StatusFragment = MassEntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit);
 				if (StatusFragment)
 				{
+					const float CurrentHealth =
+						StatusFragment->GetMutableStatus().GetStatus(ETWStatusType::Health);
+
 					StatusFragment->SetStatus(UnitStatus);
-					for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); i++)
-					{
-						if ((ETWStatusType)i != ETWStatusType::Health)
-						{
-							StatusFragment->GetMutableStatus().SetStatus(
-								static_cast<ETWStatusType>(i),UnitStatus.GetStatus(static_cast<ETWStatusType>(i)));
-						}
-					}
-					//TODO Applay Move Speed
+
+					StatusFragment->GetMutableStatus().SetStatus(
+						ETWStatusType::Health,
+						CurrentHealth
+					);
+
+					// TODO Apply Move Speed
 				}
 			}
 		}

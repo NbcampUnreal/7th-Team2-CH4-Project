@@ -64,33 +64,57 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 		const TConstArrayView<FTWUnitFragment> UnitList = Context.GetFragmentView<FTWUnitFragment>();
 		const TArrayView<FTWAttackFragment> AttackList = Context.GetMutableFragmentView<FTWAttackFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
-		const TArrayView<FMassNavMeshShortPathFragment> NavMeshShortPathFragments = Context.GetMutableFragmentView<
-	FMassNavMeshShortPathFragment>();
+		const TArrayView<FMassNavMeshShortPathFragment> NavMeshShortPathFragments = 
+			Context.GetMutableFragmentView<FMassNavMeshShortPathFragment>();
 		const FMassMovementParameters& MovementParameters = Context.GetConstSharedFragment<FMassMovementParameters>();
 
 		double TimeSeconds = Context.GetWorld()->GetTimeSeconds();
 
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
-			if (AttackList[EntityIdx].bIsTargetSet)
-			{
-				continue;
-			}
 			if (TimeSeconds - AttackList[EntityIdx].LastSearchTime < SearchingInterval)
 			{
 				continue;
 			}
 			FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
 			FMassEntityHandle Target;
+			ATWBaseBuilding* TargetBuilding = nullptr;
 			if (UnitSubsystem->FindNearestEnemyEntity(
 				EntityLocation,
 				Target,
+				UnitList[EntityIdx].GetOwner(),
+				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range))
+				&&Context.GetEntityManagerChecked().IsEntityValid(Target)
+				&&!Context.GetEntityManagerChecked().GetFragmentDataPtr<FTWStatusFragment>(Target)->GetIsDeath()
+				)
+			{
+				FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
+				AttackList[EntityIdx].bIsTargetSet = true;
+				AttackList[EntityIdx].TargetEntity = Target;
+				Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
+				Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
+				Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
+#pragma region Stand
+				UWorld* World = Context.GetWorld();
+				MoveTargetList[EntityIdx].Center = EntityLocation;
+				MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
+
+				UE::MassNavigation::ActivateActionStand(
+					World,
+					Entity,
+					MovementParameters.DefaultDesiredSpeed,
+					MoveTargetList[EntityIdx],
+					NavMeshShortPathFragments[EntityIdx]);
+#pragma endregion
+			}else if (UnitSubsystem->FindNearestEnemyBuilding(
+				EntityLocation, 
+				TargetBuilding,
 				UnitList[EntityIdx].GetOwner(),
 				StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 			{
 				FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
 				AttackList[EntityIdx].bIsTargetSet = true;
-				AttackList[EntityIdx].TargetEntity = Target;
+				AttackList[EntityIdx].TargetBuilding = TargetBuilding;
 				Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 				Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 				Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);

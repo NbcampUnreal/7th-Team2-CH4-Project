@@ -4,9 +4,14 @@
 #include "TimerManager.h"
 #include "UObject/Object.h"
 #include "UI/Data/TWUIInputStateTypes.h"
+#include "UI/Data/TWUIDataTypes.h"
 #include "TWPlayerUIBridge.generated.h"
 
+class ATWBaseBuilding;
 class ATWPlayerController;
+class ATWPopulationBuilding;
+class ATWTroopSpawnBuilding;
+class ATWUpgradeBuilding;
 class UDataTable;
 class UTWHUDRootWidget;
 class UTWUIHUDCoordinator;
@@ -14,6 +19,8 @@ class UTWUISelectionProvider;
 class UTWUIResourceProvider;
 struct FKey;
 struct FUICommandMetaRow;
+struct FSelectionSummaryItemViewModel;
+struct FSelectionViewModel;
 
 UCLASS()
 class CH4_PROJECT_API UTWPlayerUIBridge : public UObject
@@ -36,10 +43,13 @@ public:
 	void RefreshSelection();
 	void RefreshResources();
 
+	// 기존 외부 호환용. 현재 구조에서는 실질적으로 사용하지 않음.
 	bool HandleContextCommand(FName CommandId);
+
 	const FUICommandMetaRow* FindCommandMetaRow(FName CommandId) const;
 	bool TryResolveCommandIdFromHotkey(const FKey& InKey, FName& OutCommandId) const;
 
+	// 기존 외부 호환용 no-op
 	void ResetContext();
 	void PushContext(FName InContextId);
 	bool PopContext();
@@ -58,21 +68,54 @@ public:
 
 	void SetEdgeScrollingActive(bool bInActive);
 	UTWHUDRootWidget* GetHUDRootWidget() const { return HUDRootWidget; }
+
 protected:
 	void HandleHUDCommandRequested(FName CommandId);
 
-	void StartProductionSelectionRefresh();
-	void StopProductionSelectionRefresh();
-	void HandleProductionSelectionRefreshTick();
-
-	void StartPostCommandSelectionRefreshWindow();
-	void StopPostCommandSelectionRefreshWindow();
-	void HandlePostCommandSelectionRefreshTick();
+	// Selection refresh timer (생산/대기열/명령 직후 갱신 통합)
+	void StartSelectionRefreshTimer(float InGraceSeconds = 0.0f);
+	void StopSelectionRefreshTimer();
+	void HandleSelectionRefreshTick();
+	void UpdateSelectionRefreshPolicyFromSelectedBuilding();
+	bool ShouldKeepSelectionRefreshTimerRunning() const;
 
 	FString NormalizeHotkeyLabelFromKey(const FKey& InKey) const;
 	int32 ResolveBuildingQueueCount(FName CommandId) const;
+
 	void RefreshInputState();
 	void RefreshDragSelectionState();
+
+	// Selection refresh 리팩토링용 helper
+	bool TryBuildModeSelectionVM(FSelectionViewModel& OutVM, TArray<FName>& OutCommandIds);
+	bool TryBuildingSelectionVM(FSelectionViewModel& OutVM, TArray<FName>& OutCommandIds);
+	bool TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FName>& OutCommandIds);
+
+	void FillCommonBuildingSelectionVM(ATWBaseBuilding* SelectedBuilding, FSelectionViewModel& OutVM) const;
+	void FillTroopBuildingSelectionData(
+		ATWTroopSpawnBuilding* TroopBuilding,
+		FSelectionViewModel& InOutVM,
+		TArray<FName>& OutCommandIds
+	);
+	void FillUpgradeBuildingSelectionData(
+		ATWUpgradeBuilding* UpgradeBuilding,
+		FSelectionViewModel& InOutVM,
+		TArray<FName>& OutCommandIds
+	);
+	void FillPopulationBuildingSelectionData(
+		ATWPopulationBuilding* PopulationBuilding,
+		FSelectionViewModel& InOutVM,
+		TArray<FName>& OutCommandIds
+	);
+
+	void ApplySelectionResult(
+		const FSelectionViewModel& VM,
+		const TArray<FName>& CommandIds,
+		ESelectionViewMode ViewMode,
+		int32 TotalCount,
+		const TArray<FSelectionSummaryItemViewModel>& SummaryItems
+	);
+	void ApplyCommandQueueCounts(const TArray<FName>& CommandIds);
+	void ClearSelectionResult();
 
 protected:
 	UPROPERTY()
@@ -114,21 +157,12 @@ protected:
 	UPROPERTY()
 	TArray<FName> CurrentVisibleCommandIds;
 
-	UPROPERTY()
-	TArray<FName> ContextStack;
-
-	UPROPERTY()
-	FName CurrentContextId = NAME_None;
-
-	FTimerHandle ProductionSelectionRefreshTimerHandle;
-	bool bProductionSelectionRefreshActive = false;
-
-	FTimerHandle PostCommandSelectionRefreshTimerHandle;
-	bool bPostCommandSelectionRefreshActive = false;
-	float PostCommandSelectionRefreshRemaining = 0.f;
+	FTimerHandle SelectionRefreshTimerHandle;
+	bool bSelectionRefreshTimerActive = false;
+	float SelectionRefreshGraceRemaining = 0.0f;
 
 	FOnUICommandRequested OnUICommandRequested;
-	
+
 	UPROPERTY()
 	FName ArmedCommandId = NAME_None;
 
@@ -137,7 +171,7 @@ protected:
 
 	UPROPERTY()
 	FUIDragSelectionStateViewModel CachedDragSelectionState;
-	
+
 	UPROPERTY()
 	bool bEdgeScrollingActive = false;
 };

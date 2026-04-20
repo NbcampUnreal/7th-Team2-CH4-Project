@@ -55,6 +55,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	int32 GetRuntimeCommandQueueCount(FName CommandId) const;
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void SetRuntimeCommandEnabled(FName CommandId, bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	bool GetRuntimeCommandEnabled(FName CommandId, bool& OutEnabled) const;
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void SetRuntimeCommandDescription(FName CommandId, const FString& InDescription);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	bool GetRuntimeCommandDescription(FName CommandId, FString& OutDescription) const;
+
 	virtual FSelectionViewModel GetSelectionViewModel_Implementation() const override;
 	virtual TArray<FName> GetCurrentCommandIds_Implementation() const override;
 
@@ -114,6 +126,8 @@ protected:
 	TMap<FName, TArray<FName>> EntityCommandMap;
 	TMap<FName, TArray<FName>> ContextCommandMap;
 	TMap<FName, int32> RuntimeCommandQueueCounts;
+	TMap<FName, bool> RuntimeCommandEnabledMap;
+	TMap<FName, FString> RuntimeCommandDescriptionMap;
 
 	FOnUISelectionChanged OnSelectionChanged;
 	FOnUICommandContextChanged OnCommandContextChanged;

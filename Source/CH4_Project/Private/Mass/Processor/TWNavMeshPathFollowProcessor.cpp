@@ -9,6 +9,7 @@
 #include "MassNavMeshNavigationFragments.h"
 #include "NavigationSystem.h"
 #include "NavCorridor.h"
+#include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/StateTree/TWStateTreeCommandTask.h"
 #include "Mass/Traits/TWCommandTrait.h"
 
@@ -110,10 +111,18 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 			if (Signals.Contains(PathInitSignal))
 			{
 				FVector TargetLocation = CommandFragments[EntityIdx].GetLocation();
-				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToUnit ||
-					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToUnit)
+				if (CommandFragments[EntityIdx].GetType() == ETWMassCommand::AttackToTarget ||
+					CommandFragments[EntityIdx].GetType() == ETWMassCommand::MoveToTarget)
 				{
-					TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
+					if (CommandFragments[EntityIdx].GetTarget().IsValid() && 
+						!EntityManager.GetFragmentDataPtr<FTWStatusFragment>(CommandFragments[EntityIdx].GetTarget())->GetIsDeath())
+					{
+						TargetLocation = EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation();
+					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()) 
+						&& !CommandFragments[EntityIdx].GetTargetBuilding()->IsDead())
+					{
+						TargetLocation = CommandFragments[EntityIdx].GetTargetBuilding()->GetTransform().GetLocation();
+					}
 				}
 				
 				if (!RequestPath(
@@ -179,7 +188,15 @@ bool UTWNavMeshPathFollowProcessor::RequestPath(
 		return false;
 	}
 		
-	FPathFindingQuery Query(NavMeshSubsystem, *NavData, AgentNavLocation, TargetLocation);
+	FNavLocation ProjectedLocation;
+	FVector NavTargetLocation = FVector::ZeroVector;
+	if (NavMeshSubsystem && NavMeshSubsystem->ProjectPointToNavigation(TargetLocation, ProjectedLocation, FVector(500.f, 500.f, 500.f)))
+	{
+		NavTargetLocation = ProjectedLocation.Location;
+	}
+	
+	
+	FPathFindingQuery Query(NavMeshSubsystem, *NavData, AgentNavLocation, NavTargetLocation);
 
 	// Why fix it after if there is none??
 	if (!Query.NavData.IsValid())

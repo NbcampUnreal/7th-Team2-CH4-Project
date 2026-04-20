@@ -1,4 +1,6 @@
 ﻿#include "Building/TWBaseBuilding.h"
+
+#include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingDataAsset.h"
 #include "Components/StaticMeshComponent.h"
@@ -135,10 +137,34 @@ void ATWBaseBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 
 	CurrentHP -= InDamageAmount;
 	CurrentHP = FMath::Max(0.0f, CurrentHP);
+
+	NotifyRecentCombatBuildingDamaged(1.25f);
 	
 	if (CurrentHP <= 0.0f)
 	{
 		HandleDestroyedByDamage();
+	}
+}
+
+void ATWBaseBuilding::NotifyRecentCombatBuildingDamaged(float InVisibleTime)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const float SafeVisibleTime = (InVisibleTime > 0.0f) ? InVisibleTime : 1.25f;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TargetPC = Cast<ATWPlayerController>(It->Get());
+		if (!TargetPC)
+		{
+			continue;
+		}
+
+		TargetPC->ClientNotifyRecentCombatBuildingDamaged(this, SafeVisibleTime);
 	}
 }
 

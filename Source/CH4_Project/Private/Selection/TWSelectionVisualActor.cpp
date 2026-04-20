@@ -66,12 +66,12 @@ void ATWSelectionVisualActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (PlayerSlotColorMap.Num() == 0)
+	if (TeamColorMap.Num() == 0)
 	{
-		PlayerSlotColorMap.Add(0, FLinearColor(0.10f, 0.45f, 1.00f, 1.00f));
-		PlayerSlotColorMap.Add(1, FLinearColor(1.00f, 0.15f, 0.15f, 1.00f));
-		PlayerSlotColorMap.Add(2, FLinearColor(0.15f, 0.90f, 0.20f, 1.00f));
-		PlayerSlotColorMap.Add(3, FLinearColor(1.00f, 0.85f, 0.10f, 1.00f));
+		TeamColorMap.Add(0, FLinearColor(0.10f, 0.45f, 1.00f, 1.00f));
+		TeamColorMap.Add(1, FLinearColor(1.00f, 0.15f, 0.15f, 1.00f));
+		TeamColorMap.Add(2, FLinearColor(0.15f, 0.90f, 0.20f, 1.00f));
+		TeamColorMap.Add(3, FLinearColor(1.00f, 0.85f, 0.10f, 1.00f));
 	}
 
 	ClearVisuals();
@@ -155,13 +155,15 @@ void ATWSelectionVisualActor::SetVisualData(
 	const FTWSelectedVisualData& InPrimarySelectedVisualData,
 	const TArray<FTWUnitRingVisualData>& InSelectedUnitRingVisuals,
 	const TArray<FTWBuildingSelectionVisualData>& InSelectedBuildingVisuals,
-	const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals
+	const TArray<FTWHPBarVisualData>& InSelectedHPBarVisuals,
+	const TArray<FTWHPBarVisualData>& InRecentCombatHPBarVisuals
 )
 {
 	PrimarySelectedVisualData = InPrimarySelectedVisualData;
 	SelectedUnitRingVisuals = InSelectedUnitRingVisuals;
 	SelectedBuildingVisuals = InSelectedBuildingVisuals;
 	SelectedHPBarVisuals = InSelectedHPBarVisuals;
+	RecentCombatHPBarVisuals = InRecentCombatHPBarVisuals;
 }
 
 void ATWSelectionVisualActor::ClearVisuals()
@@ -170,6 +172,7 @@ void ATWSelectionVisualActor::ClearVisuals()
 	SelectedUnitRingVisuals.Empty();
 	SelectedBuildingVisuals.Empty();
 	SelectedHPBarVisuals.Empty();
+	RecentCombatHPBarVisuals.Empty();
 
 	if (UnitRingISM)
 	{
@@ -222,30 +225,104 @@ int32 ATWSelectionVisualActor::ResolveLocalPlayerSlot() const
 	return INDEX_NONE;
 }
 
-FLinearColor ATWSelectionVisualActor::ResolveSlotBaseColor(int32 InOwnerPlayerSlot) const
+int32 ATWSelectionVisualActor::ResolveLocalTeamID() const
 {
-	if (const FLinearColor* FoundColor = PlayerSlotColorMap.Find(InOwnerPlayerSlot))
+	const AActor* OwnerActor = GetOwner();
+	if (const ATWPlayerController* OwnerTWPC = Cast<ATWPlayerController>(OwnerActor))
+	{
+		if (const ATWPlayerState* TWPS = OwnerTWPC->GetPlayerState<ATWPlayerState>())
+		{
+			return TWPS->GetTeamID();
+		}
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (const ATWPlayerState* TWPS = PC->GetPlayerState<ATWPlayerState>())
+			{
+				return TWPS->GetTeamID();
+			}
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+bool ATWSelectionVisualActor::TryResolveTeamIDFromPlayerSlot(int32 InPlayerSlot, int32& OutTeamID) const
+{
+	OutTeamID = INDEX_NONE;
+
+	if (InPlayerSlot == INDEX_NONE)
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		const ATWPlayerState* TWPS = PC->GetPlayerState<ATWPlayerState>();
+		if (!TWPS)
+		{
+			continue;
+		}
+
+		if (TWPS->PlayerSlot != InPlayerSlot)
+		{
+			continue;
+		}
+
+		OutTeamID = TWPS->GetTeamID();
+		return OutTeamID != INDEX_NONE;
+	}
+
+	return false;
+}
+
+FLinearColor ATWSelectionVisualActor::ResolveTeamBaseColor(int32 InTeamID) const
+{
+	if (const FLinearColor* FoundColor = TeamColorMap.Find(InTeamID))
 	{
 		return *FoundColor;
 	}
 
-	return DefaultSlotColor;
+	return DefaultTeamColor;
 }
 
-FLinearColor ATWSelectionVisualActor::ApplyRelationTint(const FLinearColor& InBaseColor, int32 InOwnerPlayerSlot) const
+FLinearColor ATWSelectionVisualActor::ApplyRelationTintByTeam(
+	const FLinearColor& InBaseColor,
+	int32 InOwnerPlayerSlot) const
 {
 	if (InOwnerPlayerSlot == INDEX_NONE)
 	{
 		return FLinearColor::LerpUsingHSV(InBaseColor, NeutralColor, NeutralDesaturationAlpha);
 	}
 
-	const int32 LocalPlayerSlot = ResolveLocalPlayerSlot();
-	if (LocalPlayerSlot == INDEX_NONE)
+	int32 OwnerTeamID = INDEX_NONE;
+	if (!TryResolveTeamIDFromPlayerSlot(InOwnerPlayerSlot, OwnerTeamID))
+	{
+		return FLinearColor::LerpUsingHSV(InBaseColor, NeutralColor, NeutralDesaturationAlpha);
+	}
+
+	const int32 LocalTeamID = ResolveLocalTeamID();
+	if (LocalTeamID == INDEX_NONE)
 	{
 		return InBaseColor;
 	}
 
-	if (LocalPlayerSlot == InOwnerPlayerSlot)
+	if (LocalTeamID == OwnerTeamID)
 	{
 		return InBaseColor;
 	}
@@ -260,8 +337,15 @@ FLinearColor ATWSelectionVisualActor::ApplyRelationTint(const FLinearColor& InBa
 
 FLinearColor ATWSelectionVisualActor::ResolveFinalOwnerColor(int32 InOwnerPlayerSlot) const
 {
-	const FLinearColor BaseColor = ResolveSlotBaseColor(InOwnerPlayerSlot);
-	return ApplyRelationTint(BaseColor, InOwnerPlayerSlot);
+	int32 OwnerTeamID = INDEX_NONE;
+	const bool bHasOwnerTeam = TryResolveTeamIDFromPlayerSlot(InOwnerPlayerSlot, OwnerTeamID);
+
+	const FLinearColor BaseColor =
+		bHasOwnerTeam
+		? ResolveTeamBaseColor(OwnerTeamID)
+		: DefaultTeamColor;
+
+	return ApplyRelationTintByTeam(BaseColor, InOwnerPlayerSlot);
 }
 
 void ATWSelectionVisualActor::SyncUnitRingISM()
@@ -280,34 +364,23 @@ void ATWSelectionVisualActor::SyncUnitRingISM()
 	}
 
 	const float SafeBaseDiameter = FMath::Max(1.f, UnitRingMeshBaseDiameter);
-	constexpr float ExtraVisualScale = 1.10f;
-	const float SafeZOffset = FMath::Max(UnitRingZOffset, 12.f);
+	constexpr float ExtraVisualScale = 1.0f;
 
 	for (const FTWUnitRingVisualData& RingData : SelectedUnitRingVisuals)
 	{
-		const float DebugRadius = FMath::Max(1.f, RingData.RingRadius);
-		const float VisualRadius = DebugRadius * UnitRingScaleMultiplier * ExtraVisualScale;
-		const float VisualDiameter = VisualRadius * 2.f;
-		const float ScaleXY = VisualDiameter / SafeBaseDiameter;
+		const float Diameter = FMath::Max(1.f, RingData.RingRadius * 2.f);
+		const float UniformScale = (Diameter / SafeBaseDiameter) * UnitRingScaleMultiplier * ExtraVisualScale;
 
-		const FVector InstanceLocation(
-			RingData.RingWorldLocation.X,
-			RingData.RingWorldLocation.Y,
-			RingData.RingWorldLocation.Z + SafeZOffset
-		);
-
-		const FRotator InstanceRotation =
+		const FVector RingLocation = RingData.RingWorldLocation + FVector(0.f, 0.f, UnitRingZOffset);
+		const FRotator RingRotation =
 			bRotateUnitRingToGroundPlane
 			? UnitRingRotationOffset
 			: FRotator::ZeroRotator;
 
-		const FVector InstanceScale(
-			FMath::Max(0.01f, ScaleXY),
-			FMath::Max(0.01f, ScaleXY),
-			1.0f
+		UnitRingISM->AddInstance(
+			FTransform(RingRotation, RingLocation, FVector(UniformScale, UniformScale, UniformScale)),
+			true
 		);
-
-		UnitRingISM->AddInstance(FTransform(InstanceRotation, InstanceLocation, InstanceScale), true);
 	}
 
 	UnitRingISM->SetHiddenInGame(false);
@@ -363,13 +436,33 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 	HPBarISM->ClearInstances();
 	HPBarISM->NumCustomDataFloats = HPBAR_NUM_CUSTOMDATA_FLOATS;
 
-	if (SelectedHPBarVisuals.Num() <= 0)
+	TArray<FTWHPBarVisualData> CombinedHPBars;
+	CombinedHPBars.Reserve(SelectedHPBarVisuals.Num() + RecentCombatHPBarVisuals.Num());
+
+	for (const FTWHPBarVisualData& Data : SelectedHPBarVisuals)
+	{
+		if (Data.bValid)
+		{
+			CombinedHPBars.Add(Data);
+		}
+	}
+
+	for (const FTWHPBarVisualData& Data : RecentCombatHPBarVisuals)
+	{
+		if (Data.bValid)
+		{
+			CombinedHPBars.Add(Data);
+		}
+	}
+
+	if (CombinedHPBars.Num() <= 0)
 	{
 		HPBarISM->MarkRenderStateDirty();
 		return;
 	}
 
 	FRotator FacingRotation = FRotator::ZeroRotator;
+
 	if (UWorld* World = GetWorld())
 	{
 		if (APlayerController* PC = World->GetFirstPlayerController())
@@ -377,48 +470,59 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 			if (PC->PlayerCameraManager)
 			{
 				const FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
-				if (SelectedHPBarVisuals.Num() > 0)
+
+				for (const FTWHPBarVisualData& HPBarData : CombinedHPBars)
 				{
+					if (!HPBarData.bValid)
+					{
+						continue;
+					}
+
 					FacingRotation = UKismetMathLibrary::FindLookAtRotation(
-						SelectedHPBarVisuals[0].WorldLocation,
+						HPBarData.WorldLocation,
 						CameraLocation
 					);
 					FacingRotation.Pitch = 0.f;
 					FacingRotation.Roll = 0.f;
+
+					const FTransform HPBarTransform(
+						FacingRotation,
+						HPBarData.WorldLocation,
+						HPBarData.WorldScale
+					);
+
+					const int32 InstanceIndex = HPBarISM->AddInstance(HPBarTransform, true);
+					if (InstanceIndex == INDEX_NONE)
+					{
+						continue;
+					}
+
+					const FLinearColor FinalColor = ResolveFinalOwnerColor(HPBarData.OwnerPlayerSlot);
+
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_HEALTH_PERCENT,
+						FMath::Clamp(HPBarData.HealthPercent, 0.f, 1.f),
+						false
+					);
+					HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_R, FinalColor.R, false);
+					HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_G, FinalColor.G, false);
+					HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_B, FinalColor.B, false);
+					HPBarISM->SetCustomDataValue(
+						InstanceIndex,
+						HPBAR_CUSTOMDATA_IS_BUILDING,
+						HPBarData.bIsBuilding ? 1.f : 0.f,
+						false
+					);
 				}
+
+				HPBarISM->SetHiddenInGame(false);
+				HPBarISM->SetVisibility(true, true);
+				HPBarISM->MarkRenderStateDirty();
+				return;
 			}
 		}
 	}
 
-	for (const FTWHPBarVisualData& HPBarData : SelectedHPBarVisuals)
-	{
-		if (!HPBarData.bValid)
-		{
-			continue;
-		}
-
-		const FTransform HPBarTransform(
-			FacingRotation,
-			HPBarData.WorldLocation,
-			HPBarData.WorldScale
-		);
-
-		const int32 InstanceIndex = HPBarISM->AddInstance(HPBarTransform, true);
-		if (InstanceIndex == INDEX_NONE)
-		{
-			continue;
-		}
-
-		const FLinearColor FinalColor = ResolveFinalOwnerColor(HPBarData.OwnerPlayerSlot);
-
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_HEALTH_PERCENT, FMath::Clamp(HPBarData.HealthPercent, 0.f, 1.f), false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_R, FinalColor.R, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_G, FinalColor.G, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_COLOR_B, FinalColor.B, false);
-		HPBarISM->SetCustomDataValue(InstanceIndex, HPBAR_CUSTOMDATA_IS_BUILDING, HPBarData.bIsBuilding ? 1.f : 0.f, false);
-	}
-
-	HPBarISM->SetHiddenInGame(false);
-	HPBarISM->SetVisibility(true, true);
 	HPBarISM->MarkRenderStateDirty();
 }

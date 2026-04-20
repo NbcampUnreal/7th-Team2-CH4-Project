@@ -4,6 +4,7 @@
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 
 void UTWCommandSlotWidget::NativeConstruct()
 {
@@ -21,6 +22,7 @@ void UTWCommandSlotWidget::NativeConstruct()
 void UTWCommandSlotWidget::SetCommandData(const FCommandSlotViewModel& InViewModel)
 {
 	CachedViewModel = InViewModel;
+
 	if (ArmedBorder)
 	{
 		ArmedBorder->SetVisibility(
@@ -29,6 +31,7 @@ void UTWCommandSlotWidget::SetCommandData(const FCommandSlotViewModel& InViewMod
 				: ESlateVisibility::Collapsed
 		);
 	}
+
 	RefreshVisual();
 }
 
@@ -39,7 +42,7 @@ void UTWCommandSlotWidget::HandleButtonClicked()
 		return;
 	}
 
-	if (!CachedViewModel.bVisible || !CachedViewModel.bEnabled)
+	if (!CachedViewModel.bEnabled)
 	{
 		return;
 	}
@@ -49,40 +52,66 @@ void UTWCommandSlotWidget::HandleButtonClicked()
 
 void UTWCommandSlotWidget::RefreshVisual()
 {
-	SetVisibility(CachedViewModel.bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	// 3x3 틀 고정을 위해 슬롯 위젯 자체는 항상 자리를 차지하게 둔다.
+	// bVisible=false 인 특수 케이스만 Hidden 처리
+	if (!CachedViewModel.bVisible && !CachedViewModel.CommandId.IsNone())
+	{
+		SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
+	SetVisibility(ESlateVisibility::Visible);
+
+	const bool bIsEmptySlot = CachedViewModel.CommandId.IsNone();
+	const bool bIsEnabledSlot = !bIsEmptySlot && CachedViewModel.bEnabled;
 
 	if (TextDisplayName)
 	{
-		TextDisplayName->SetText(FText::FromString(CachedViewModel.DisplayName));
+		TextDisplayName->SetText(
+			bIsEmptySlot
+				? FText::GetEmpty()
+				: FText::FromString(CachedViewModel.DisplayName)
+		);
 	}
 
 	if (TextHotkey)
 	{
-		TextHotkey->SetText(FText::FromString(CachedViewModel.HotkeyLabel));
+		TextHotkey->SetText(
+			bIsEmptySlot
+				? FText::GetEmpty()
+				: FText::FromString(CachedViewModel.HotkeyLabel)
+		);
 	}
 
 	if (SlotButton)
 	{
-		SlotButton->SetIsEnabled(CachedViewModel.bEnabled);
+		SlotButton->SetIsEnabled(bIsEnabledSlot);
 	}
-	
+
 	if (IconImage)
 	{
-		UTexture2D* LoadedTexture = CachedViewModel.Icon.Get();
-
-		if (!LoadedTexture && !CachedViewModel.Icon.IsNull())
+		if (bIsEmptySlot)
 		{
-			LoadedTexture = CachedViewModel.Icon.LoadSynchronous();
-		}
-
-		if (LoadedTexture)
-		{
-			IconImage->SetBrushFromTexture(LoadedTexture);
-			IconImage->SetVisibility(ESlateVisibility::Visible);
+			IconImage->SetVisibility(ESlateVisibility::Hidden);
 		}
 		else
 		{
-			IconImage->SetVisibility(ESlateVisibility::Collapsed);
+			UTexture2D* LoadedTexture = CachedViewModel.Icon.Get();
+
+			if (!LoadedTexture && !CachedViewModel.Icon.IsNull())
+			{
+				LoadedTexture = CachedViewModel.Icon.LoadSynchronous();
+			}
+
+			if (LoadedTexture)
+			{
+				IconImage->SetBrushFromTexture(LoadedTexture);
+				IconImage->SetVisibility(ESlateVisibility::Visible);
+			}
+			else
+			{
+				IconImage->SetVisibility(ESlateVisibility::Hidden);
+			}
 		}
 	}
 }

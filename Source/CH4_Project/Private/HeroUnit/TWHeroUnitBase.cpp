@@ -61,3 +61,5 @@ float ATWHeroUnitBase::GetCooldownPercentage() const
 	
 	return 1.f - (RemainingCooldownTime - TotalCooldownTime);
 }
+
+

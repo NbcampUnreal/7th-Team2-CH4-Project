@@ -52,6 +52,9 @@ void UTWPlayerSelectionVisualComponent::ClearSelectionVisuals()
 	LastSelectedBuilding = nullptr;
 	LastSelectedOwnerPlayerSlot = INDEX_NONE;
 
+	RecentCombatHPBars.Empty();
+	RecentCombatHPBarVisuals.Empty();
+
 	ClearCachedVisualData();
 	HideAllRenderers();
 }
@@ -68,6 +71,22 @@ void UTWPlayerSelectionVisualComponent::TickVisuals(float DeltaSeconds)
 		LastSelectedBuilding.Get(),
 		LastSelectedOwnerPlayerSlot
 	);
+
+	TickRecentCombatHPBars(DeltaSeconds);
+	BuildRecentCombatHPBarVisualData();
+
+	const bool bHasSelectionVisual =
+		(SelectedUnitRingVisuals.Num() > 0) ||
+		(SelectedBuildingVisuals.Num() > 0) ||
+		(SelectedHPBarVisuals.Num() > 0);
+
+	const bool bHasRecentCombatVisual = (RecentCombatHPBarVisuals.Num() > 0);
+
+	if (!bHasSelectionVisual && !bHasRecentCombatVisual)
+	{
+		HideAllRenderers();
+		return;
+	}
 
 	SyncRenderBackendFromCachedData();
 }
@@ -97,6 +116,7 @@ void UTWPlayerSelectionVisualComponent::ClearCachedVisualData()
 	SelectedUnitRingVisuals.Empty();
 	SelectedBuildingVisuals.Empty();
 	SelectedHPBarVisuals.Empty();
+	RecentCombatHPBarVisuals.Empty();
 }
 
 bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
@@ -124,6 +144,8 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 	SelectedUnitRingVisuals.Reserve(InSelectedUnitNetIds.Num());
 	SelectedHPBarVisuals.Reserve(InSelectedUnitNetIds.Num());
 
+	TArray<FMassNetworkID> InvalidNetIds;
+
 	bool bAnyBuilt = false;
 	bool bPrimaryBuilt = false;
 
@@ -132,6 +154,7 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 		FVector RingLocation = FVector::ZeroVector;
 		if (!UnitSubsystem->TryGetUnitVisualLocation(NetId, RingLocation))
 		{
+			InvalidNetIds.Add(NetId);
 			continue;
 		}
 
@@ -154,23 +177,32 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 			HPBarLocation = RingLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
 		}
 
+		int32 ResolvedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, ResolvedOwnerPlayerSlot))
+		{
+			ResolvedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+		}
+
 		float CurrentHP = 0.f;
 		float MaxHP = 0.f;
 
-		const bool bHasCurrentHP = UnitSubsystem->TryGetUnitCurrentHP(NetId, InSelectedOwnerPlayerSlot, CurrentHP);
-		const bool bHasMaxHP = UnitSubsystem->TryGetUnitMaxHP(NetId, InSelectedOwnerPlayerSlot, MaxHP);
+		const bool bHasCurrentHP = UnitSubsystem->TryGetUnitCurrentHP(NetId, ResolvedOwnerPlayerSlot, CurrentHP);
+		const bool bHasMaxHP = UnitSubsystem->TryGetUnitMaxHP(NetId, ResolvedOwnerPlayerSlot, MaxHP);
+
+		if (!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
+		{
+			InvalidNetIds.Add(NetId);
+			continue;
+		}
 
 		FTWHPBarVisualData HPBarData;
 		HPBarData.bValid = true;
 		HPBarData.bIsBuilding = false;
-		HPBarData.OwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+		HPBarData.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
 		HPBarData.WorldLocation = HPBarLocation;
-		HPBarData.CurrentHP = bHasCurrentHP ? CurrentHP : 0.f;
-		HPBarData.MaxHP = bHasMaxHP ? MaxHP : 0.f;
-		HPBarData.HealthPercent =
-			(HPBarData.MaxHP > KINDA_SMALL_NUMBER)
-			? FMath::Clamp(HPBarData.CurrentHP / HPBarData.MaxHP, 0.f, 1.f)
-			: 0.f;
+		HPBarData.CurrentHP = CurrentHP;
+		HPBarData.MaxHP = MaxHP;
+		HPBarData.HealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
 		HPBarData.WorldScale = HPBarWorldScale;
 
 		SelectedHPBarVisuals.Add(HPBarData);
@@ -179,20 +211,29 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 		{
 			PrimarySelectedVisualData.bValid = true;
 			PrimarySelectedVisualData.bIsBuilding = false;
-			PrimarySelectedVisualData.OwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+			PrimarySelectedVisualData.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
 			PrimarySelectedVisualData.SelectionWorldLocation = RingLocation;
 			PrimarySelectedVisualData.HPBarWorldLocation = HPBarLocation;
-			PrimarySelectedVisualData.CurrentHP = HPBarData.CurrentHP;
-			PrimarySelectedVisualData.MaxHP = HPBarData.MaxHP;
+			PrimarySelectedVisualData.CurrentHP = CurrentHP;
+			PrimarySelectedVisualData.MaxHP = MaxHP;
 			PrimarySelectedVisualData.HealthPercent = HPBarData.HealthPercent;
 			PrimarySelectedVisualData.SelectionRadius = RingData.RingRadius;
 			PrimarySelectedVisualData.BuildingHalfExtentXY = FVector2D::ZeroVector;
 			PrimarySelectedVisualData.BuildingZOffset = 0.f;
-
 			bPrimaryBuilt = true;
 		}
 
 		bAnyBuilt = true;
+	}
+
+	if (InvalidNetIds.Num() > 0)
+	{
+		LastSelectedUnitNetIds.RemoveAll(
+			[&InvalidNetIds](const FMassNetworkID& Id)
+			{
+				return InvalidNetIds.Contains(Id);
+			}
+		);
 	}
 
 	return bAnyBuilt;
@@ -258,6 +299,260 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedBuildingVisualData(ATWBaseB
 	}
 
 	return true;
+}
+
+void UTWPlayerSelectionVisualComponent::NotifyRecentCombatUnitDamaged(
+	const FMassNetworkID& InUnitNetId,
+	int32 InOwnerPlayerSlot,
+	float InVisibleTime
+)
+{
+	if (!InUnitNetId.IsValid())
+	{
+		return;
+	}
+
+	const float SafeVisibleTime =
+		(InVisibleTime > 0.f)
+		? InVisibleTime
+		: RecentCombatHPBarVisibleTime;
+
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		if (!Item.bIsBuilding && Item.UnitNetId == InUnitNetId)
+		{
+			Item.OwnerPlayerSlot = InOwnerPlayerSlot;
+			Item.RemainingTime = SafeVisibleTime;
+			Item.bValid = true;
+			Item.bIsBuilding = false;
+			return;
+		}
+	}
+
+	FTWRecentCombatHPBarData NewItem;
+	NewItem.bValid = true;
+	NewItem.bIsBuilding = false;
+	NewItem.UnitNetId = InUnitNetId;
+	NewItem.Building = nullptr;
+	NewItem.OwnerPlayerSlot = InOwnerPlayerSlot;
+	NewItem.RemainingTime = SafeVisibleTime;
+	RecentCombatHPBars.Add(NewItem);
+}
+
+void UTWPlayerSelectionVisualComponent::NotifyRecentCombatBuildingDamaged(
+	ATWBaseBuilding* InBuilding,
+	float InVisibleTime
+)
+{
+	if (!IsValid(InBuilding))
+	{
+		return;
+	}
+
+	const float SafeVisibleTime =
+		(InVisibleTime > 0.f)
+		? InVisibleTime
+		: RecentCombatHPBarVisibleTime;
+
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		if (Item.bIsBuilding && Item.Building.Get() == InBuilding)
+		{
+			Item.OwnerPlayerSlot = InBuilding->OwnerPlayerSlot;
+			Item.RemainingTime = SafeVisibleTime;
+			Item.bValid = true;
+			return;
+		}
+	}
+
+	FTWRecentCombatHPBarData NewItem;
+	NewItem.bValid = true;
+	NewItem.bIsBuilding = true;
+	NewItem.UnitNetId = FMassNetworkID();
+	NewItem.Building = InBuilding;
+	NewItem.OwnerPlayerSlot = InBuilding->OwnerPlayerSlot;
+	NewItem.RemainingTime = SafeVisibleTime;
+	RecentCombatHPBars.Add(NewItem);
+}
+
+void UTWPlayerSelectionVisualComponent::TickRecentCombatHPBars(float DeltaSeconds)
+{
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		Item.RemainingTime -= DeltaSeconds;
+	}
+
+	RemoveExpiredRecentCombatHPBars();
+}
+
+void UTWPlayerSelectionVisualComponent::RemoveExpiredRecentCombatHPBars()
+{
+	for (int32 Index = RecentCombatHPBars.Num() - 1; Index >= 0; --Index)
+	{
+		const FTWRecentCombatHPBarData& Item = RecentCombatHPBars[Index];
+
+		const bool bInvalidBuildingRef =
+			Item.bIsBuilding && !Item.Building.IsValid();
+
+		if (!Item.bValid || Item.RemainingTime <= 0.f || bInvalidBuildingRef)
+		{
+			RecentCombatHPBars.RemoveAt(Index);
+		}
+	}
+}
+
+void UTWPlayerSelectionVisualComponent::BuildRecentCombatHPBarVisualData()
+{
+	if (!OwnerController)
+	{
+		return;
+	}
+
+	UWorld* World = OwnerController->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return;
+	}
+
+	if (RecentCombatHPBars.Num() <= 0)
+	{
+		return;
+	}
+
+	RecentCombatHPBarVisuals.Reserve(FMath::Min(RecentCombatHPBars.Num(), MaxRecentCombatHPBarCount));
+
+	int32 AddedCount = 0;
+	TArray<FMassNetworkID> InvalidUnitNetIds;
+	TArray<TWeakObjectPtr<ATWBaseBuilding>> InvalidBuildings;
+
+	for (FTWRecentCombatHPBarData& Item : RecentCombatHPBars)
+	{
+		if (AddedCount >= MaxRecentCombatHPBarCount)
+		{
+			break;
+		}
+
+		if (Item.bIsBuilding)
+		{
+			ATWBaseBuilding* Building = Item.Building.Get();
+			if (!IsValid(Building))
+			{
+				InvalidBuildings.Add(Item.Building);
+				continue;
+			}
+
+			const FVector HPBarLocation = Building->GetSelectionHPBarWorldLocation();
+			const float CurrentHP = Building->GetCurrentHP();
+			const float MaxHP = Building->GetMaxHP();
+
+			if (MaxHP <= KINDA_SMALL_NUMBER)
+			{
+				InvalidBuildings.Add(Item.Building);
+				continue;
+			}
+
+			Item.OwnerPlayerSlot = Building->OwnerPlayerSlot;
+			Item.CachedWorldLocation = HPBarLocation;
+			Item.CachedCurrentHP = CurrentHP;
+			Item.CachedMaxHP = MaxHP;
+			Item.CachedHealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
+
+			FTWHPBarVisualData HPBarData;
+			HPBarData.bValid = true;
+			HPBarData.bIsBuilding = true;
+			HPBarData.OwnerPlayerSlot = Item.OwnerPlayerSlot;
+			HPBarData.WorldLocation = Item.CachedWorldLocation;
+			HPBarData.CurrentHP = Item.CachedCurrentHP;
+			HPBarData.MaxHP = Item.CachedMaxHP;
+			HPBarData.HealthPercent = Item.CachedHealthPercent;
+			HPBarData.WorldScale = HPBarWorldScale;
+
+			RecentCombatHPBarVisuals.Add(HPBarData);
+			++AddedCount;
+			continue;
+		}
+
+		FVector HPBarLocation = FVector::ZeroVector;
+		if (!UnitSubsystem->TryGetUnitHPBarWorldLocation(Item.UnitNetId, HPBarLocation))
+		{
+			FVector UnitLocation = FVector::ZeroVector;
+			if (!UnitSubsystem->TryGetUnitVisualLocation(Item.UnitNetId, UnitLocation))
+			{
+				InvalidUnitNetIds.Add(Item.UnitNetId);
+				continue;
+			}
+
+			HPBarLocation = UnitLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+		}
+
+		int32 ResolvedOwnerPlayerSlot = Item.OwnerPlayerSlot;
+		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(Item.UnitNetId, ResolvedOwnerPlayerSlot))
+		{
+			ResolvedOwnerPlayerSlot = Item.OwnerPlayerSlot;
+		}
+
+		float CurrentHP = 0.f;
+		float MaxHP = 0.f;
+
+		const bool bHasCurrentHP =
+			UnitSubsystem->TryGetUnitCurrentHP(Item.UnitNetId, ResolvedOwnerPlayerSlot, CurrentHP);
+
+		const bool bHasMaxHP =
+			UnitSubsystem->TryGetUnitMaxHP(Item.UnitNetId, ResolvedOwnerPlayerSlot, MaxHP);
+
+		if (!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
+		{
+			InvalidUnitNetIds.Add(Item.UnitNetId);
+			continue;
+		}
+
+		Item.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+		Item.CachedWorldLocation = HPBarLocation;
+		Item.CachedCurrentHP = CurrentHP;
+		Item.CachedMaxHP = MaxHP;
+		Item.CachedHealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
+
+		FTWHPBarVisualData HPBarData;
+		HPBarData.bValid = true;
+		HPBarData.bIsBuilding = false;
+		HPBarData.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+		HPBarData.WorldLocation = Item.CachedWorldLocation;
+		HPBarData.CurrentHP = Item.CachedCurrentHP;
+		HPBarData.MaxHP = Item.CachedMaxHP;
+		HPBarData.HealthPercent = Item.CachedHealthPercent;
+		HPBarData.WorldScale = HPBarWorldScale;
+
+		RecentCombatHPBarVisuals.Add(HPBarData);
+		++AddedCount;
+	}
+
+	if (InvalidUnitNetIds.Num() > 0 || InvalidBuildings.Num() > 0)
+	{
+		RecentCombatHPBars.RemoveAll(
+			[&InvalidUnitNetIds, &InvalidBuildings](const FTWRecentCombatHPBarData& Item)
+			{
+				if (Item.bIsBuilding)
+				{
+					for (const TWeakObjectPtr<ATWBaseBuilding>& InvalidBuilding : InvalidBuildings)
+					{
+						if (Item.Building == InvalidBuilding)
+						{
+							return true;
+						}
+					}
+					return false;
+				}
+
+				return InvalidUnitNetIds.Contains(Item.UnitNetId);
+			}
+		);
+	}
 }
 
 void UTWPlayerSelectionVisualComponent::InitializeRenderBackend()
@@ -367,7 +662,8 @@ void UTWPlayerSelectionVisualComponent::SyncRenderBackendFromCachedData()
 		PrimarySelectedVisualData,
 		SelectedUnitRingVisuals,
 		SelectedBuildingVisuals,
-		SelectedHPBarVisuals
+		SelectedHPBarVisuals,
+		RecentCombatHPBarVisuals
 	);
 	SelectionVisualActor->SyncVisuals();
 }

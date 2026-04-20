@@ -17,9 +17,57 @@
 #include "MassNavigationFragments.h"
 #include "MassSpawner.h"
 #include "MassActorSubsystem.h"
+#include "Building/TWBaseBuilding.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWMassClientBubbleInfo.h"
+
+namespace
+{
+	static bool TryResolveActiveEntityManager(
+		const UWorld* World,
+		FMassEntityManager*& OutEntityManager
+	)
+	{
+		OutEntityManager = nullptr;
+
+		if (!World)
+		{
+			return false;
+		}
+
+		OutEntityManager = UE::Mass::Utils::GetEntityManager(World);
+		return OutEntityManager != nullptr;
+	}
+
+	static bool IsSafeActiveEntity(
+		FMassEntityManager* EntityManager,
+		const FMassEntityHandle& Entity
+	)
+	{
+		if (!EntityManager)
+		{
+			return false;
+		}
+
+		if (!Entity.IsSet())
+		{
+			return false;
+		}
+
+		if (!EntityManager->IsEntityValid(Entity))
+		{
+			return false;
+		}
+
+		if (!EntityManager->IsEntityActive(Entity))
+		{
+			return false;
+		}
+
+		return true;
+	}
+}
 
 UTWUnitSubsystem::UTWUnitSubsystem()
 {
@@ -165,8 +213,10 @@ bool UTWUnitSubsystem::FindNearestOwnedEntity(
 	return false;
 }
 
-bool UTWUnitSubsystem::FindNearestAnyEntity(const FVector& Location, FMassEntityHandle& OutEntityHandle,
-                                            float MaxDistance)
+bool UTWUnitSubsystem::FindNearestAnyEntity(
+	const FVector& Location,
+	FMassEntityHandle& OutEntityHandle,
+	float MaxDistance)
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
 
@@ -255,7 +305,6 @@ bool UTWUnitSubsystem::FindNearestEnemyEntity(
 				continue;
 			}
 
-			// 적 유닛만 선택 대상으로 제한
 			if (UnitFrag->GetOwner() == OwnerPlayerSlot)
 			{
 				continue;
@@ -279,6 +328,69 @@ bool UTWUnitSubsystem::FindNearestEnemyEntity(
 	}
 
 	return false;
+}
+
+bool UTWUnitSubsystem::FindNearestEnemyBuilding(
+	const FVector& Location,
+	ATWBaseBuilding*& OutBuilding,
+	int32 OwnerPlayerSlot,
+	float MaxDistance)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	OutBuilding = nullptr;
+
+	float MinSquaredDistance = FMath::Square(MaxDistance);
+
+	for (TActorIterator<ATWBaseBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWBaseBuilding* Building = *It;
+		if (!IsValid(Building))
+		{
+			continue;
+		}
+
+		if (Building->GetOwnerPlayerSlot() == OwnerPlayerSlot)
+		{
+			continue;
+		}
+
+		if (!Building->CanBeAttacked())
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared(Location, Building->GetAttackTargetLocation());
+		if (DistSq < MinSquaredDistance)
+		{
+			MinSquaredDistance = DistSq;
+			OutBuilding = Building;
+		}
+	}
+
+	return OutBuilding != nullptr;
+}
+
+bool UTWUnitSubsystem::FindNearestEnemyBuildingCandidate(
+	const FVector& Location,
+	int32 OwnerPlayerSlot,
+	FTWAttackableBuildingCandidate& OutCandidate,
+	float MaxDistance)
+{
+	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	OutCandidate = FTWAttackableBuildingCandidate();
+
+	ATWBaseBuilding* FoundBuilding = nullptr;
+	if (!FindNearestEnemyBuilding(Location, FoundBuilding, OwnerPlayerSlot, MaxDistance))
+	{
+		return false;
+	}
+
+	OutCandidate.Building = FoundBuilding;
+	OutCandidate.TargetLocation = FoundBuilding->GetAttackTargetLocation();
+	OutCandidate.DistSquared = FVector::DistSquared(Location, OutCandidate.TargetLocation);
+	return true;
 }
 
 bool UTWUnitSubsystem::GetEntitiesInRectangle(
@@ -408,23 +520,21 @@ void UTWUnitSubsystem::SpawnUnit(
 			{
 				UnitFragment->SetUnitID(UnitTableRowBase.UnitID);
 				UnitFragment->SetOwner(PlayerState->PlayerSlot);
-				UE_LOG(LogTemp, Warning, TEXT("PlayerSlot :	%d"), PlayerState->PlayerSlot)
+				UE_LOG(LogTemp, Warning, TEXT("PlayerSlot :	%d"), PlayerState->PlayerSlot);
 			}
 
-			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(
-				SpawnedUnit))
+			if (FTransformFragment* TransformFragment = InOutEntityManager.GetFragmentDataPtr<FTransformFragment>(SpawnedUnit))
 			{
 				TransformFragment->GetMutableTransform().SetLocation(Location);
 			}
 
-			if (FMassMoveTargetFragment* MoveTargetFragment = InOutEntityManager.GetFragmentDataPtr<
-				FMassMoveTargetFragment>(SpawnedUnit))
+			if (FMassMoveTargetFragment* MoveTargetFragment =
+				InOutEntityManager.GetFragmentDataPtr<FMassMoveTargetFragment>(SpawnedUnit))
 			{
 				MoveTargetFragment->Center = Location;
 			}
 
-			if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(
-				SpawnedUnit))
+			if (FTWStatusFragment* StatusFragment = InOutEntityManager.GetFragmentDataPtr<FTWStatusFragment>(SpawnedUnit))
 			{
 				const FTWUnitStatus UnitStatus =
 					WeakThis->GetUnitDefaultStatus(UnitTableRowBase.UnitID, PlayerState->PlayerSlot);
@@ -438,21 +548,25 @@ void UTWUnitSubsystem::SpawnUnit(
 
 void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 
 	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
 	if (!EntityManager)
 	{
 		return;
 	}
+
 	FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(Unit);
 	if (!UnitFragment)
 	{
 		return;
 	}
+
 	int32 PlayerSlot = UnitFragment->GetOwner();
 	RemoveUnit(PlayerSlot, UnitFragment->GetIdx());
-
 }
 
 TMap<EResourceType, int32> UTWUnitSubsystem::GetUpkeep(int32 PlayerSlot)
@@ -494,8 +608,10 @@ void UTWUnitSubsystem::AddUnit(int32 PlayerSlot, FMassEntityHandle& Unit)
 
 void UTWUnitSubsystem::RemoveUnit(int32 PlayerSlot, int32 Idx)
 {
-	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
-
+	if (!GetWorld()->GetAuthGameMode())
+	{
+		return;
+	}
 	if (!UnitContainers.Contains(PlayerSlot) || !UnitContainers[PlayerSlot])
 	{
 		return;
@@ -546,8 +662,13 @@ FTWUnitStatus UTWUnitSubsystem::GetUnitDefaultStatus(FName UnitID, int32 PlayerS
 
 FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassEntityHandle& Unit, int32 PlayerSlot) const
 {
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-	if (!EntityManager || !Unit.IsValid())
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	{
+		return FTWUnitStatus();
+	}
+
+	if (!IsSafeActiveEntity(EntityManager, Unit))
 	{
 		return FTWUnitStatus();
 	}
@@ -609,6 +730,17 @@ FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitN
 		return FTWUnitStatus();
 	}
 
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	{
+		return FTWUnitStatus();
+	}
+
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+	{
+		return FTWUnitStatus();
+	}
+
 	return GetUnitCurrentStatus(EntityInfo->Entity, PlayerSlot);
 }
 
@@ -622,8 +754,13 @@ bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutU
 		return false;
 	}
 
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-	if (!EntityManager)
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	{
+		return false;
+	}
+
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
 	{
 		return false;
 	}
@@ -638,6 +775,41 @@ bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutU
 	return OutUnitID != NAME_None;
 }
 
+bool UTWUnitSubsystem::TryGetUnitOwnerPlayerSlot(
+	const FMassNetworkID& UnitNetID,
+	int32& OutOwnerPlayerSlot) const
+{
+	OutOwnerPlayerSlot = INDEX_NONE;
+
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return false;
+	}
+
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	{
+		return false;
+	}
+
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+	{
+		return false;
+	}
+
+	const FTWUnitFragment* UnitFragment =
+		EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
+
+	if (!UnitFragment)
+	{
+		return false;
+	}
+
+	OutOwnerPlayerSlot = UnitFragment->GetOwner();
+	return OutOwnerPlayerSlot != INDEX_NONE;
+}
+
 bool UTWUnitSubsystem::TryGetUnitVisualActor(
 	const FMassNetworkID& UnitNetID,
 	const ATWUnit*& OutVisualActor) const
@@ -650,13 +822,20 @@ bool UTWUnitSubsystem::TryGetUnitVisualActor(
 		return false;
 	}
 
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-	if (!EntityManager)
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
 	{
 		return false;
 	}
 
-	const FMassActorFragment* ActorFragment = EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+	{
+		return false;
+	}
+
+	const FMassActorFragment* ActorFragment =
+		EntityManager->GetFragmentDataPtr<FMassActorFragment>(EntityInfo->Entity);
+
 	if (!ActorFragment || !ActorFragment->IsValid())
 	{
 		return false;
@@ -690,14 +869,20 @@ bool UTWUnitSubsystem::TryGetUnitLocationInternal(
 		return false;
 	}
 
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(GetWorld());
-	if (!EntityManager)
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
 	{
 		return false;
 	}
 
-	const FTransformFragment* TransformFragment = EntityManager->GetFragmentDataPtr<FTransformFragment>(
-		EntityInfo->Entity);
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+	{
+		return false;
+	}
+
+	const FTransformFragment* TransformFragment =
+		EntityManager->GetFragmentDataPtr<FTransformFragment>(EntityInfo->Entity);
+
 	if (!TransformFragment)
 	{
 		return false;
@@ -803,9 +988,33 @@ bool UTWUnitSubsystem::TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int3
 {
 	OutCurrentHP = 0.f;
 
-	const FTWUnitStatus Status = GetUnitCurrentStatus(UnitNetID, PlayerSlot);
-	OutCurrentHP = Status.GetStatus(ETWStatusType::Health);
-	return OutCurrentHP > 0.f;
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
+	{
+		return false;
+	}
+
+	FMassEntityManager* EntityManager = nullptr;
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	{
+		return false;
+	}
+
+	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+	{
+		return false;
+	}
+
+	const FTWStatusFragment* StatusFragment =
+		EntityManager->GetFragmentDataPtr<FTWStatusFragment>(EntityInfo->Entity);
+
+	if (!StatusFragment)
+	{
+		return false;
+	}
+
+	OutCurrentHP = StatusFragment->GetStatus().GetStatus(ETWStatusType::Health);
+	return true;
 }
 
 bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 PlayerSlot, float& OutMaxHP) const
@@ -818,14 +1027,34 @@ bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 Pl
 		return false;
 	}
 
+	int32 ResolvedOwnerPlayerSlot = PlayerSlot;
+
+	const FMassReplicationEntityInfo* EntityInfo = nullptr;
+	if (TryGetReplicationEntityInfo(UnitNetID, EntityInfo) && EntityInfo)
+	{
+		FMassEntityManager* EntityManager = nullptr;
+		if (TryResolveActiveEntityManager(GetWorld(), EntityManager) &&
+			IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
+		{
+			const FTWUnitFragment* UnitFragment =
+				EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
+
+			if (UnitFragment)
+			{
+				ResolvedOwnerPlayerSlot = UnitFragment->GetOwner();
+			}
+		}
+	}
+
 	const FTWUnitTableRowBase* UnitRow = GetUnitTableRowBase(UnitID);
 	if (!UnitRow)
 	{
 		return false;
 	}
 
-	// 현재 PlayerController/UI 흐름에서는 업그레이드가 반영된 최대 HP가 더 자연스러움
-	const FTWUnitStatus DefaultStatus = const_cast<UTWUnitSubsystem*>(this)->GetUnitDefaultStatus(UnitID, PlayerSlot);
+	const FTWUnitStatus DefaultStatus =
+		const_cast<UTWUnitSubsystem*>(this)->GetUnitDefaultStatus(UnitID, ResolvedOwnerPlayerSlot);
+
 	OutMaxHP = DefaultStatus.GetStatus(ETWStatusType::Health);
 	return OutMaxHP > 0.f;
 }

@@ -48,7 +48,7 @@ public:
 		bool bEdgeScrollingActive
 	);
 
-	void HandleUICommandRequested(FName CommandId);
+	void HandleCommandRequested(FName CommandId);
 	void RefreshBuildModeNotification();
 	bool IsPointerOverHUD() const;
 	UTWPlayerUIBridge* GetPlayerUIBridge() const { return PlayerUIBridge; }
@@ -59,7 +59,7 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UTWPlayerUIBridge> PlayerUIBridge = nullptr;
-	
+
 	UPROPERTY(Transient)
 	TSubclassOf<UTWHUDRootWidget> HUDRootWidgetClass;
 
@@ -83,7 +83,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="UI|Selection Refresh")
 	bool bEnableRealtimeSelectionRefresh = true;
-	
+
 	UPROPERTY(EditAnywhere, Category="UI|Selection Refresh", meta=(ClampMin="0.01"))
 	float SelectionRefreshInterval = 0.30f;
 
