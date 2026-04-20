@@ -1,6 +1,5 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Lobby/TWLobbyGameMode.h"
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Lobby/TWLobbyGameState.h"
@@ -17,13 +16,17 @@ ATWLobbyGameMode::ATWLobbyGameMode()
 }
 
 // 수정x
-void ATWLobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId,
-	FString& ErrorMessage)
+void ATWLobbyGameMode::PreLogin(
+	const FString& Options,
+	const FString& Address,
+	const FUniqueNetIdRepl& UniqueId,
+	FString& ErrorMessage
+)
 {
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
-	
-	int32 CurrentPlayerCount = GetNumPlayers();
-	
+
+	const int32 CurrentPlayerCount = GetNumPlayers();
+
 	if (CurrentPlayerCount >= 4)
 	{
 		ErrorMessage = TEXT("Server is Full");
@@ -35,34 +38,37 @@ void ATWLobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
-	
-	UE_LOG(LogTemp, Error, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *NewPlayer->GetName());
-	
+
+	UE_LOG(LogTemp, Error, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *GetNameSafe(NewPlayer));
+
 	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
-	if (!LGS || !NewPlayer) return;
-	
-	if (!IsValid(NewPlayer)) return;
-	
-	if (IsValid(NewPlayer))
+	if (!LGS || !NewPlayer)
 	{
-		ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
-		
-		if (LPS)
+		return;
+	}
+
+	if (!IsValid(NewPlayer))
+	{
+		return;
+	}
+
+	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
+	if (LPS)
+	{
+		if (GetNumPlayers() == 1)
 		{
-			if (GetNumPlayers() == 1)
-			{
-				UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
-				LPS->SetIsHost(true);
-				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost :  %d!!!"), LPS->IsHost());
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
-				LPS->SetIsHost(false);
-				UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost :  %d!!!"), LPS->IsHost());
-			}
+			UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
+			LPS->SetIsHost(true);
+			UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
+			LPS->SetIsHost(false);
+			UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
 		}
 	}
+
 	CheckStartCondition();
 }
 
@@ -70,7 +76,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 void ATWLobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
-	
+
 	AssignNewHost();
 	CheckStartCondition();
 }
@@ -79,20 +85,20 @@ void ATWLobbyGameMode::Logout(AController* Exiting)
 bool ATWLobbyGameMode::CheckStartCondition()
 {
 	bAllReady = true;
-	
+
 	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
 	if (!LGS)
 	{
 		return false;
 	}
-	
+
 	// 조건 1 : 최소 인원수 (2명)
 	if (LGS->PlayerArray.Num() < MinPlayersToStart)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("To Start Play need at least 2 player"));
 		return false;
 	}
-	
+
 	// 조건 2 : 방장 제외 전원 준비 완료
 	for (APlayerState* PS : LGS->PlayerArray)
 	{
@@ -106,28 +112,58 @@ bool ATWLobbyGameMode::CheckStartCondition()
 			}
 		}
 	}
-	
+
 	UE_LOG(LogTemp, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("true") : TEXT("false"));
 	return bAllReady;
 }
 
-// 수정x
+// 수정 필요
 void ATWLobbyGameMode::StartGame()
 {
-	bUseSeamlessTravel = true;
-	GetWorld()->ServerTravel(TEXT("L_TestUI?listen"));
+	if (GameLevelName.IsNone())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
+		return;
+	}
+
+	bUseSeamlessTravel = bUseSeamlessTravelForGame;
+
+	FString TravelURL = GameLevelName.ToString();
+	if (bTravelAsListenServer)
+	{
+		TravelURL += TEXT("?listen");
+	}
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
+		*TravelURL,
+		bUseSeamlessTravel ? TEXT("true") : TEXT("false")
+	);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->ServerTravel(TravelURL);
+	}
 }
 
 // 수정 필요
 void ATWLobbyGameMode::AssignNewHost()
 {
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
-	if (!GS) return;
-	
-	if (GS->PlayerArray.Num() <= 0) return;
-	
+	if (!GS)
+	{
+		return;
+	}
+
+	if (GS->PlayerArray.Num() <= 0)
+	{
+		return;
+	}
+
 	bool bHasHost = false;
-	
+
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
@@ -137,6 +173,7 @@ void ATWLobbyGameMode::AssignNewHost()
 			break;
 		}
 	}
+
 	if (!bHasHost)
 	{
 		ATWLobbyPlayerState* NewHost = Cast<ATWLobbyPlayerState>(GS->PlayerArray[0]);
