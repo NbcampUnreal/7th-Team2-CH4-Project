@@ -2563,6 +2563,80 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 	}
 	}
 }
+
+void ATWPlayerController::Client_ShowGameResult_Implementation(int32 GameResult)
+{
+	TSubclassOf<UUserWidget> CurrentWidget = nullptr;
+	
+	if (GameResult == 1)
+	{
+		CurrentWidget = VictoryWidgetClass;
+	}
+	else if (GameResult == 0)
+	{
+		CurrentWidget = DefeatWidgetClass;
+	}
+	else
+	{
+		return;
+	}
+	
+	if (CurrentWidget)
+	{
+		UUserWidget* ResultUI = CreateWidget<UUserWidget>(this, CurrentWidget);
+		if (ResultUI)
+		{
+			ResultUI->AddToViewport();
+		}
+	}
+	FInputModeUIOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}
+
+void ATWPlayerController::ToggleMenu()
+{
+	if (!MenuWidgetInstance && MenuWidgetClass)
+	{
+		MenuWidgetInstance = CreateWidget<UUserWidget>(this, MenuWidgetClass);
+	}
+	
+	if (MenuWidgetInstance)
+	{
+		if (!MenuWidgetInstance->IsInViewport())
+		{
+			MenuWidgetInstance->AddToViewport();
+			
+			FInputModeGameAndUI InputMode;
+			InputMode.SetWidgetToFocus(MenuWidgetInstance->GetCachedWidget());
+			SetInputMode(InputMode);
+			SetShowMouseCursor(true);
+		}
+		else
+		{
+			MenuWidgetInstance->RemoveFromParent();
+			MenuWidgetInstance = nullptr;
+			
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			SetShowMouseCursor(false);
+
+			InitializeSelectionVisualManager();
+			RefreshSelectionVisualManager();
+
+			InitializeUIBridge();
+			RefreshUIBridge();
+			RefreshDynamicMappingContexts();
+		}
+	}
+}
+
+void ATWPlayerController::Client_ShowMenu_Implementation(bool Open)
+{
+	
+}
 #pragma endregion
 
 #pragma region 병력 스폰 대기열

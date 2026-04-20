@@ -115,7 +115,7 @@ bool ATWLobbyGameMode::CheckStartCondition()
 void ATWLobbyGameMode::StartGame()
 {
 	bUseSeamlessTravel = true;
-	GetWorld()->ServerTravel(TEXT("L_Main?listen"));
+	GetWorld()->ServerTravel(TEXT("L_TestUI?listen"));
 }
 
 // 수정 필요
