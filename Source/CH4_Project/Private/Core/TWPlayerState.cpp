@@ -23,7 +23,7 @@ ATWPlayerState::ATWPlayerState()
 	Resources.SetNum(static_cast<int32>(EResourceType::Count));
 	for (int32& Resource : Resources)
 	{
-		Resource = 0;
+		Resource = 10000;
 	}
 	
 	PendingPopulation = 0;
