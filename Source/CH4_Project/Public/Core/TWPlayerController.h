@@ -17,6 +17,7 @@ class UTWBuildComponent;
 class UTWHUDRootWidget;
 class UTWPlayerUIControllerComponent;
 class UTWPlayerSelectionVisualComponent;
+class ATWHeroUnitBase;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -314,6 +315,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleCommandById(FName CommandId);
+public:
+	ATWHeroUnitBase* GetOwnedHeroUnit() const;
+	bool IsOwnedHeroCurrentlySelected() const;
 #pragma endregion
 
 public:

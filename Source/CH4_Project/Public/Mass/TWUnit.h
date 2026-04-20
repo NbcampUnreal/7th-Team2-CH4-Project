@@ -44,6 +44,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|TeamColor")
 	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
 public:
+	UFUNCTION(BlueprintCallable, Category="Unit")
+	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
 	UFUNCTION(BlueprintCallable, Category="MassVisual|Anchor")
 	USceneComponent* GetSelectionAnchorComponent() const { return SelectionAnchor; }
 
