@@ -9,6 +9,8 @@
 #include "Subsystems/TWGridSubSystem.h"
 #include "NavModifierComponent.h"
 #include "Component/TWTeamColorComponent.h"
+#include "Component/TWTeamComponent.h"
+#include "FOW/TWVisionComponent.h"
 #include "NavAreas/NavArea_Null.h"
 
 ATWBaseBuilding::ATWBaseBuilding()
@@ -33,6 +35,12 @@ ATWBaseBuilding::ATWBaseBuilding()
 	MeshComponent->SetCanEverAffectNavigation(false);
 	
 	TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
+	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
+	FogVisionComponent = CreateDefaultSubobject<UTWVisionComponent>(TEXT("FogVisionComponent"));
+	if (FogVisionComponent)
+	{
+		FogVisionComponent->VisionRadius = 2000.f;
+	}
 }
 
 void ATWBaseBuilding::PostInitializeComponents()
@@ -358,6 +366,11 @@ void ATWBaseBuilding::SetOwnerPlayerSlot(int32 InSlot)
 			{
 				OnRep_BuildingState();
 			}
+		}
+		
+		if (TeamComponent)
+		{
+			TeamComponent->SetTeamID(OwnerPlayerSlot);
 		}
 	}
 }

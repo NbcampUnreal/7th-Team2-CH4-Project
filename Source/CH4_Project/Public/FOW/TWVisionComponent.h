@@ -7,7 +7,7 @@
 #include "TWVisionComponent.generated.h"
 
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), DisplayName="Fog Vision")
+UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), DisplayName="TWFogVision")
 class CH4_PROJECT_API UTWVisionComponent : public UActorComponent
 {
 	GENERATED_BODY()
