@@ -4,6 +4,8 @@
 #include "GameFramework/Actor.h"
 #include "TWBaseBuilding.generated.h"
 
+class UTWVisionComponent;
+class UTWTeamComponent;
 class UTWTeamColorComponent;
 class UTWBuildingDataAsset;
 class ATWPlayerState;
@@ -45,6 +47,12 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building|Component")
 	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Building|Component")
+	TObjectPtr<UTWTeamComponent> TeamComponent;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Building|Component")
+	TObjectPtr<UTWVisionComponent> FogVisionComponent;
 	
 	// 0 = Player1, 1 = Player2 ... [테스트]
 	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
