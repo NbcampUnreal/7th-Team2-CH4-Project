@@ -31,7 +31,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Grid|Settings")
 	FIntPoint GetGridDimensions() const { return GridDimensions; }
 	
+    UFUNCTION(BlueprintPure, Category = "Grid|Settings")
+    FVector GetGridOrigin() const { return GridOrigin; }
+
+    UFUNCTION(BlueprintPure, Category = "Grid|Settings")
+    FVector2D GetGridFullSize() const { return FVector2D(GridDimensions.X * CellSize, GridDimensions.Y * CellSize); }
 #pragma endregion 
+	
+	
 	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	bool CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize) const;
