@@ -19,6 +19,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "InputAction.h"
+#include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 
 #include "NavigationSystem.h"
@@ -355,6 +356,7 @@ void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingC
 void ATWPlayerController::RefreshDynamicMappingContexts()
 {
 	SetMappingContextActive(IMC_UnitCommand, 1, ShouldUseUnitCommandContext(), bUnitCommandContextActive);
+	SetMappingContextActive(IMC_BuildingCommand, 1, ShouldUseBuildingCommandContext(), bBuildingCommandContextActive);
 	SetMappingContextActive(IMC_Build, 2, ShouldUseBuildContext(), bBuildContextActive);
 }
 
@@ -389,6 +391,36 @@ bool ATWPlayerController::ShouldUseBuildContext() const
 	return bBuildShortcutModeActive;
 }
 
+bool ATWPlayerController::ShouldUseBuildingCommandContext() const
+{
+	if (bBuildShortcutModeActive)
+	{
+		return false;
+	}
+	
+	if (BuildComponent && BuildComponent->GetBuildMode())
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	ATWBaseBuilding* TargetBuilding  = GetSelectedBuilding();
+
+	if (!LocalPS || !IsValid(TargetBuilding ))
+	{
+		return false;
+	}
+	
+	if (TargetBuilding ->OwnerPlayerSlot != LocalPS->PlayerSlot)
+	{
+		return false;
+	}
+
+	return
+		(Cast<ATWTroopSpawnBuilding>(TargetBuilding ) != nullptr) ||
+		(Cast<ATWPopulationBuilding>(TargetBuilding ) != nullptr);
+}
+
 void ATWPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -407,8 +439,11 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(SelectUpgradeCommandAction));
 	check(IsValid(SelectBlockingCommandAction));
 
-	check(IsValid(IA_TestSpawnTroop));
-	check(IsValid(IA_TestIncreasePopulation));
+	check(IsValid(QueueHotkeyQAction));
+	check(IsValid(QueueHotkeyWAction));
+	check(IsValid(QueueHotkeyEAction));
+	check(IsValid(QueueHotkeyAAction));
+	
 	check(IsValid(IA_TestDamageBlockingBuilding));
 	check(IsValid(IA_TestUpgrade));
 
@@ -434,8 +469,11 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(SelectUpgradeCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectUpgradeBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectBlockingCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectBlockingBuildingCommandAction);
 
-	EnhancedInputComponent->BindAction(IA_TestSpawnTroop, ETriggerEvent::Started, this, &ThisClass::HandleTestSpawnTroop);
-	EnhancedInputComponent->BindAction(IA_TestIncreasePopulation, ETriggerEvent::Started, this, &ThisClass::HandleTestIncreasePopulation);
+	EnhancedInputComponent->BindAction(QueueHotkeyQAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyQ);
+	EnhancedInputComponent->BindAction(QueueHotkeyWAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyW);
+	EnhancedInputComponent->BindAction(QueueHotkeyEAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyE);
+	EnhancedInputComponent->BindAction(QueueHotkeyAAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyA);
+	
 	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
 	EnhancedInputComponent->BindAction(IA_TestUpgrade, ETriggerEvent::Started, this, &ThisClass::HandleTestUpgrade);
 	
@@ -1355,7 +1393,60 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 
 	return bIsEdgeScrollingNow;
 }
+#pragma region 병력 스폰
+void ATWPlayerController::OnQueueHotkeyQ(const FInputActionValue&)
+{
+	ATWBaseBuilding* TargetBuilding = GetSelectedBuilding();
+	if (!IsValid(TargetBuilding))
+	{
+		return;
+	}
 
+	if (Cast<ATWPopulationBuilding>(TargetBuilding))
+	{
+		HandleCommandById(TEXT("IncreasePopulation"));
+		return;
+	}
+
+	HandleBuildingProductionSlot(0);
+}
+
+void ATWPlayerController::OnQueueHotkeyW(const FInputActionValue&)
+{
+	HandleBuildingProductionSlot(1);
+}
+
+void ATWPlayerController::OnQueueHotkeyE(const FInputActionValue&)
+{
+	HandleBuildingProductionSlot(2);
+}
+
+void ATWPlayerController::OnQueueHotkeyA(const FInputActionValue&)
+{
+	HandleBuildingProductionSlot(3);
+}
+void ATWPlayerController::HandleBuildingProductionSlot(int32 SlotIndex)
+{
+	if (!ShouldUseBuildingCommandContext())
+	{
+		return;
+	}
+
+	ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(GetSelectedBuilding());
+	if (!IsValid(TroopBuilding))
+	{
+		return;
+	}
+
+	FName ResolvedCommandId = NAME_None;
+
+	if (PlayerUIControllerComponent &&
+		PlayerUIControllerComponent->TryGetVisibleCommandIdAtIndex(SlotIndex, ResolvedCommandId))
+	{
+		HandleCommandById(ResolvedCommandId);
+	}
+}
+#pragma endregion
 
 #pragma region UI
 void ATWPlayerController::InitializeUIBridge()
@@ -2636,262 +2727,6 @@ void ATWPlayerController::ToggleMenu()
 void ATWPlayerController::Client_ShowMenu_Implementation(bool Open)
 {
 	
-}
-#pragma endregion
-
-#pragma region 병력 스폰 대기열
-void ATWPlayerController::HandleTestSpawnTroop(const FInputActionValue& Value)
-{
-	ServerTestSpawnTroop();
-}
-
-void ATWPlayerController::ServerTestSpawnTroop_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TestSpawnTroop] Failed: PlayerState is null"));
-		return;
-	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-	ATWTroopSpawnBuilding* TargetTroopBuilding = nullptr;
-
-	if (ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding())
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestSpawnTroop] SelectedBuilding=%s | BuildingOwner=%d | MySlot=%d"),
-			*GetNameSafe(CurrentSelectedBuilding),
-			CurrentSelectedBuilding->OwnerPlayerSlot,
-			MyPlayerSlot
-		);
-
-		ATWTroopSpawnBuilding* SelectedTroopBuilding = Cast<ATWTroopSpawnBuilding>(CurrentSelectedBuilding);
-		if (!SelectedTroopBuilding)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestSpawnTroop] Rejected: selected building is not ATWTroopSpawnBuilding")
-			);
-			return;
-		}
-
-		if (SelectedTroopBuilding->OwnerPlayerSlot != MyPlayerSlot)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestSpawnTroop] Rejected: selected troop building is not mine | BuildingOwner=%d | MySlot=%d"),
-				SelectedTroopBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-			return;
-		}
-
-		TargetTroopBuilding = SelectedTroopBuilding;
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestSpawnTroop] No selected building. Searching owned troop spawn building... | MySlot=%d"),
-			MyPlayerSlot
-		);
-
-		for (TActorIterator<ATWTroopSpawnBuilding> It(GetWorld()); It; ++It)
-		{
-			ATWTroopSpawnBuilding* TroopBuilding = *It;
-			if (!TroopBuilding)
-			{
-				continue;
-			}
-
-			UE_LOG(
-				LogTemp,
-				Verbose,
-				TEXT("[TestSpawnTroop] Candidate=%s | Owner=%d | MySlot=%d"),
-				*GetNameSafe(TroopBuilding),
-				TroopBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-
-			if (TroopBuilding->OwnerPlayerSlot != MyPlayerSlot)
-			{
-				continue;
-			}
-
-			TargetTroopBuilding = TroopBuilding;
-			break;
-		}
-	}
-
-	if (!TargetTroopBuilding)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestSpawnTroop] Failed: no valid owned troop spawn building found | MySlot=%d"),
-			MyPlayerSlot
-		);
-		return;
-	}
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[TestSpawnTroop] Execute: Building=%s | Owner=%d | MySlot=%d"),
-		*GetNameSafe(TargetTroopBuilding),
-		TargetTroopBuilding->OwnerPlayerSlot,
-		MyPlayerSlot
-	);
-
-	const bool bEnqueueSuccess = TargetTroopBuilding->RequestEnqueueTroop();
-	if (bEnqueueSuccess)
-	{
-		RefreshUIBridge();
-		ClientForceRefreshSelectionBridge();
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestSpawnTroop] RequestEnqueueTroop failed | Building=%s"),
-			*GetNameSafe(TargetTroopBuilding)
-		);
-	}
-}
-#pragma endregion
-
-#pragma region 인구 수 대기열
-void ATWPlayerController::HandleTestIncreasePopulation(const FInputActionValue& Value)
-{
-	ServerTestIncreasePopulation();
-}
-
-void ATWPlayerController::ServerTestIncreasePopulation_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TestIncreasePopulation] Failed: PlayerState is null"));
-		return;
-	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-	ATWPopulationBuilding* TargetPopulationBuilding = nullptr;
-
-	if (ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding())
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestIncreasePopulation] SelectedBuilding=%s | BuildingOwner=%d | MySlot=%d"),
-			*GetNameSafe(CurrentSelectedBuilding),
-			CurrentSelectedBuilding->OwnerPlayerSlot,
-			MyPlayerSlot
-		);
-
-		ATWPopulationBuilding* SelectedPopulationBuilding = Cast<ATWPopulationBuilding>(CurrentSelectedBuilding);
-		if (!SelectedPopulationBuilding)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestIncreasePopulation] Rejected: selected building is not ATWPopulationBuilding")
-			);
-			return;
-		}
-
-		if (SelectedPopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestIncreasePopulation] Rejected: selected population building is not mine | BuildingOwner=%d | MySlot=%d"),
-				SelectedPopulationBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-			return;
-		}
-
-		TargetPopulationBuilding = SelectedPopulationBuilding;
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestIncreasePopulation] No selected building. Searching owned population building... | MySlot=%d"),
-			MyPlayerSlot
-		);
-
-		for (TActorIterator<ATWPopulationBuilding> It(GetWorld()); It; ++It)
-		{
-			ATWPopulationBuilding* PopulationBuilding = *It;
-			if (!PopulationBuilding)
-			{
-				continue;
-			}
-
-			UE_LOG(
-				LogTemp,
-				Verbose,
-				TEXT("[TestIncreasePopulation] Candidate=%s | Owner=%d | MySlot=%d"),
-				*GetNameSafe(PopulationBuilding),
-				PopulationBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-
-			if (PopulationBuilding->OwnerPlayerSlot != MyPlayerSlot)
-			{
-				continue;
-			}
-
-			TargetPopulationBuilding = PopulationBuilding;
-			break;
-		}
-	}
-
-	if (!TargetPopulationBuilding)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestIncreasePopulation] Failed: no valid owned population building found | MySlot=%d"),
-			MyPlayerSlot
-		);
-		return;
-	}
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[TestIncreasePopulation] Execute: Building=%s | Owner=%d | MySlot=%d"),
-		*GetNameSafe(TargetPopulationBuilding),
-		TargetPopulationBuilding->OwnerPlayerSlot,
-		MyPlayerSlot
-	);
-
-	const int8 bEnqueueSuccess = TargetPopulationBuilding->RequestEnqueuePopulation();
-	if (bEnqueueSuccess != 0)
-	{
-		RefreshUIBridge();
-		ClientForceRefreshSelectionBridge();
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestIncreasePopulation] RequestEnqueuePopulation failed | Building=%s"),
-			*GetNameSafe(TargetPopulationBuilding)
-		);
-	}
 }
 #pragma endregion
 

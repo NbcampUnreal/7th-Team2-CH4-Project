@@ -215,3 +215,15 @@ bool UTWPlayerUIControllerComponent::IsPointerOverHUD() const
 	return HUDRoot->IsHovered();
 }
 
+bool UTWPlayerUIControllerComponent::TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const
+{
+	OutCommandId = NAME_None;
+
+	if (!PlayerUIBridge)
+	{
+		return false;
+	}
+
+	return PlayerUIBridge->TryGetVisibleCommandIdAtIndex(Index, OutCommandId);
+}
+
