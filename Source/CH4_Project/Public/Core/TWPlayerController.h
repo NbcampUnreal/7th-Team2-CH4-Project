@@ -18,6 +18,7 @@ class UTWHUDRootWidget;
 class UTWPlayerUIControllerComponent;
 class UTWPlayerSelectionVisualComponent;
 class ATWHeroUnitBase;
+class UUserWidget;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -328,6 +329,34 @@ public:
 public:
 	ATWHeroUnitBase* GetOwnedHeroUnit() const;
 	bool IsOwnedHeroCurrentlySelected() const;
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> VictoryWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> DefeatWidgetClass;
+	
+public:
+	UFUNCTION(Client, Reliable)
+	void Client_ShowGameResult(int32 GameResult);
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> IA_Menu = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> MenuWidgetClass;
+	
+	UPROPERTY()
+	UUserWidget* MenuWidgetInstance;
+	
+	void ToggleMenu();
+	
+public:
+	UFUNCTION(Client, Reliable)
+	void Client_ShowMenu(bool Open);
+
 #pragma endregion
 
 public:

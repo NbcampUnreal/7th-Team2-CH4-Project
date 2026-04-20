@@ -2,7 +2,9 @@
 #include "Core/TWPlayerState.h"
 #include "Building/TWResourceBuilding.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
+#include "Core/TWPlayerController.h"
 
 void ATWGameMode::PostLogin(APlayerController* NewPlayer)
 {
@@ -104,11 +106,13 @@ void ATWGameMode::TryBindBuilding(ATWBaseBuilding* InBuilding)
 
 void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 {
-	int32 WinnerPlayerSlot = -1;
+	int32 CurrentPlayerCount = GameState->PlayerArray.Num();
+	UE_LOG(LogTemp, Warning, TEXT("Current Player Count: %d"), CurrentPlayerCount);
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		APlayerController* PC = It->Get();
+		int32 FinalResult = -1;
+		ATWPlayerController* PC = Cast<ATWPlayerController>(It->Get());
 		if (!PC)
 		{
 			continue;
@@ -119,15 +123,34 @@ void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 		{
 			continue;
 		}
-
-		if (PS->PlayerSlot != DefeatedPlayerSlot)
+		
+		if (CurrentPlayerCount <= 1)
 		{
-			WinnerPlayerSlot = PS->PlayerSlot;
-			break;
+			FinalResult = 1;
+		}
+		else if (CurrentPlayerCount == 2)
+		{
+			FinalResult = (PS->PlayerSlot == DefeatedPlayerSlot) ? 0 : 1;
+		}
+		else
+		{
+			if (PS->PlayerSlot == DefeatedPlayerSlot)
+			{
+				FinalResult = 0;
+			}
+			else
+			{
+				continue;
+			}
+		}
+		if (FinalResult != -1)
+		{
+			PS->SetGameResult(FinalResult);
+			PC->Client_ShowGameResult(FinalResult);
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Player %d Defeated / Player %d Victory"), DefeatedPlayerSlot, WinnerPlayerSlot);
+	UE_LOG(LogTemp, Warning, TEXT("Player %d Defeated"), DefeatedPlayerSlot);
 	
 	// 1) 입력 막기
 	// 2) 승패 UI 표시

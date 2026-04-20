@@ -16,6 +16,8 @@ ATWPlayerState::ATWPlayerState()
 
 	PlayerSlot = -1;
 	
+	GameResult = -1;
+	
 	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
 
 	Resources.SetNum(static_cast<int32>(EResourceType::Count));
@@ -450,6 +452,7 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, CurrentPopulation);
 	DOREPLIFETIME(ATWPlayerState, ReplicatedWoodUpkeep);
 	DOREPLIFETIME(ATWPlayerState, ReplicatedOreUpkeep);
+	DOREPLIFETIME(ATWPlayerState, GameResult);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()
