@@ -57,11 +57,11 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
 	float CellSize = 100.0f;
 	
-	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
-	FIntPoint GridDimensions = FIntPoint(200, 200);
+	UPROPERTY(VisibleAnywhere, Category="Grid|Settings")
+	FIntPoint GridDimensions;
 	
-	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
-	FVector GridOrigin = FVector(-3100.0f, -3100.0f, 0.0f); // 그리드 기준점 이동 변수 / 현재 테스트 레벨 사용중이라 미사용
+	UPROPERTY(VisibleAnywhere, Category="Grid|Settings")
+	FVector GridOrigin; // 그리드 기준점 이동 변수 / 현재 테스트 레벨 사용중이라 미사용
 	
 	TArray<FTWGridCellData> GridData;	
 	
