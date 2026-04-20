@@ -82,10 +82,13 @@ public:
 protected:
 	
 	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Unit")
-	int32 OwnerPlayerSlot = 0;
+	int32 OwnerPlayerSlot = -1;
 	
 	UFUNCTION()
 	void OnRep_OwnerPlayerSlot();
+	
+	UFUNCTION()
+	void OnTeamChangedCallBack(int32 NewTeamID);
 	
 public:
 	

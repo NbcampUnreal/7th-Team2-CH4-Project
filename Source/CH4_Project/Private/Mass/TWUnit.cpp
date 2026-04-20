@@ -55,10 +55,10 @@ void ATWUnit::BeginPlay()
 	{
 		AutoPlaceAnchors();
 	}
-	
-	if (TeamColorComponent)
+
+	if (TeamComponent)
 	{
-		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+		TeamComponent->OnTeamChanged.AddDynamic(this, &ATWUnit::OnTeamChangedCallBack);
 	}
 }
 
@@ -163,6 +163,11 @@ void ATWUnit::OnRep_OwnerPlayerSlot()
 	{
 		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
 	}
+}
+
+void ATWUnit::OnTeamChangedCallBack(int32 NewTeamID)
+{
+	SetOwnerPlayerSlot(NewTeamID);
 }
 
 void ATWUnit::SetOwnerPlayerSlot(int32 InSlot)

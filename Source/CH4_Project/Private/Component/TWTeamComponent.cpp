@@ -6,14 +6,37 @@
 
 UTWTeamComponent::UTWTeamComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
 	SetIsReplicatedByDefault(true);
+	
+	bIsTeamInitialized = false;
 }
 
 void UTWTeamComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+}
+
+void UTWTeamComponent::TickComponent(float DeltaTime, enum ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	
+	if (bIsTeamInitialized || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	
+	UMassAgentComponent* MassAgent = GetOwner()->FindComponentByClass<UMassAgentComponent>();
+	if (MassAgent && MassAgent->GetEntityHandle().IsValid())
+	{
+		GetTeamID();
+		
+		bIsTeamInitialized = true;
+		SetComponentTickEnabled(false);
+	}
 }
 
 void UTWTeamComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
