@@ -7,6 +7,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "TextureResource.h" // RenderTarget 읽기를 위해 필요
+#include "Core/TWPlayerController.h"
 
 ATWFogManager::ATWFogManager()
 {
@@ -133,11 +134,11 @@ void ATWFogManager::UpdateFog()
 
 void ATWFogManager::UpdateEnemyVisibility()
 {
-    APlayerController* PC = GetWorld()->GetFirstPlayerController();
-    if (!PC || !PC->IsLocalController()) return;
+    ATWPlayerController* TWPC = Cast<ATWPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (!TWPC || !TWPC->IsLocalController()) return;
 
-    ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
-    if (!PS || !CurrentFogRT) return;
+    ATWPlayerState* TWPS = TWPC->GetPlayerState<ATWPlayerState>();
+    if (!TWPS || !CurrentFogRT) return;
     
     FTextureResource* TextureResource = CurrentFogRT->GetResource();
     if (!TextureResource)
@@ -156,7 +157,7 @@ void ATWFogManager::UpdateEnemyVisibility()
     TArray<AActor*> TaggedUnits;
     UGameplayStatics::GetAllActorsWithTag(GetWorld(), TEXT("Unit"), TaggedUnits);
 
-    int32 LocalPlayerTeamID = PS->PlayerSlot;
+    int32 LocalPlayerTeamID = TWPS->PlayerSlot;
     int32 RTSizeX = CurrentFogRT->SizeX;
     int32 RTSizeY = CurrentFogRT->SizeY;
 
