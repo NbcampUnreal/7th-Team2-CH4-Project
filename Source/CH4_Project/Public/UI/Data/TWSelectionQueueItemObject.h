@@ -13,4 +13,10 @@ class CH4_PROJECT_API UTWSelectionQueueItemObject : public UObject
 public:
 	UPROPERTY(BlueprintReadOnly)
 	FProductionQueueItemViewModel QueueData;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 QueueIndex = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 TotalCount = 0;
 };

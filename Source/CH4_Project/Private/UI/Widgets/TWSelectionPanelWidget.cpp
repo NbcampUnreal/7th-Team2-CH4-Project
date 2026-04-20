@@ -332,8 +332,12 @@ void UTWSelectionPanelWidget::RebuildProductionQueueTiles(const TArray<FProducti
 
 	ProductionQueueTileView->ClearListItems();
 
-	for (const FProductionQueueItemViewModel& Item : InItems)
+	const int32 TotalCount = InItems.Num();
+
+	for (int32 Index = 0; Index < TotalCount; ++Index)
 	{
+		const FProductionQueueItemViewModel& Item = InItems[Index];
+
 		UTWSelectionQueueItemObject* ItemObject = NewObject<UTWSelectionQueueItemObject>(this);
 		if (!ItemObject)
 		{
@@ -341,6 +345,9 @@ void UTWSelectionPanelWidget::RebuildProductionQueueTiles(const TArray<FProducti
 		}
 
 		ItemObject->QueueData = Item;
+		ItemObject->QueueIndex = Index;
+		ItemObject->TotalCount = TotalCount;
+
 		ProductionQueueTileView->AddItem(ItemObject);
 	}
 }
