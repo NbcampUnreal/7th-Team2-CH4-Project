@@ -100,6 +100,34 @@ bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint Building
 			}
 		}
 	}
+	
+	UWorld* World = GetWorld();
+	
+	FVector CenterLocation = GetBuildingCenterPosition(AnchorLocation, BuildingSize);
+	
+	CenterLocation.Z += 50.0f;
+	
+	FVector BoxExtent(BuildingSize.X * CellSize * 0.45f, BuildingSize.Y * CellSize * 0.45f, 50.0f);
+	
+	FCollisionQueryParams QueryParams;
+	QueryParams.bTraceComplex = false;
+	
+	bool bIsOverlapping = World->OverlapAnyTestByChannel(
+		CenterLocation,
+		FQuat::Identity,
+		ECC_GameTraceChannel2,
+		FCollisionShape::MakeBox(BoxExtent),
+		QueryParams
+	);
+	
+	FColor BoxColor = bIsOverlapping ? FColor::Green : FColor::Red;
+	DrawDebugBox(World, CenterLocation, BoxExtent, BoxColor, false, -1.0f, 0, 5.0f);
+	
+	if (bIsOverlapping)
+	{
+		return false;
+	}
+	
 	return true;
 }
 
