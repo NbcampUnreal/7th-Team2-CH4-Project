@@ -41,9 +41,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_Build = nullptr;
-
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputMappingContext> IMC_Debug = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_BuildingCommand = nullptr;
@@ -157,18 +154,6 @@ protected:
 	void OnQueueHotkeyC(const FInputActionValue& Value);
 	
 	void HandleBuildingProductionSlot(int32 SlotIndex);
-#pragma endregion
-
-#pragma region 넥서스 데미지
-protected:
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestDamageBlockingBuilding = nullptr;
-
-	UFUNCTION()
-	void HandleTestDamageBlockingBuilding(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestDamageBlockingBuilding();
 #pragma endregion
 
 #pragma region 건설

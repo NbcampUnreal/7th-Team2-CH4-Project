@@ -19,6 +19,12 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 	{
 		return 0;
 	}
+	
+	if (BuildingState != ETWBuildingState::Completed)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 요청 실패: 건설 완료 전"));
+		return 0;
+	}
 
 	if (!OwningPlayerState)
 	{

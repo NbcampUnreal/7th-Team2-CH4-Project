@@ -52,7 +52,7 @@ protected:
 	TObjectPtr<UDataTable> UpgradeTable = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Upgrade")
-	int32 MaxUpgradeQueueCount = 8;
+	int32 MaxUpgradeQueueCount = 1;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
 	uint8 bIsUpgradeInProgress = 0;
