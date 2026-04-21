@@ -24,13 +24,19 @@ protected:
 	void OnStartButtonClicked();
 	
 	UFUNCTION()
+	void OnHostButtonClicked();
+	
+	UFUNCTION()
 	void OnExitButtonClicked();
 	
-private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, meta = (AllowPrivateAccess, BindWidget))
+protected:
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> StartButton;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, meta = (AllowPrivateAccess, BindWidget))
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> HostButton;
+	
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> ExitButton;
 	
 };

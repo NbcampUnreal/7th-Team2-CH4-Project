@@ -72,6 +72,22 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
 		}
 	}
+	if (GetWorld()->GetNetMode() == NM_Standalone)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_Standalone"));
+	}
+	if (GetWorld()->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_Client!!"));
+	}
+	if (GetWorld()->GetNetMode() == NM_ListenServer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_ListenServer!!"));
+	}
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NM_DedicatedServer!!"));
+	}
 	CheckStartCondition();
 }
 

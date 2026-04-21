@@ -7,6 +7,7 @@ void ATWTitleGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	
+	
 	APlayerController* NewPlayerController = Cast<APlayerController>(NewPlayer);
 	if (IsValid(NewPlayerController) == true)
 	{
