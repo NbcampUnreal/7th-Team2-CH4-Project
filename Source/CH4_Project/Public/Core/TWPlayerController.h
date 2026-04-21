@@ -117,7 +117,7 @@ private:
 	bool HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
 
-#pragma region 병력 스폰 대기열 / 인구 수 대기열
+#pragma region 병력 스폰 대기열 / 인구 수 대기열 / 연구소 대기열
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputAction> QueueHotkeyQAction = nullptr;
@@ -212,18 +212,6 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWBuildComponent> BuildComponent = nullptr;
-#pragma endregion
-
-#pragma region 업그레이드
-protected:
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestUpgrade = nullptr;
-
-	UFUNCTION()
-	void HandleTestUpgrade(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestUpgrade();
 #pragma endregion
 
 #pragma region UI / Visual Components
