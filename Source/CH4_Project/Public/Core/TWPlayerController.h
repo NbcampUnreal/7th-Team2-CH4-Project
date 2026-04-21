@@ -117,7 +117,7 @@ private:
 	bool HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
 
-#pragma region 병력 스폰 대기열 / 인구 수 대기열
+#pragma region 병력 스폰 대기열 / 인구 수 대기열 / 연구소 대기열
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputAction> QueueHotkeyQAction = nullptr;
@@ -130,11 +130,31 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputAction> QueueHotkeyAAction = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeySAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyDAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyZAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyXAction = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyCAction = nullptr;
 
 	void OnQueueHotkeyQ(const FInputActionValue& Value);
 	void OnQueueHotkeyW(const FInputActionValue& Value);
 	void OnQueueHotkeyE(const FInputActionValue& Value);
 	void OnQueueHotkeyA(const FInputActionValue& Value);
+	void OnQueueHotkeyS(const FInputActionValue& Value);
+	void OnQueueHotkeyD(const FInputActionValue& Value);
+	void OnQueueHotkeyZ(const FInputActionValue& Value);
+	void OnQueueHotkeyX(const FInputActionValue& Value);
+	void OnQueueHotkeyC(const FInputActionValue& Value);
 	
 	void HandleBuildingProductionSlot(int32 SlotIndex);
 #pragma endregion
@@ -192,18 +212,6 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTWBuildComponent> BuildComponent = nullptr;
-#pragma endregion
-
-#pragma region 업그레이드
-protected:
-	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestUpgrade = nullptr;
-
-	UFUNCTION()
-	void HandleTestUpgrade(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestUpgrade();
 #pragma endregion
 
 #pragma region UI / Visual Components

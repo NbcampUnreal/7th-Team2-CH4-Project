@@ -20,6 +20,7 @@
 #include "Core/TWPlayerState.h"
 #include "Core/TWPlayerController.h"
 #include "EngineUtils.h"
+#include "MassNavigationUtils.h"
 #include "MassReplicationFragments.h"
 #include "Runtime/Engine/Internal/Kismet/BlueprintTypeConversions.h"
 
@@ -267,8 +268,12 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				const float NewHealth = FMath::Max(0.0f, OldHealth - DamageAmount);
 				EnemyStatus.Status[HealthIndex] = NewHealth;
 				AttackList[EntityIdx].LastAttackTime = TimeSeconds;
-				TransformList[EntityIdx].GetMutableTransform().SetRotation(
-					UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
+				
+				
+				const FVector::FReal NewHeading = UE::MassNavigation::GetYawFromDirection(EnemyLocation-EntityLocation);
+				FQuat Rotation(FVector::UpVector, NewHeading);
+				
+				TransformList[EntityIdx].GetMutableTransform().SetRotation(Rotation);
 
 				if (NewHealth < OldHealth)
 				{

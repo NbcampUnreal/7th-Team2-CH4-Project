@@ -451,9 +451,13 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(QueueHotkeyWAction));
 	check(IsValid(QueueHotkeyEAction));
 	check(IsValid(QueueHotkeyAAction));
+	check(IsValid(QueueHotkeySAction));
+	check(IsValid(QueueHotkeyDAction));
+	check(IsValid(QueueHotkeyZAction));
+	check(IsValid(QueueHotkeyXAction));
+	check(IsValid(QueueHotkeyCAction));
 	
 	check(IsValid(IA_TestDamageBlockingBuilding));
-	check(IsValid(IA_TestUpgrade));
 
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
@@ -464,12 +468,13 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Started, this, &ThisClass::OnStartLeftMouseAction);
 	EnhancedInputComponent->BindAction(LeftMouseAction, ETriggerEvent::Completed, this, &ThisClass::OnEndLeftMouseAction);
 	EnhancedInputComponent->BindAction(RightMouseAction, ETriggerEvent::Started, this, &ThisClass::OnRightMouseAction);
+	EnhancedInputComponent->BindAction(IA_Menu, ETriggerEvent::Started, this, &ATWPlayerController::ToggleMenu);
+	EnhancedInputComponent->BindAction(ToggleBuildModeAction, ETriggerEvent::Started, this, &ThisClass::OnToggleBuildModeAction);
 
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
-
-	EnhancedInputComponent->BindAction(ToggleBuildModeAction, ETriggerEvent::Started, this, &ThisClass::OnToggleBuildModeAction);
+	
 	EnhancedInputComponent->BindAction(SelectWoodCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectStoneCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectStoneBuildingCommandAction);
@@ -481,11 +486,13 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(QueueHotkeyWAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyW);
 	EnhancedInputComponent->BindAction(QueueHotkeyEAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyE);
 	EnhancedInputComponent->BindAction(QueueHotkeyAAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyA);
+	EnhancedInputComponent->BindAction(QueueHotkeySAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyS);
+	EnhancedInputComponent->BindAction(QueueHotkeyDAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyD);
+	EnhancedInputComponent->BindAction(QueueHotkeyZAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyZ);
+	EnhancedInputComponent->BindAction(QueueHotkeyXAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyX);
+	EnhancedInputComponent->BindAction(QueueHotkeyCAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyC);
 	
 	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
-	EnhancedInputComponent->BindAction(IA_TestUpgrade, ETriggerEvent::Started, this, &ThisClass::HandleTestUpgrade);
-	
-	EnhancedInputComponent->BindAction(IA_Menu, ETriggerEvent::Started, this, &ATWPlayerController::ToggleMenu);
 }
 
 #pragma region 마우스
@@ -1340,7 +1347,6 @@ void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuild
 
 	ClientApplyBuildingSelection(TargetBuilding);
 }
-#pragma endregion
 
 bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 {
@@ -1401,7 +1407,9 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 
 	return bIsEdgeScrollingNow;
 }
-#pragma region 병력 스폰
+#pragma endregion
+
+#pragma region 병력 스폰 대기열 / 인구 수 대기열 / 연구소 대기열
 void ATWPlayerController::OnQueueHotkeyQ(const FInputActionValue&)
 {
 	HandleBuildingProductionSlot(0);
@@ -1421,6 +1429,32 @@ void ATWPlayerController::OnQueueHotkeyA(const FInputActionValue&)
 {
 	HandleBuildingProductionSlot(3);
 }
+
+void ATWPlayerController::OnQueueHotkeyS(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(4);
+}
+
+void ATWPlayerController::OnQueueHotkeyD(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(5);
+}
+
+void ATWPlayerController::OnQueueHotkeyZ(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(6);
+}
+
+void ATWPlayerController::OnQueueHotkeyX(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(7);
+}
+
+void ATWPlayerController::OnQueueHotkeyC(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(8);
+}
+
 void ATWPlayerController::HandleBuildingProductionSlot(int32 SlotIndex)
 {
 	if (!ShouldUseBuildingCommandContext())
@@ -2815,134 +2849,6 @@ void ATWPlayerController::NotifyResourceStateChanged()
 	}
 
 	RefreshUIBridge();
-}
-#pragma endregion
-
-#pragma region 업그레이드
-void ATWPlayerController::HandleTestUpgrade(const FInputActionValue& Value)
-{
-	ServerTestUpgrade();
-}
-
-void ATWPlayerController::ServerTestUpgrade_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[TestUpgrade] Failed: PlayerState is null"));
-		return;
-	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-	ATWUpgradeBuilding* TargetUpgradeBuilding = nullptr;
-
-	if (ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding())
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestUpgrade] SelectedBuilding=%s | BuildingOwner=%d | MySlot=%d"),
-			*GetNameSafe(CurrentSelectedBuilding),
-			CurrentSelectedBuilding->OwnerPlayerSlot,
-			MyPlayerSlot
-		);
-
-		ATWUpgradeBuilding* SelectedUpgradeBuilding = Cast<ATWUpgradeBuilding>(CurrentSelectedBuilding);
-		if (!SelectedUpgradeBuilding)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestUpgrade] Rejected: selected building is not ATWUpgradeBuilding")
-			);
-			return;
-		}
-
-		if (SelectedUpgradeBuilding->OwnerPlayerSlot != MyPlayerSlot)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[TestUpgrade] Rejected: selected upgrade building is not mine | BuildingOwner=%d | MySlot=%d"),
-				SelectedUpgradeBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-			return;
-		}
-
-		TargetUpgradeBuilding = SelectedUpgradeBuilding;
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestUpgrade] No selected building. Searching owned upgrade building... | MySlot=%d"),
-			MyPlayerSlot
-		);
-
-		for (TActorIterator<ATWUpgradeBuilding> It(GetWorld()); It; ++It)
-		{
-			ATWUpgradeBuilding* UpgradeBuilding = *It;
-			if (!UpgradeBuilding)
-			{
-				continue;
-			}
-
-			UE_LOG(
-				LogTemp,
-				Verbose,
-				TEXT("[TestUpgrade] Candidate=%s | Owner=%d | MySlot=%d"),
-				*GetNameSafe(UpgradeBuilding),
-				UpgradeBuilding->OwnerPlayerSlot,
-				MyPlayerSlot
-			);
-
-			if (UpgradeBuilding->OwnerPlayerSlot != MyPlayerSlot)
-			{
-				continue;
-			}
-
-			TargetUpgradeBuilding = UpgradeBuilding;
-			break;
-		}
-	}
-
-	if (!TargetUpgradeBuilding)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestUpgrade] Failed: no valid owned upgrade building found | MySlot=%d"),
-			MyPlayerSlot
-		);
-		return;
-	}
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[TestUpgrade] Execute: Building=%s | Owner=%d | MySlot=%d"),
-		*GetNameSafe(TargetUpgradeBuilding),
-		TargetUpgradeBuilding->OwnerPlayerSlot,
-		MyPlayerSlot
-	);
-
-	const int8 bStarted = TargetUpgradeBuilding->RequestStartUpgrade(TEXT("Upgrade_Damage"));
-	if (bStarted != 0)
-	{
-		RefreshUIBridge();
-		ClientForceRefreshSelectionBridge();
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[TestUpgrade] RequestStartUpgrade failed | Building=%s"),
-			*GetNameSafe(TargetUpgradeBuilding)
-		);
-	}
 }
 #pragma endregion
 

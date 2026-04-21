@@ -201,8 +201,6 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 				if (FVector::DistSquared(EntityLocation, BuildingLocation) <
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
-					check(CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget||
-						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
 
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassChasingTag>(Entity);

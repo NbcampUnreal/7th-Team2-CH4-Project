@@ -33,6 +33,7 @@ void UTWNavMeshPathFollowProcessor::ConfigureQueries(const TSharedRef<FMassEntit
 	EntityQuery.AddRequirement<FTWCommandFragment>(EMassFragmentAccess::ReadWrite);
 	
 	
+	EntityQuery.AddRequirement<FTWStatusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
@@ -66,6 +67,7 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 			return;
 		}	
 		const TArrayView<FTWCommandFragment> CommandFragments = Context.GetMutableFragmentView<FTWCommandFragment>();
+		const TConstArrayView<FTWStatusFragment> StatusFragments = Context.GetFragmentView<FTWStatusFragment>();
 		const TConstArrayView<FTransformFragment> TransformFragments = Context.GetFragmentView<FTransformFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetFragments = 
 			Context.GetMutableFragmentView<FMassMoveTargetFragment>();
@@ -119,7 +121,8 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 					NavMeshShortPathFragments[EntityIdx],
 					MoveTargetFragments[EntityIdx],
 					MovementParameters,
-					DesiredMovementFragments[EntityIdx]
+					DesiredMovementFragments[EntityIdx],
+					StatusFragments[EntityIdx]
 					))
 				{
 					CommandFragments[EntityIdx].SetType(ETWMassCommand::Hold);
@@ -158,7 +161,8 @@ bool UTWNavMeshPathFollowProcessor::RequestPath(
 	FMassNavMeshShortPathFragment& ShortPathFragment,
 	FMassMoveTargetFragment& MoveTarget,
 	const FMassMovementParameters& MovementParams,
-	const FMassDesiredMovementFragment& DesiredMovementFragment
+	const FMassDesiredMovementFragment& DesiredMovementFragment,
+	const FTWStatusFragment& StatusFragment
 ) const
 {
 //	FMassNavMeshPathFollowTaskInstanceData& InstanceData = Context.GetInstanceData<FMassNavMeshPathFollowTaskInstanceData>(*this);
@@ -220,13 +224,13 @@ bool UTWNavMeshPathFollowProcessor::RequestPath(
 			CachedPathFragment.NavPathNextStartIndex = (uint16)FMath::Max(ShortPathFragment.NumPoints - FMassNavMeshShortPathFragment::NumPointsBeyondUpdate - FMassNavMeshCachedPathFragment::NumLeadingPoints, 0);
 			
 			// Update MoveTarget
-			float DesiredSpeed = MovementParams.MaxSpeed;
+			float DesiredSpeed = StatusFragment.GetStatus().GetStatus(ETWStatusType::MoveSpeed);
 
 			// Apply DesiredMaxSpeedOverride
 			DesiredSpeed = FMath::Min(DesiredSpeed, DesiredMovementFragment.DesiredMaxSpeedOverride);
 
 			MoveTarget.DesiredSpeed.Set(DesiredSpeed);
-			
+
 			MoveTarget.CreateNewAction(EMassMovementAction::Move, *World);
 
 			return true;
