@@ -585,6 +585,24 @@ void UTWPlayerUIBridge::Initialize(
 	}
 }
 
+void UTWPlayerUIBridge::RefreshTopBarOnly()
+{
+	if (HUDCoordinator)
+	{
+		HUDCoordinator->RefreshTopBar();
+	}
+}
+
+int32 UTWPlayerUIBridge::GetCurrentElapsedSeconds() const
+{
+	if (!ResourceProvider)
+	{
+		return 0;
+	}
+
+	return ResourceProvider->GetElapsedSeconds();
+}
+
 void UTWPlayerUIBridge::RefreshAll()
 {
 	RefreshSelection();

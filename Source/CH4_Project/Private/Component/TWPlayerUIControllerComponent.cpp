@@ -19,17 +19,34 @@ void UTWPlayerUIControllerComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!bEnableRealtimeSelectionRefresh)
-	{
-		return;
-	}
-
 	if (!OwnerController || !OwnerController->IsLocalController())
 	{
 		return;
 	}
 
 	if (!PlayerUIBridge)
+	{
+		return;
+	}
+	
+	if (bEnableRealtimeTopBarClockRefresh)
+	{
+		TopBarClockRefreshAccumulator += DeltaTime;
+
+		if (TopBarClockRefreshAccumulator >= TopBarClockRefreshInterval)
+		{
+			TopBarClockRefreshAccumulator = 0.0f;
+
+			const int32 CurrentElapsedSeconds = PlayerUIBridge->GetCurrentElapsedSeconds();
+			if (CurrentElapsedSeconds != LastRenderedTopBarSeconds)
+			{
+				LastRenderedTopBarSeconds = CurrentElapsedSeconds;
+				PlayerUIBridge->RefreshTopBarOnly();
+			}
+		}
+	}
+	
+	if (!bEnableRealtimeSelectionRefresh)
 	{
 		return;
 	}

@@ -42,6 +42,8 @@ public:
 	void RefreshAll();
 	void RefreshSelection();
 	void RefreshResources();
+	void RefreshTopBarOnly();
+	int32 GetCurrentElapsedSeconds() const;
 
 	// 기존 외부 호환용. 현재 구조에서는 실질적으로 사용하지 않음.
 	bool HandleContextCommand(FName CommandId);
