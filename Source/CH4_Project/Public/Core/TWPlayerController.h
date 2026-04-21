@@ -130,11 +130,31 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputAction> QueueHotkeyAAction = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeySAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyDAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyZAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyXAction = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyCAction = nullptr;
 
 	void OnQueueHotkeyQ(const FInputActionValue& Value);
 	void OnQueueHotkeyW(const FInputActionValue& Value);
 	void OnQueueHotkeyE(const FInputActionValue& Value);
 	void OnQueueHotkeyA(const FInputActionValue& Value);
+	void OnQueueHotkeyS(const FInputActionValue& Value);
+	void OnQueueHotkeyD(const FInputActionValue& Value);
+	void OnQueueHotkeyZ(const FInputActionValue& Value);
+	void OnQueueHotkeyX(const FInputActionValue& Value);
+	void OnQueueHotkeyC(const FInputActionValue& Value);
 	
 	void HandleBuildingProductionSlot(int32 SlotIndex);
 #pragma endregion

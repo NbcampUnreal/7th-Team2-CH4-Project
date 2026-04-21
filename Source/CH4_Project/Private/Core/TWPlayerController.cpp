@@ -450,6 +450,11 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(QueueHotkeyWAction));
 	check(IsValid(QueueHotkeyEAction));
 	check(IsValid(QueueHotkeyAAction));
+	check(IsValid(QueueHotkeySAction));
+	check(IsValid(QueueHotkeyDAction));
+	check(IsValid(QueueHotkeyZAction));
+	check(IsValid(QueueHotkeyXAction));
+	check(IsValid(QueueHotkeyCAction));
 	
 	check(IsValid(IA_TestDamageBlockingBuilding));
 	check(IsValid(IA_TestUpgrade));
@@ -480,6 +485,11 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(QueueHotkeyWAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyW);
 	EnhancedInputComponent->BindAction(QueueHotkeyEAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyE);
 	EnhancedInputComponent->BindAction(QueueHotkeyAAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyA);
+	EnhancedInputComponent->BindAction(QueueHotkeySAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyS);
+	EnhancedInputComponent->BindAction(QueueHotkeyDAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyD);
+	EnhancedInputComponent->BindAction(QueueHotkeyZAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyZ);
+	EnhancedInputComponent->BindAction(QueueHotkeyXAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyX);
+	EnhancedInputComponent->BindAction(QueueHotkeyCAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyC);
 	
 	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
 	EnhancedInputComponent->BindAction(IA_TestUpgrade, ETriggerEvent::Started, this, &ThisClass::HandleTestUpgrade);
@@ -1420,6 +1430,32 @@ void ATWPlayerController::OnQueueHotkeyA(const FInputActionValue&)
 {
 	HandleBuildingProductionSlot(3);
 }
+
+void ATWPlayerController::OnQueueHotkeyS(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(4);
+}
+
+void ATWPlayerController::OnQueueHotkeyD(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(5);
+}
+
+void ATWPlayerController::OnQueueHotkeyZ(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(6);
+}
+
+void ATWPlayerController::OnQueueHotkeyX(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(7);
+}
+
+void ATWPlayerController::OnQueueHotkeyC(const FInputActionValue& Value)
+{
+	HandleBuildingProductionSlot(8);
+}
+
 void ATWPlayerController::HandleBuildingProductionSlot(int32 SlotIndex)
 {
 	if (!ShouldUseBuildingCommandContext())
