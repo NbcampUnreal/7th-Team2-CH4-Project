@@ -14,6 +14,7 @@ enum class ETWStatusType : uint8
 	AttackSpeed	UMETA(DisplayName="AttackSpeed"),
 	MoveSpeed UMETA(DisplayName = "MoveSpeed"),
 	Range UMETA(DisplayName = "Range"),
+	SearchingRange UMETA(DisplayName = "SearchingRange"),
 	Count UMETA(Hidden),
 };
 USTRUCT(BlueprintType)
