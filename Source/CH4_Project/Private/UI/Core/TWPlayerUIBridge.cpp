@@ -1306,8 +1306,7 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 		OutCommandIds = {
 			TWCommandIds::Move,
 			TWCommandIds::Attack,
-			TWCommandIds::Hold,
-			TWCommandIds::BuildMenu
+			TWCommandIds::Hold
 		};
 
 		if (OwnerController && OwnerController->IsOwnedHeroCurrentlySelected())
