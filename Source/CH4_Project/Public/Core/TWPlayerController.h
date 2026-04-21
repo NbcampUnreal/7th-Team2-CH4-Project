@@ -428,4 +428,16 @@ private:
 	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;
 	bool bHasValidRawMousePositionThisFrame = false;
 	bool bWasEdgeScrollingLastFrame = false;
+	
+#pragma region Cheat
+	
+public:
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_CheatAddResource(EResourceType ResourceType, int32 Amount);
+	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_CheatTimeScale(float TimeMultiplier);
+	
+#pragma endregion
+	
 };

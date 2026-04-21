@@ -8,6 +8,7 @@
 #include "Component/TWTeamColorComponent.h"
 #include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
+#include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
 
 ATW_CapturePoint::ATW_CapturePoint()
@@ -132,6 +133,11 @@ void ATW_CapturePoint::CheckCaptureStatus()
     TSet<int32> PresentTeams;
     for (AActor* Actor : CurrentlyInArea)
     {
+        if (Actor == this)
+        {
+            continue;
+        }
+        
         UTWTeamComponent* TeamComp = Actor->FindComponentByClass<UTWTeamComponent>();
         if (TeamComp)
         {
@@ -167,12 +173,27 @@ void ATW_CapturePoint::CheckCaptureStatus()
                 
                 if (CurrentlyInArea.Num() > 0 && CurrentlyInArea[0])
                 {
-                    if (APawn* CapturePawn = Cast<APawn>(CurrentlyInArea[0]))
+                    // if (APawn* CapturePawn = Cast<APawn>(CurrentlyInArea[0]))
+                    // {
+                    //     // 이 유닛을 소유한 플레이어의 State를 가져옴
+                    //     if (ATWPlayerState* PS = Cast<ATWPlayerState>(CapturePawn->GetPlayerState()))
+                    //     {
+                    //         SetOwningPlayer(PS);
+                    //     }
+                    // }
+                    
+                    if (AGameStateBase* GameState = GetWorld()->GetGameState())
                     {
-                        // 이 유닛을 소유한 플레이어의 State를 가져옴
-                        if (ATWPlayerState* PS = Cast<ATWPlayerState>(CapturePawn->GetPlayerState()))
+                        for (APlayerState* PS : GameState->PlayerArray)
                         {
-                            SetOwningPlayer(PS);
+                            if (ATWPlayerState * TWPS = Cast<ATWPlayerState>(PS))
+                            {
+                                if (TWPS->PlayerSlot == CurrentUnitTeam)
+                                {
+                                    SetOwningPlayer(TWPS);
+                                    break;   
+                                }
+                            }
                         }
                     }
                 }
