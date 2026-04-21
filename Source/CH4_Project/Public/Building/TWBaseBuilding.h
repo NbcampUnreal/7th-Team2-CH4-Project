@@ -37,30 +37,29 @@ public:
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building")
-	TObjectPtr<USceneComponent> SceneRoot;
-	
+	TObjectPtr<USceneComponent> SceneRoot = nullptr;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<UStaticMeshComponent> MeshComponent = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<UTWBuildingDataAsset> BuildingData = nullptr;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building|Component")
-	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Building|Component")
-	TObjectPtr<UTWTeamComponent> TeamComponent;
-	
-	UPROPERTY(VisibleAnywhere, Category = "Building|Component")
-	TObjectPtr<UTWVisionComponent> FogVisionComponent;
-	
-	// 0 = Player1, 1 = Player2 ... [테스트]
+	TObjectPtr<UTWTeamColorComponent> TeamColorComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building|Component")
+	TObjectPtr<UTWTeamComponent> TeamComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building|Component")
+	TObjectPtr<UTWVisionComponent> FogVisionComponent = nullptr;
+
 	UPROPERTY(ReplicatedUsing=OnRep_OwnerPlayerSlot, EditInstanceOnly, BlueprintReadOnly, Category="Building")
 	int32 OwnerPlayerSlot = -1;
-	
+
 	UFUNCTION(BlueprintCallable, Category="Building")
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
-	
+
 	UFUNCTION(BlueprintCallable, Category="Building|HP")
 	virtual void ApplyDamageToBuilding(const float InDamageAmount);
 
@@ -72,11 +71,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Building|Construction")
 	float GetBuildingProgress() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category="Building|Construction")
 	float GetRemainingBuildTime() const;
 
-	// 최신 월드 표시용
 	UFUNCTION(BlueprintCallable, Category="Building|Visual")
 	virtual FVector GetSelectionAnchorWorldLocation() const;
 
@@ -86,7 +84,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Building|Visual")
 	virtual float GetSelectionVisualRadius() const;
 
-	// SelectionVisualManager 호환용
 	UFUNCTION(BlueprintCallable, Category="Building|Visual")
 	void SetSelectionVisualActive(bool bInActive);
 
@@ -101,7 +98,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Building|Visual")
 	FVector GetSelectionHPBarWorldLocation() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category="Building|Combat")
 	virtual bool CanBeAttacked() const
 	{
@@ -119,7 +116,13 @@ public:
 	{
 		return GetActorLocation();
 	}
-	
+
+	UFUNCTION(BlueprintCallable, Category="Building")
+	void SetOwnerPlayerSlot(int32 InSlot);
+
+	void SetOwnerPlayerState(ATWPlayerState* InPlayerState);
+	ATWPlayerState* GetOwnerPlayerState() const { return OwningPlayerState; }
+
 protected:
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building")
 	TObjectPtr<ATWPlayerState> OwningPlayerState = nullptr;
@@ -129,20 +132,20 @@ protected:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Building|HP")
 	float CurrentHP = 0.0f;
-	
+
 	UPROPERTY(ReplicatedUsing=OnRep_BuildingState, VisibleAnywhere, BlueprintReadOnly, Category="Building|Construction")
 	ETWBuildingState BuildingState = ETWBuildingState::None;
-	
+
 	UFUNCTION()
 	void OnRep_OwnerPlayerSlot();
-	
+
 	UFUNCTION()
 	void OnRep_BuildingState();
-	
+
 	void NotifyRecentCombatBuildingDamaged(float InVisibleTime = 1.25f);
-	
+
 	UPROPERTY(EditAnywhere, Category="Building|Visual")
-	TObjectPtr<UMaterialInterface> ConstructionMaterial;
+	TObjectPtr<UMaterialInterface> ConstructionMaterial = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Building|Visual")
 	FVector SelectionAnchorOffset = FVector::ZeroVector;
@@ -152,28 +155,21 @@ protected:
 
 	UPROPERTY(Transient)
 	bool bSelectionVisualActive = false;
-	
+
 	FTimerHandle ConstructionTimerHandle;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category="Building|Construction")
 	float ConstructionTickInterval = 0.1f;
-	
+
 	float CurrentBuildTime = 0.0f;
 	float MaxBuildTime = 0.0f;
-	
+
 	void StartConstruction();
 	void UpdateConstruction();
 	void FinishConstruction();
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Navigation")
-	TObjectPtr<UNavModifierComponent> NavModifier;
-	
-public:
-	UFUNCTION(BlueprintCallable, Category="Building")
-	void SetOwnerPlayerSlot(int32 InSlot);
-	
-	void SetOwnerPlayerState(ATWPlayerState* InPlayerState);
-	ATWPlayerState* GetOwnerPlayerState() const { return OwningPlayerState; }
+	TObjectPtr<UNavModifierComponent> NavModifier = nullptr;
 
 protected:
 	virtual void HandleDestroyedByDamage();

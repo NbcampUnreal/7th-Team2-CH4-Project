@@ -119,7 +119,12 @@ protected:
 	);
 	void ApplyCommandQueueCounts(const TArray<FName>& CommandIds);
 	void ClearSelectionResult();
-
+protected:
+	bool IsHeroSelectionId(FName InSelectionId) const;
+	void AppendHeroSkillCommandIfNeeded(
+		FName InSelectionId,
+		TArray<FName>& InOutCommandIds
+	) const;
 protected:
 	UPROPERTY()
 	TObjectPtr<ATWPlayerController> OwnerController = nullptr;

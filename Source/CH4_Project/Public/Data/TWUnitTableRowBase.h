@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "MassEntityConfigAsset.h"
 #include "TWBuildingTypes.h"
 #include "TWUnitStatus.h"
@@ -27,5 +28,6 @@ public:
 	float SpawnDuration = 1;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Unit")
 	TObjectPtr<UTexture2D> Icon;	
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Unit|Hero")
+	FName HeroSkillRowId = NAME_None;
 };

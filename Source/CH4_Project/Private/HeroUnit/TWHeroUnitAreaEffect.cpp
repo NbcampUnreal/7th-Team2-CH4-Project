@@ -164,6 +164,3 @@ void ATWHeroUnitAreaEffect::UpdateMeshScale()
 		AreaIndicatorMesh->SetRelativeScale3D(FVector(ScaleValue, ScaleValue, 1.f));
 	}
 }
-
-
-

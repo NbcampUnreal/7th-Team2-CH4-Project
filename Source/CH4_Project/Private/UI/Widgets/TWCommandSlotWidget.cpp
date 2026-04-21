@@ -82,6 +82,24 @@ void UTWCommandSlotWidget::RefreshVisual()
 				: FText::FromString(CachedViewModel.HotkeyLabel)
 		);
 	}
+	if (TextDescription)
+	{
+		const FString DescriptionText =
+			!CachedViewModel.Description.IsEmpty()
+				? CachedViewModel.Description
+				: CachedViewModel.DisableReason;
+
+		if (bIsEmptySlot || DescriptionText.IsEmpty())
+		{
+			TextDescription->SetText(FText::GetEmpty());
+			TextDescription->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		else
+		{
+			TextDescription->SetText(FText::FromString(DescriptionText));
+			TextDescription->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+	}
 
 	if (SlotButton)
 	{

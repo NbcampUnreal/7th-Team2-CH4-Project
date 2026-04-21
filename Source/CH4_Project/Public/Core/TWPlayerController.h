@@ -6,6 +6,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Data/TWUnitStatus.h"
 #include "UI/Data/TWUIDataTypes.h"
+#include "Data/TWHeroTableRowBase.h"
+#include "Components/DecalComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "TWPlayerController.generated.h"
 
 class ATWBaseBuilding;
@@ -28,6 +31,9 @@ class CH4_PROJECT_API ATWPlayerController : public APlayerController
 
 public:
 	ATWPlayerController();
+
+	UFUNCTION(Client, Reliable)
+	void ClientFocusStartLocation(const FVector& InWorldLocation);
 
 protected:
 	virtual void BeginPlay() override;
@@ -58,6 +64,13 @@ protected:
 	bool ShouldUseBuildingCommandContext() const;
 
 #pragma region Input
+public:
+	UFUNCTION(BlueprintCallable)
+	float GetHeroSkillRemainingCooldownTime() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool IsHeroSkillReady() const;
+
 protected:
 	virtual void SetupInputComponent() override;
 
@@ -98,6 +111,23 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleAttackCommand(const FVector& CommandLocation);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseHeroSkill(FVector InTargetLocation, FName InHeroUnitId);
+
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyHeroSkillCooldown(float InDuration);
+
+	UFUNCTION(Client, Unreliable)
+	void ClientPlayHeroSkillFX(FName InHeroUnitId, FVector InStartLocation, FVector InTargetLocation, float InRadius);
+
+	bool TryGetSelectedHeroUnitId(FName& OutHeroUnitId) const;
+	bool TryGetSelectedHeroEntityHandle(FMassEntityHandle& OutEntityHandle, FName& OutHeroUnitId) const;
+	bool TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMassEntityHandle& OutEntityHandle) const;
+	bool TryApplyDamageToBuilding(ATWBaseBuilding* InTargetBuilding, float InDamage) const;
+	void NotifyAllPlayersUnitDamaged(const FMassEntityHandle& InTargetEntity, float InVisibleTime = 1.25f) const;
+	void NotifyAllPlayersBuildingDamaged(ATWBaseBuilding* InTargetBuilding, float InVisibleTime = 1.25f) const;
+	void NotifyAllPlayersHeroSkillFX(FName InHeroUnitId, const FVector& InStartLocation, const FVector& InTargetLocation, float InRadius) const;
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleHoldCommand();
@@ -381,6 +411,9 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientForceRefreshSelectionBridge();
 
+	UFUNCTION(Client, Reliable)
+	void ClientRefreshSelectedUnitStatusAndUI();
+
 private:
 	void UpdateInputOverlayState();
 	void UpdateDragSelectionOverlay();
@@ -444,4 +477,64 @@ public:
 	
 #pragma endregion
 	
+#pragma region Skill
+protected:
+	bool bHeroSkillTargetingMode = false;
+	
+	FVector GetMouseWorldLocation() const;
+	void BeginHeroSkillTargeting();
+	void ConfirmHeroSkillTargeting();
+	void CancelHeroSkillTargeting();
+	void UpdateHeroSkillTargeting();
+	void BeginHeroSkillTargeting(FName InHeroUnitId);
+	
+	float LocalHeroSkillCooldownEndTime = 0.f;
+	float ServerHeroSkillCooldownEndTime = 0.f;
+	
+	UPROPERTY(VisibleInstanceOnly, Category="Hero|Skill")
+	FName PendingHeroSkillUnitId = NAME_None;
+
+protected:
+	// 영웅 스킬 FX / 데칼 / 범위 / 데미지 값을 한 곳에서 관리하는 데이터 테이블
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill")
+	TObjectPtr<UDataTable> HeroSkillDataTable = nullptr;
+
+	// 데이터 테이블에 값이 없을 때만 사용할 최소 fallback 값
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill")
+	TObjectPtr<UMaterialInterface> HeroSkillDefaultTargetDecalMaterial = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill")
+	TObjectPtr<UMaterialInterface> HeroSkillDefaultImpactDecalMaterial = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill")
+	float HeroSkillDefaultTargetDecalRadius = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill")
+	float HeroSkillDefaultImpactDecalLifeTime = 0.75f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|Debug")
+	bool bDrawHeroSkillDebug = true;
+
+	UPROPERTY()
+	TObjectPtr<UDecalComponent> HeroSkillTargetDecal = nullptr;
+
+	UPROPERTY(VisibleInstanceOnly, Category="Hero|Skill")
+	float HeroSkillTargetDecalRadius = 250.f;
+
+	FName ResolveHeroSkillRowName(FName InHeroUnitId) const;
+	const FTWHeroTableRowBase* FindHeroSkillRow(FName InHeroUnitId) const;
+	float ResolveHeroSkillTargetRadius(FName InHeroUnitId) const;
+	float ResolveHeroSkillDamageRadius(const FTWHeroTableRowBase* InHeroSkillRow) const;
+	float ResolveHeroSkillAcquireRadius(const FTWHeroTableRowBase* InHeroSkillRow) const;
+	float ResolveHeroSkillImpactRadius(const FTWHeroTableRowBase* InHeroSkillRow) const;
+	float ResolveHeroSkillImpactLifeTime(const FTWHeroTableRowBase* InHeroSkillRow) const;
+	UMaterialInterface* ResolveHeroSkillTargetDecalMaterial(FName InHeroUnitId) const;
+	UMaterialInterface* ResolveHeroSkillImpactDecalMaterial(FName InHeroUnitId) const;
+	void ApplyHeroSkillTargetDecalStyle(FName InHeroUnitId, float InRadius);
+
+	void EnsureHeroSkillTargetDecal();
+	void ShowHeroSkillTargetDecal(float InRadius);
+	void HideHeroSkillTargetDecal();
+	void UpdateHeroSkillTargetDecal(const FVector& InWorldLocation);
+#pragma endregion
 };

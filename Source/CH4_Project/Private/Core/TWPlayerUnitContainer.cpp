@@ -156,7 +156,7 @@ void UTWPlayerUnitContainer::AddUnit(FMassEntityHandle& Unit)
 		UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 		if (IsValid(UnitSubsystem))
 		{
-			FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
+			const FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
 			if (nullptr != UnitTableRowBase)
 			{
 				IncreasePopulation(UnitTableRowBase->Population);
@@ -177,7 +177,7 @@ void UTWPlayerUnitContainer::RemoveUnit(int32 Idx)
 		UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 		if (IsValid(UnitSubsystem))
 		{
-			FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
+			const FTWUnitTableRowBase* UnitTableRowBase = UnitSubsystem->GetUnitTableRowBase(UnitFragment->GetUnitID());
 			if (nullptr != UnitTableRowBase)
 			{
 				DecreasePopulation(UnitTableRowBase->Population);

@@ -57,6 +57,31 @@ void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 	}
 }
 
+bool ATWLobbyPlayerController::Server_SetLobbyNickname_Validate(const FString& InNickname)
+{
+	return InNickname.Len() <= 64;
+}
+
+void ATWLobbyPlayerController::Server_SetLobbyNickname_Implementation(const FString& InNickname)
+{
+	if (ATWLobbyPlayerState* LPS = GetPlayerState<ATWLobbyPlayerState>())
+	{
+		LPS->SetLobbyNickname(InNickname);
+	}
+}
+
+bool ATWLobbyPlayerController::Server_SetSelectedHeroUnitId_Validate(FName InHeroUnitId)
+{
+	return true;
+}
+
+void ATWLobbyPlayerController::Server_SetSelectedHeroUnitId_Implementation(FName InHeroUnitId)
+{
+	if (ATWLobbyPlayerState* LPS = GetPlayerState<ATWLobbyPlayerState>())
+	{
+		LPS->SetSelectedHeroUnitId(InHeroUnitId);
+	}
+}
 
 void ATWLobbyPlayerController::ExitLobby()
 {

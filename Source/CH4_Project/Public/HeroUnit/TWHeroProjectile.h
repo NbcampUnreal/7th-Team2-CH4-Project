@@ -15,6 +15,9 @@ class CH4_PROJECT_API ATWHeroProjectile : public AActor
 public:	
 	ATWHeroProjectile();
 	
+	UFUNCTION(BlueprintCallable)
+	void InitializeVisualProjectile(const FVector& InTargetLocation);
+	
 protected:
 	virtual void BeginPlay() override;
 
@@ -38,7 +41,9 @@ protected:
 		int32 OtherBodyIndex,
 		bool bFromSweep,
 		const FHitResult& SweepResult);
-	
+
+
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Move")
 	float InitSpeed = 2000.f;
@@ -46,4 +51,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Move")
 	float MaxSpeed = 2000.f;
 
+	UPROPERTY()
+	FVector TargetLocation = FVector::ZeroVector;
 };

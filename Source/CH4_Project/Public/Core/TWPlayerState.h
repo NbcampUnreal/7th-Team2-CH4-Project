@@ -11,6 +11,7 @@
 #include "TWPlayerState.generated.h"
 
 struct FTWUpgradeTableRowBase;
+class ATWNexusBuilding;
 class UTWTeamComponent;
 
 USTRUCT(BlueprintType)
@@ -42,6 +43,18 @@ public:
 	int32 PlayerSlot = -1;
 
 	void SetPlayerSlot(const int32 InPlayerSlot);
+	
+	UFUNCTION(BlueprintCallable, Category="Lobby")
+	void SetLobbyNickname(const FString& InNickname);
+
+	UFUNCTION(BlueprintCallable, Category="Lobby")
+	void SetSelectedHeroUnitId(FName InHeroUnitId);
+
+	const FString& GetLobbyNickname() const { return LobbyNickname; }
+	FName GetSelectedHeroUnitId() const { return SelectedHeroUnitId; }
+
+	void SetAssignedStartNexus(ATWNexusBuilding* InNexus);
+	ATWNexusBuilding* GetAssignedStartNexus() const { return AssignedStartNexus.Get(); }
 
 #pragma region 자원
 protected:
@@ -186,4 +199,16 @@ private:
 	{
 		return GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 	}
+	
+#pragma region 로비 플레이어 정보 연동
+protected:
+	UPROPERTY(Replicated)
+	FString LobbyNickname;
+
+	UPROPERTY(Replicated)
+	FName SelectedHeroUnitId = NAME_None;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<ATWNexusBuilding> AssignedStartNexus = nullptr;
+#pragma endregion
 };	

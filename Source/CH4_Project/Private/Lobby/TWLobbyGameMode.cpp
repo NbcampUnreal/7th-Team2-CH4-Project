@@ -15,7 +15,6 @@ ATWLobbyGameMode::ATWLobbyGameMode()
 	GameStateClass = ATWLobbyGameState::StaticClass();
 }
 
-// 수정x
 void ATWLobbyGameMode::PreLogin(
 	const FString& Options,
 	const FString& Address,
@@ -34,80 +33,109 @@ void ATWLobbyGameMode::PreLogin(
 	}
 }
 
-// 수정 필요
 void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	UE_LOG(LogTemp, Warning, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *GetNameSafe(NewPlayer));
 	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
-	if (!LGS || !NewPlayer)
+	if (!IsValid(NewPlayer) || !LGS)
 	{
 		return;
 	}
 
-	if (!IsValid(NewPlayer))
+	LGS->SetCurrentPlayerCount(GetNumPlayers());
+	UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+
+	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
+	if (!LPS)
 	{
+		CheckStartCondition();
 		return;
 	}
-	
-	if (LGS)
+
+	const int32 JoinedPlayerIndex = LGS->GetCurrentPlayerCount();
+	LPS->SetIsHost(JoinedPlayerIndex == 1);
+
+	if (LPS->GetLobbyNickname().IsEmpty())
 	{
-		LGS->SetCurrentPlayerCount(GetNumPlayers());
-		
-		UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+		const FString DebugNickname = FString::Printf(TEXT("Tester%d"), JoinedPlayerIndex);
+		LPS->SetLobbyNickname(DebugNickname);
 	}
-	
-	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
-	if (LPS)
+
+	if (LPS->GetSelectedHeroUnitId().IsNone())
 	{
-		if (LGS->GetCurrentPlayerCount() == 1)
+		FName DebugHeroId = NAME_None;
+
+		switch (JoinedPlayerIndex)
 		{
-			LPS->SetIsHost(true);
-			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
+		case 1:
+			DebugHeroId = TEXT("Markman");
+			break;
+		case 2:
+			DebugHeroId = TEXT("Astrologian");
+			break;
+		case 3:
+			DebugHeroId = TEXT("DragonKnight");
+			break;
+		case 4:
+			DebugHeroId = TEXT("DragonKnight");
+			break;
+		default:
+			DebugHeroId = TEXT("DragonKnight");
+			break;
 		}
-		else
+
+		LPS->SetSelectedHeroUnitId(DebugHeroId);
+
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("[LobbyDebug] Auto profile assigned | PlayerIndex=%d | Nickname=%s | HeroId=%s"),
+			JoinedPlayerIndex,
+			*LPS->GetLobbyNickname(),
+			*DebugHeroId.ToString()
+		);
+	}
+
+	if (GetWorld())
+	{
+		switch (GetWorld()->GetNetMode())
 		{
-			LPS->SetIsHost(false);
-			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
+		case NM_Standalone:
+			UE_LOG(LogTemp, Warning, TEXT("NM_Standalone"));
+			break;
+		case NM_Client:
+			UE_LOG(LogTemp, Warning, TEXT("NM_Client!!"));
+			break;
+		case NM_ListenServer:
+			UE_LOG(LogTemp, Warning, TEXT("NM_ListenServer!!"));
+			break;
+		case NM_DedicatedServer:
+			UE_LOG(LogTemp, Warning, TEXT("NM_DedicatedServer!!"));
+			break;
+		default:
+			break;
 		}
 	}
-	if (GetWorld()->GetNetMode() == NM_Standalone)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NM_Standalone"));
-	}
-	if (GetWorld()->GetNetMode() == NM_Client)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NM_Client!!"));
-	}
-	if (GetWorld()->GetNetMode() == NM_ListenServer)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NM_ListenServer!!"));
-	}
-	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NM_DedicatedServer!!"));
-	}
+
 	CheckStartCondition();
 }
 
-// 수정x
 void ATWLobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
-	
+
 	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
 	if (LGS)
 	{
 		LGS->SetCurrentPlayerCount(GetNumPlayers());
-		
-		UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+		UE_LOG(LogTemp, Warning, TEXT("Logout : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 	}
+
 	AssignNewHost();
 	CheckStartCondition();
 }
 
-// 수정x
 bool ATWLobbyGameMode::CheckStartCondition()
 {
 	bAllReady = true;
@@ -118,14 +146,12 @@ bool ATWLobbyGameMode::CheckStartCondition()
 		return false;
 	}
 
-	// 조건 1 : 최소 인원수 (2명)
 	if (LGS->PlayerArray.Num() < MinPlayersToStart)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("To Start Play need at least 2 player"));
 		return false;
 	}
 
-	// 조건 2 : 방장 제외 전원 준비 완료
 	for (APlayerState* PS : LGS->PlayerArray)
 	{
 		ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
@@ -143,7 +169,6 @@ bool ATWLobbyGameMode::CheckStartCondition()
 	return bAllReady;
 }
 
-// 수정 필요
 void ATWLobbyGameMode::StartGame()
 {
 	if (GameLevelName.IsNone())
@@ -161,8 +186,11 @@ void ATWLobbyGameMode::StartGame()
 	}
 
 	UE_LOG(
-		LogTemp,Warning,TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
-		*TravelURL, bUseSeamlessTravel ? TEXT("true") : TEXT("false")
+		LogTemp,
+		Warning,
+		TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
+		*TravelURL,
+		bUseSeamlessTravel ? TEXT("true") : TEXT("false")
 	);
 
 	if (UWorld* World = GetWorld())
@@ -171,7 +199,6 @@ void ATWLobbyGameMode::StartGame()
 	}
 }
 
-// 수정 필요
 void ATWLobbyGameMode::AssignNewHost()
 {
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();

@@ -42,7 +42,8 @@ enum class ETWCommandType : uint8
 	Back,
 	ProduceUnit,
 	BuildStructure,
-	Research
+	Research,
+	HeroSkill
 };
 
 UENUM(BlueprintType)

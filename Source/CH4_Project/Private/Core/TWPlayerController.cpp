@@ -46,6 +46,13 @@
 #include "Core/TWGameMode.h"
 #include "HeroUnit/TWHeroUnitBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "HeroUnit/TWHeroProjectile.h"
+#include "Components/DecalComponent.h"
+#include "Materials/MaterialInterface.h"
+#include "Data/TWHeroTableRowBase.h"
+#include "Particles/ParticleSystem.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Log/TWLogCategory.h"
 
 namespace
@@ -289,6 +296,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	UpdateCursorOverlayPosition();
+	UpdateHeroSkillTargeting();
 
 	const bool bIsEdgeScrollingNow = HandleScreenEdgeScrolling(DeltaSeconds);
 
@@ -316,6 +324,20 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	}
 
 	RefreshLocalSelectionRuntimeData();
+}
+
+void ATWPlayerController::ClientFocusStartLocation_Implementation(const FVector& InWorldLocation)
+{
+	APawn* MyPawn = GetPawn();
+	if (!IsValid(MyPawn))
+	{
+		return;
+	}
+
+	FVector NewLocation = InWorldLocation;
+	NewLocation.Z = MyPawn->GetActorLocation().Z;
+
+	MyPawn->SetActorLocation(NewLocation);
 }
 
 void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority,
@@ -492,8 +514,13 @@ void ATWPlayerController::SetupInputComponent()
 #pragma region 마우스
 void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputActionValue)
 {
+	if (bHeroSkillTargetingMode)
+	{
+		ConfirmHeroSkillTargeting();
+		bConsumeLeftMouseRelease = true;
+		return;
+	}
 	bConsumeLeftMouseRelease = false;
-
 	const bool bMouseOverUI = IsMouseOverHitTestableUI();
 	if (bMouseOverUI)
 	{
@@ -511,7 +538,6 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 		}
 		return;
 	}
-
 	if (BuildComponent && BuildComponent->GetBuildMode())
 	{
 		BuildComponent->RequestBuild();
@@ -641,11 +667,15 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 
 void ATWPlayerController::OnRightMouseAction(const FInputActionValue& InputActionValue)
 {
+	if (bHeroSkillTargetingMode)
+	{
+		CancelHeroSkillTargeting();
+		return;
+	}
 	if (IsMouseOverHitTestableUI())
 	{
 		return;
 	}
-
 	if (bBuildShortcutModeActive)
 	{
 		if (BuildComponent && BuildComponent->GetBuildMode())
@@ -1505,6 +1535,893 @@ void ATWPlayerController::RefreshUIBridge()
 	}
 }
 
+FVector ATWPlayerController::GetMouseWorldLocation() const
+{
+	FHitResult Hit;
+	GetHitResultUnderCursor(ECC_Visibility, false, Hit);
+	return Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
+}
+bool ATWPlayerController::TryGetSelectedHeroUnitId(FName& OutHeroUnitId) const
+{
+	OutHeroUnitId = NAME_None;
+
+	const UTWUnitSubsystem* UnitSubsystem =
+		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+
+	for (const FMassNetworkID& NetId : ClientSelectedEntities)
+	{
+		FName UnitId = NAME_None;
+		int32 OwnerSlot = INDEX_NONE;
+
+		if (!UnitSubsystem->TryGetUnitID(NetId, UnitId))
+		{
+			continue;
+		}
+
+		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, OwnerSlot))
+		{
+			continue;
+		}
+
+		const ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+		if (!PS || OwnerSlot != PS->PlayerSlot)
+		{
+			continue;
+		}
+
+		if (
+			UnitId == TEXT("DragonKnight") ||
+			UnitId == TEXT("Markman") ||
+			UnitId == TEXT("Astrologian")
+		)
+		{
+			OutHeroUnitId = UnitId;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMassEntityHandle& OutEntityHandle) const
+{
+	OutEntityHandle = FMassEntityHandle();
+
+	if (!HasAuthority() || InHeroUnitId.IsNone())
+	{
+		return false;
+	}
+
+	const ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!PS)
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	UTWUnitSubsystem* UnitSubsystem = World ? World->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	UMassEntitySubsystem* EntitySubsystem = World ? World->GetSubsystem<UMassEntitySubsystem>() : nullptr;
+	if (!World || !UnitSubsystem || !EntitySubsystem)
+	{
+		return false;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+
+	for (const FMassEntityHandle& Entity : ServerSelectedEntities)
+	{
+		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+		{
+			continue;
+		}
+
+		const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+		if (!UnitFrag)
+		{
+			continue;
+		}
+
+		if (UnitFrag->GetOwner() != PS->PlayerSlot)
+		{
+			continue;
+		}
+
+		if (UnitFrag->GetUnitID() == InHeroUnitId)
+		{
+			OutEntityHandle = Entity;
+			return true;
+		}
+	}
+
+	const ATWHeroUnitBase* OwnedHero = GetOwnedHeroUnit();
+	if (!IsValid(OwnedHero))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] OwnedHero actor not found"));
+		return false;
+	}
+
+	const FVector HeroLocation = OwnedHero->GetActorLocation();
+	const FVector SearchExtent(200.f, 200.f, 300.f);
+	const FVector AreaMin = HeroLocation - SearchExtent;
+	const FVector AreaMax = HeroLocation + SearchExtent;
+
+	TArray<FMassEntityHandle> NearbyEntities;
+	if (!UnitSubsystem->GetEntitiesInRectangle(AreaMin, AreaMax, NearbyEntities, PS->PlayerSlot))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] No nearby entities around hero actor"));
+		return false;
+	}
+
+	for (const FMassEntityHandle& Entity : NearbyEntities)
+	{
+		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+		{
+			continue;
+		}
+
+		const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+		if (!UnitFrag)
+		{
+			continue;
+		}
+
+		if (UnitFrag->GetOwner() != PS->PlayerSlot)
+		{
+			continue;
+		}
+
+		if (UnitFrag->GetUnitID() == InHeroUnitId)
+		{
+			OutEntityHandle = Entity;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ATWPlayerController::TryApplyDamageToBuilding(ATWBaseBuilding* InTargetBuilding, float InDamage) const
+{
+	if (!IsValid(InTargetBuilding))
+	{
+		return false;
+	}
+
+	InTargetBuilding->ApplyDamageToBuilding(FMath::Max(1, FMath::RoundToInt(InDamage)));
+	return true;
+}
+
+void ATWPlayerController::NotifyAllPlayersUnitDamaged(const FMassEntityHandle& InTargetEntity, float InVisibleTime) const
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	UMassEntitySubsystem* EntitySubsystem = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem)
+	{
+		return;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+	if (!EntityManager.IsEntityActive(InTargetEntity))
+	{
+		return;
+	}
+
+	const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(InTargetEntity);
+	const FMassNetworkIDFragment* NetworkIDFragment = EntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(InTargetEntity);
+	if (!UnitFragment || !NetworkIDFragment)
+	{
+		return;
+	}
+
+	const int32 OwnerPlayerSlot = UnitFragment->GetOwner();
+	const FMassNetworkID UnitNetId = NetworkIDFragment->NetID;
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TargetPC = Cast<ATWPlayerController>(It->Get());
+		if (!TargetPC)
+		{
+			continue;
+		}
+
+		TargetPC->ClientNotifyRecentCombatUnitDamaged(UnitNetId, OwnerPlayerSlot, InVisibleTime);
+	}
+}
+
+void ATWPlayerController::NotifyAllPlayersBuildingDamaged(ATWBaseBuilding* InTargetBuilding, float InVisibleTime) const
+{
+	if (!GetWorld() || !IsValid(InTargetBuilding))
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TargetPC = Cast<ATWPlayerController>(It->Get());
+		if (!TargetPC)
+		{
+			continue;
+		}
+
+		TargetPC->ClientNotifyRecentCombatBuildingDamaged(InTargetBuilding, InVisibleTime);
+	}
+}
+FName ATWPlayerController::ResolveHeroSkillRowName(FName InHeroUnitId) const
+{
+	if (InHeroUnitId.IsNone())
+	{
+		return NAME_None;
+	}
+
+	const UWorld* World = GetWorld();
+	const UTWUnitSubsystem* UnitSubsystem = World ? World->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	if (UnitSubsystem)
+	{
+		if (const FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(InHeroUnitId))
+		{
+			if (!UnitRow->HeroSkillRowId.IsNone())
+			{
+				return UnitRow->HeroSkillRowId;
+			}
+		}
+	}
+
+	return InHeroUnitId;
+}
+
+const FTWHeroTableRowBase* ATWPlayerController::FindHeroSkillRow(FName InHeroUnitId) const
+{
+	if (!HeroSkillDataTable || InHeroUnitId.IsNone())
+	{
+		return nullptr;
+	}
+
+	const FName RowName = ResolveHeroSkillRowName(InHeroUnitId);
+	if (RowName.IsNone())
+	{
+		return nullptr;
+	}
+
+	static const FString ContextString(TEXT("ATWPlayerController::FindHeroSkillRow"));
+	return HeroSkillDataTable->FindRow<FTWHeroTableRowBase>(RowName, ContextString, false);
+}
+
+void ATWPlayerController::EnsureHeroSkillTargetDecal()
+{
+	if (HeroSkillTargetDecal)
+	{
+		return;
+	}
+
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn)
+	{
+		return;
+	}
+
+	HeroSkillTargetDecal = NewObject<UDecalComponent>(MyPawn, TEXT("HeroSkillTargetDecal"));
+	if (!HeroSkillTargetDecal)
+	{
+		return;
+	}
+
+	HeroSkillTargetDecal->SetupAttachment(MyPawn->GetRootComponent());
+	HeroSkillTargetDecal->RegisterComponent();
+	HeroSkillTargetDecal->SetVisibility(false);
+	HeroSkillTargetDecal->SetHiddenInGame(true);
+	HeroSkillTargetDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+
+	if (HeroSkillDefaultTargetDecalMaterial)
+	{
+		HeroSkillTargetDecal->SetDecalMaterial(HeroSkillDefaultTargetDecalMaterial);
+	}
+}
+
+void ATWPlayerController::ShowHeroSkillTargetDecal(float InRadius)
+{
+	EnsureHeroSkillTargetDecal();
+
+	if (!HeroSkillTargetDecal)
+	{
+		return;
+	}
+
+	HeroSkillTargetDecalRadius = InRadius;
+	HeroSkillTargetDecal->DecalSize = FVector(FMath::Max(16.f, InRadius), FMath::Max(16.f, InRadius), FMath::Max(16.f, InRadius));
+	HeroSkillTargetDecal->SetVisibility(true);
+	HeroSkillTargetDecal->SetHiddenInGame(false);
+}
+
+void ATWPlayerController::HideHeroSkillTargetDecal()
+{
+	if (!HeroSkillTargetDecal)
+	{
+		return;
+	}
+
+	HeroSkillTargetDecal->SetVisibility(false);
+	HeroSkillTargetDecal->SetHiddenInGame(true);
+}
+
+void ATWPlayerController::UpdateHeroSkillTargetDecal(const FVector& InWorldLocation)
+{
+	if (!HeroSkillTargetDecal || !bHeroSkillTargetingMode)
+	{
+		return;
+	}
+
+	const FVector DecalLocation = InWorldLocation + FVector(0.f, 0.f, 10.f);
+	HeroSkillTargetDecal->SetWorldLocation(DecalLocation);
+	HeroSkillTargetDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+}
+
+float ATWPlayerController::ResolveHeroSkillTargetRadius(FName InHeroUnitId) const
+{
+	const FTWHeroTableRowBase* HeroSkillRow = FindHeroSkillRow(InHeroUnitId);
+	if (!HeroSkillRow)
+	{
+		return HeroSkillDefaultTargetDecalRadius;
+	}
+
+	if (HeroSkillRow->TargetDecalRadius > 0.f)
+	{
+		return HeroSkillRow->TargetDecalRadius;
+	}
+
+	if (HeroSkillRow->DamageRadius > 0.f)
+	{
+		return HeroSkillRow->DamageRadius;
+	}
+
+	if (HeroSkillRow->SkillRange > 0.f)
+	{
+		return HeroSkillRow->SkillRange;
+	}
+
+	return HeroSkillDefaultTargetDecalRadius;
+}
+
+float ATWPlayerController::ResolveHeroSkillDamageRadius(const FTWHeroTableRowBase* InHeroSkillRow) const
+{
+	if (!InHeroSkillRow)
+	{
+		return HeroSkillDefaultTargetDecalRadius;
+	}
+
+	if (InHeroSkillRow->DamageRadius > 0.f)
+	{
+		return InHeroSkillRow->DamageRadius;
+	}
+
+	if (InHeroSkillRow->TargetDecalRadius > 0.f)
+	{
+		return InHeroSkillRow->TargetDecalRadius;
+	}
+
+	if (InHeroSkillRow->SkillRange > 0.f)
+	{
+		return InHeroSkillRow->SkillRange;
+	}
+
+	return HeroSkillDefaultTargetDecalRadius;
+}
+
+float ATWPlayerController::ResolveHeroSkillAcquireRadius(const FTWHeroTableRowBase* InHeroSkillRow) const
+{
+	if (!InHeroSkillRow)
+	{
+		return HeroSkillDefaultTargetDecalRadius;
+	}
+
+	if (InHeroSkillRow->TargetAcquireRadius > 0.f)
+	{
+		return InHeroSkillRow->TargetAcquireRadius;
+	}
+
+	if (InHeroSkillRow->TargetDecalRadius > 0.f)
+	{
+		return InHeroSkillRow->TargetDecalRadius;
+	}
+
+	if (InHeroSkillRow->SkillRange > 0.f)
+	{
+		return InHeroSkillRow->SkillRange;
+	}
+
+	return HeroSkillDefaultTargetDecalRadius;
+}
+
+float ATWPlayerController::ResolveHeroSkillImpactRadius(const FTWHeroTableRowBase* InHeroSkillRow) const
+{
+	if (!InHeroSkillRow)
+	{
+		return HeroSkillDefaultTargetDecalRadius;
+	}
+
+	if (InHeroSkillRow->ImpactDecalRadius > 0.f)
+	{
+		return InHeroSkillRow->ImpactDecalRadius;
+	}
+
+	return ResolveHeroSkillDamageRadius(InHeroSkillRow);
+}
+
+float ATWPlayerController::ResolveHeroSkillImpactLifeTime(const FTWHeroTableRowBase* InHeroSkillRow) const
+{
+	if (InHeroSkillRow && InHeroSkillRow->ImpactDecalLifeTime > 0.f)
+	{
+		return InHeroSkillRow->ImpactDecalLifeTime;
+	}
+
+	return HeroSkillDefaultImpactDecalLifeTime;
+}
+
+UMaterialInterface* ATWPlayerController::ResolveHeroSkillTargetDecalMaterial(FName InHeroUnitId) const
+{
+	const FTWHeroTableRowBase* HeroSkillRow = FindHeroSkillRow(InHeroUnitId);
+	if (HeroSkillRow && HeroSkillRow->TargetDecalMaterial)
+	{
+		return HeroSkillRow->TargetDecalMaterial;
+	}
+
+	return HeroSkillDefaultTargetDecalMaterial;
+}
+
+UMaterialInterface* ATWPlayerController::ResolveHeroSkillImpactDecalMaterial(FName InHeroUnitId) const
+{
+	const FTWHeroTableRowBase* HeroSkillRow = FindHeroSkillRow(InHeroUnitId);
+	if (HeroSkillRow && HeroSkillRow->ImpactDecalMaterial)
+	{
+		return HeroSkillRow->ImpactDecalMaterial;
+	}
+
+	return HeroSkillDefaultImpactDecalMaterial ? HeroSkillDefaultImpactDecalMaterial : HeroSkillDefaultTargetDecalMaterial;
+}
+
+void ATWPlayerController::ApplyHeroSkillTargetDecalStyle(FName InHeroUnitId, float InRadius)
+{
+	EnsureHeroSkillTargetDecal();
+
+	if (!HeroSkillTargetDecal)
+	{
+		return;
+	}
+
+	if (UMaterialInterface* DecalMaterial = ResolveHeroSkillTargetDecalMaterial(InHeroUnitId))
+	{
+		HeroSkillTargetDecal->SetDecalMaterial(DecalMaterial);
+	}
+
+	ShowHeroSkillTargetDecal(InRadius);
+}
+
+void ATWPlayerController::ClientPlayHeroSkillFX_Implementation(
+	FName InHeroUnitId,
+	FVector InStartLocation,
+	FVector InTargetLocation,
+	float InRadius)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FTWHeroTableRowBase* HeroSkillRow = FindHeroSkillRow(InHeroUnitId);
+	const float EffectRadius = InRadius > 0.f ? InRadius : ResolveHeroSkillImpactRadius(HeroSkillRow);
+
+	if (HeroSkillRow && HeroSkillRow->ImpactNiagaraFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			World,
+			HeroSkillRow->ImpactNiagaraFX,
+			InTargetLocation,
+			FRotator::ZeroRotator
+		);
+	}
+
+	if (HeroSkillRow && HeroSkillRow->ImpactParticleFX)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(
+			World,
+			HeroSkillRow->ImpactParticleFX,
+			FTransform(FRotator::ZeroRotator, InTargetLocation)
+		);
+	}
+
+	if (InHeroUnitId == TEXT("Markman"))
+	{
+		if (!HeroSkillRow || !HeroSkillRow->ProjectileClass)
+		{
+			DrawDebugLine(World, InStartLocation, InTargetLocation, FColor::Yellow, false, 0.5f, 0, 2.5f);
+			return;
+		}
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		AActor* SpawnedActor = World->SpawnActor<AActor>(
+			HeroSkillRow->ProjectileClass,
+			InStartLocation,
+			(InTargetLocation - InStartLocation).Rotation(),
+			SpawnParams
+		);
+
+		if (ATWHeroProjectile* HeroProjectile = Cast<ATWHeroProjectile>(SpawnedActor))
+		{
+			HeroProjectile->InitializeVisualProjectile(InTargetLocation);
+		}
+		else if (!SpawnedActor)
+		{
+			DrawDebugLine(World, InStartLocation, InTargetLocation, FColor::Yellow, false, 0.5f, 0, 2.5f);
+		}
+
+		return;
+	}
+
+	if (UMaterialInterface* ImpactMaterial = ResolveHeroSkillImpactDecalMaterial(InHeroUnitId))
+	{
+		UGameplayStatics::SpawnDecalAtLocation(
+			World,
+			ImpactMaterial,
+			FVector(32.f, EffectRadius, EffectRadius),
+			InTargetLocation + FVector(0.f, 0.f, 10.f),
+			FRotator(-90.f, 0.f, 0.f),
+			ResolveHeroSkillImpactLifeTime(HeroSkillRow)
+		);
+	}
+
+	const bool bShouldDrawDebug = (HeroSkillRow && HeroSkillRow->bUseSkillDebugDraw) || bDrawHeroSkillDebug;
+	if (bShouldDrawDebug)
+	{
+		DrawDebugSphere(
+			World,
+			InTargetLocation + FVector(0.f, 0.f, 25.f),
+			EffectRadius,
+			48,
+			FColor::Cyan,
+			false,
+			1.25f,
+			0,
+			2.0f
+		);
+
+		DrawDebugCircle(
+			World,
+			InTargetLocation + FVector(0.f, 0.f, 10.f),
+			EffectRadius,
+			64,
+			FColor::Green,
+			false,
+			1.25f,
+			0,
+			2.0f,
+			FVector(1.f, 0.f, 0.f),
+			FVector(0.f, 1.f, 0.f),
+			false
+		);
+	}
+}
+
+void ATWPlayerController::NotifyAllPlayersHeroSkillFX(
+	FName InHeroUnitId,
+	const FVector& InStartLocation,
+	const FVector& InTargetLocation,
+	float InRadius) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TargetPC = Cast<ATWPlayerController>(It->Get());
+		if (!TargetPC)
+		{
+			continue;
+		}
+
+		TargetPC->ClientPlayHeroSkillFX(InHeroUnitId, InStartLocation, InTargetLocation, InRadius);
+	}
+}
+
+void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLocation, FName InHeroUnitId)
+{
+	if (!HasAuthority() || !GetWorld())
+	{
+		return;
+	}
+
+	if (GetWorld()->GetTimeSeconds() < ServerHeroSkillCooldownEndTime)
+	{
+		return;
+	}
+
+	const FName HeroUnitId = InHeroUnitId;
+	if (HeroUnitId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroUnitId is None"));
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] UnitId=%s"), *HeroUnitId.ToString());
+
+	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!UnitSubsystem || !PS)
+	{
+		return;
+	}
+
+	FMassEntityHandle HeroEntity;
+	if (!TryFindOwnedHeroEntityByUnitId(HeroUnitId, HeroEntity))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroEntity not found for UnitId=%s"), *HeroUnitId.ToString());
+		return;
+	}
+
+	const FTWHeroTableRowBase* HeroRow = FindHeroSkillRow(HeroUnitId);
+	if (!HeroRow)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroRow not found: %s"), *HeroUnitId.ToString());
+		return;
+	}
+
+	FVector HeroLocation = FVector::ZeroVector;
+	if (!UnitSubsystem->TryGetUnitWorldLocation(HeroEntity, HeroLocation))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] hero location resolve failed"));
+		return;
+	}
+
+	const FTWUnitStatus HeroRuntimeStatus = UnitSubsystem->GetUnitCurrentStatus(HeroEntity, PS->PlayerSlot);
+	const float BaseDamage = HeroRuntimeStatus.GetStatus(ETWStatusType::Damage);
+	const float SkillDamage = FMath::Max(1.f, BaseDamage * HeroRow->SkillMultiplier);
+
+	if (HeroUnitId == TEXT("DragonKnight"))
+	{
+		TArray<ETWStatusType> TargetStatuses = {
+			ETWStatusType::Damage,
+			ETWStatusType::Armor,
+			ETWStatusType::AttackSpeed,
+			ETWStatusType::MoveSpeed
+		};
+
+		UnitSubsystem->ApplyTemporaryMultiplierBuffToFriendlyUnits(
+			HeroLocation,
+			ResolveHeroSkillDamageRadius(HeroRow),
+			PS->PlayerSlot,
+			HeroRow->StatMultiplier,
+			HeroRow->BuffDuration,
+			TargetStatuses,
+			true
+		);
+
+
+		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
+		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
+		ClientRefreshSelectedUnitStatusAndUI();
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[HeroSkill][Server] DragonKnight buff applied | Radius=%.1f Multiplier=%.2f Duration=%.1f"),
+			ResolveHeroSkillDamageRadius(HeroRow),
+			HeroRow->StatMultiplier,
+			HeroRow->BuffDuration
+		);
+		return;
+	}
+
+	if (HeroUnitId == TEXT("Astrologian"))
+	{
+		const float AreaRadius = ResolveHeroSkillDamageRadius(HeroRow);
+
+		TArray<FMassEntityHandle> EnemyEntities;
+		int32 HitUnitCount = 0;
+		int32 HitBuildingCount = 0;
+
+		if (UnitSubsystem->GetEnemyEntitiesInRadius(
+			InTargetLocation,
+			AreaRadius,
+			PS->PlayerSlot,
+			EnemyEntities))
+		{
+			for (const FMassEntityHandle& EnemyEntity : EnemyEntities)
+			{
+				if (UnitSubsystem->TryApplyDamageToEntity(EnemyEntity, SkillDamage))
+				{
+					HitUnitCount++;
+					NotifyAllPlayersUnitDamaged(EnemyEntity);
+				}
+			}
+		}
+
+		for (TActorIterator<ATWBaseBuilding> It(GetWorld()); It; ++It)
+		{
+			ATWBaseBuilding* Building = *It;
+			if (!IsValid(Building))
+			{
+				continue;
+			}
+
+			if (Building->OwnerPlayerSlot == PS->PlayerSlot)
+			{
+				continue;
+			}
+
+			const float DistSq = FVector::DistSquared2D(Building->GetActorLocation(), InTargetLocation);
+			if (DistSq > FMath::Square(AreaRadius))
+			{
+				continue;
+			}
+
+			if (TryApplyDamageToBuilding(Building, SkillDamage))
+			{
+				HitBuildingCount++;
+				NotifyAllPlayersBuildingDamaged(Building);
+			}
+		}
+
+		NotifyAllPlayersHeroSkillFX(HeroUnitId, HeroLocation, InTargetLocation, AreaRadius);
+
+		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
+		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
+		ClientRefreshSelectedUnitStatusAndUI();
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[HeroSkill][Server] Astrologian area damage | Target=%s Radius=%.1f Damage=%.1f UnitHits=%d BuildingHits=%d"),
+			*InTargetLocation.ToString(),
+			AreaRadius,
+			SkillDamage,
+			HitUnitCount,
+			HitBuildingCount
+		);
+
+		return;
+	}
+
+	if (HeroUnitId == TEXT("Markman"))
+	{
+		FMassEntityHandle TargetEntity;
+		ATWBaseBuilding* TargetBuilding = nullptr;
+		const float AcquireRadius = ResolveHeroSkillAcquireRadius(HeroRow);
+		FVector FinalTargetLocation = InTargetLocation;
+		bool bHasTargetEntity = false;
+		bool bHasTargetBuilding = false;
+
+		if (UnitSubsystem->FindNearestEnemyEntityAroundLocation(
+			InTargetLocation,
+			AcquireRadius,
+			PS->PlayerSlot,
+			TargetEntity))
+		{
+			bHasTargetEntity = true;
+			if (UnitSubsystem->TryApplyDamageToEntity(TargetEntity, SkillDamage))
+			{
+				NotifyAllPlayersUnitDamaged(TargetEntity);
+			}
+
+			FVector TargetEntityLocation = FVector::ZeroVector;
+			if (UnitSubsystem->TryGetUnitWorldLocation(TargetEntity, TargetEntityLocation))
+			{
+				FinalTargetLocation = TargetEntityLocation;
+			}
+		}
+		else
+		{
+			FTWAttackableBuildingCandidate BuildingCandidate;
+			if (UnitSubsystem->FindNearestEnemyBuildingCandidate(InTargetLocation, PS->PlayerSlot, BuildingCandidate, AcquireRadius))
+			{
+				TargetBuilding = BuildingCandidate.Building.Get();
+				if (IsValid(TargetBuilding) && TryApplyDamageToBuilding(TargetBuilding, SkillDamage))
+				{
+					bHasTargetBuilding = true;
+					FinalTargetLocation = BuildingCandidate.TargetLocation;
+					NotifyAllPlayersBuildingDamaged(TargetBuilding);
+				}
+			}
+		}
+
+		const FVector ProjectileSpawnLocation = HeroLocation + FVector(0.f, 0.f, HeroRow ? HeroRow->ProjectileSpawnZOffset : 50.f);
+		NotifyAllPlayersHeroSkillFX(HeroUnitId, ProjectileSpawnLocation, FinalTargetLocation, 0.f);
+
+		if (!HeroRow->ProjectileClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[HeroSkill][Server] ProjectileClass NULL | UnitId=%s"), *HeroUnitId.ToString());
+		}
+
+		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
+		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
+		ClientRefreshSelectedUnitStatusAndUI();
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[HeroSkill][Server] Markman damage applied | UnitTarget=%s BuildingTarget=%s TargetPoint=%s SearchRadius=%.1f Damage=%.1f"),
+			bHasTargetEntity ? TEXT("true") : TEXT("false"),
+			bHasTargetBuilding ? TEXT("true") : TEXT("false"),
+			*FinalTargetLocation.ToString(),
+			AcquireRadius,
+			SkillDamage
+		);
+		return;
+	}
+}
+void ATWPlayerController::BeginHeroSkillTargeting(FName InHeroUnitId)
+{
+	bHeroSkillTargetingMode = true;
+	PendingHeroSkillUnitId = InHeroUnitId;
+
+	const float TargetRadius = ResolveHeroSkillTargetRadius(InHeroUnitId);
+	ApplyHeroSkillTargetDecalStyle(InHeroUnitId, TargetRadius);
+	UpdateHeroSkillTargetDecal(GetMouseWorldLocation());
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[HeroSkill] Targeting Start: %s / Radius=%.1f"),
+		*InHeroUnitId.ToString(),
+		TargetRadius
+	);
+}
+
+void ATWPlayerController::ConfirmHeroSkillTargeting()
+{
+	if (!bHeroSkillTargetingMode)
+	{
+		return;
+	}
+
+	const FVector TargetLocation = GetMouseWorldLocation();
+	const FName HeroUnitId = PendingHeroSkillUnitId;
+
+	if (HeroUnitId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill] Confirm failed: PendingHeroSkillUnitId is None"));
+		HideHeroSkillTargetDecal();
+		bHeroSkillTargetingMode = false;
+		PendingHeroSkillUnitId = NAME_None;
+		return;
+	}
+
+	ServerUseHeroSkill(TargetLocation, HeroUnitId);
+
+	HideHeroSkillTargetDecal();
+
+	bHeroSkillTargetingMode = false;
+	PendingHeroSkillUnitId = NAME_None;
+}
+
+void ATWPlayerController::CancelHeroSkillTargeting()
+{
+	HideHeroSkillTargetDecal();
+
+	bHeroSkillTargetingMode = false;
+	PendingHeroSkillUnitId = NAME_None;
+}
+void ATWPlayerController::UpdateHeroSkillTargeting()
+{
+	if (!bHeroSkillTargetingMode)
+	{
+		return;
+	}
+
+	const FVector TargetLocation = GetMouseWorldLocation();
+	UpdateHeroSkillTargetDecal(TargetLocation);
+}
 ATWHeroUnitBase* ATWPlayerController::GetOwnedHeroUnit() const
 {
 	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
@@ -1528,6 +2445,54 @@ ATWHeroUnitBase* ATWPlayerController::GetOwnedHeroUnit() const
 	}
 
 	return nullptr;
+}
+
+float ATWPlayerController::GetHeroSkillRemainingCooldownTime() const
+{
+	if (!GetWorld())
+	{
+		return 0.f;
+	}
+
+	const float Remaining = LocalHeroSkillCooldownEndTime - GetWorld()->GetTimeSeconds();
+	return FMath::Max(0.f, Remaining);
+}
+
+bool ATWPlayerController::IsHeroSkillReady() const
+{
+	return GetHeroSkillRemainingCooldownTime() <= KINDA_SMALL_NUMBER;
+}
+
+void ATWPlayerController::ClientNotifyHeroSkillCooldown_Implementation(float InDuration)
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	LocalHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.f, InDuration);
+	RefreshUIBridge();
+}
+
+void ATWPlayerController::ClientRefreshSelectedUnitStatusAndUI_Implementation()
+{
+	RefreshLocalPrimarySelectedUnitStatus();
+	RefreshUIBridge();
+
+	if (UWorld* World = GetWorld())
+	{
+		FTimerHandle DeferredRefreshHandle;
+		World->GetTimerManager().SetTimer(
+			DeferredRefreshHandle,
+			[this]()
+			{
+				RefreshLocalPrimarySelectedUnitStatus();
+				RefreshUIBridge();
+			},
+			0.1f,
+			false
+		);
+	}
 }
 
 bool ATWPlayerController::IsOwnedHeroCurrentlySelected() const
@@ -2476,19 +3441,27 @@ void ATWPlayerController::HandleCommandById(FName CommandId)
 	}
 	if (CommandId == TEXT("HeroSkill"))
 	{
-		ATWHeroUnitBase* OwnedHero = GetOwnedHeroUnit();
-		if (!OwnedHero || !IsOwnedHeroCurrentlySelected())
+		FName SelectedHeroUnitId = NAME_None;
+		if (!TryGetSelectedHeroUnitId(SelectedHeroUnitId))
 		{
 			return;
 		}
 
-		if (OwnedHero->GetRemainingCooldownTime() > KINDA_SMALL_NUMBER)
+		if (!IsHeroSkillReady())
 		{
 			return;
 		}
 
-		OwnedHero->UseSkill();
-		RefreshUIBridge();
+		// 타겟팅 필요한 영웅
+		if (SelectedHeroUnitId == TEXT("Markman") ||
+			SelectedHeroUnitId == TEXT("Astrologian"))
+		{
+			BeginHeroSkillTargeting(SelectedHeroUnitId);
+			return;
+		}
+
+		// 즉시 시전 (DragonKnight)
+		ServerUseHeroSkill(GetMouseWorldLocation(), SelectedHeroUnitId);
 		return;
 	}
 	if (!CanExecuteCommand(CommandMeta, CommandId))

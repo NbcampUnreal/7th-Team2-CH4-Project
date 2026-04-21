@@ -22,6 +22,12 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_RequestStartGame();
 	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SetLobbyNickname(const FString& InNickname);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SetSelectedHeroUnitId(FName InHeroUnitId);
+	
 	void ExitLobby();
 	
 	UPROPERTY()

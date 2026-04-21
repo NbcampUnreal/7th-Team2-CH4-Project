@@ -4,7 +4,6 @@
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingTypes.h"
 #include "TimerManager.h"
-
 void ATWNexusBuilding::BeginPlay()
 {
 	Super::BeginPlay();
@@ -15,7 +14,7 @@ void ATWNexusBuilding::BeginPlay()
 	}
 
 	StartHPRegen();
-	
+
 	if (OwningPlayerState)
 	{
 		StartWoodProduction();
@@ -47,7 +46,7 @@ void ATWNexusBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 	{
 		return;
 	}
-	
+
 	if (InDamageAmount <= 0.0f)
 	{
 		return;
@@ -57,7 +56,7 @@ void ATWNexusBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 	{
 		return;
 	}
-	
+
 	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Damage : %.2f / %.2f"), CurrentHP, MaxHP);
 
 	const UTWNexusBuildingDataAsset* NexusData = GetNexusBuildingData();
@@ -97,7 +96,7 @@ void ATWNexusBuilding::StartHPRegen()
 		return;
 	}
 
-	if (CurrentHP <= 0)
+	if (CurrentHP <= 0.0f)
 	{
 		return;
 	}
@@ -129,7 +128,7 @@ void ATWNexusBuilding::HandleHPRegen()
 		return;
 	}
 
-	if (CurrentHP <= 0)
+	if (CurrentHP <= 0.0f)
 	{
 		GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
 		return;
@@ -142,7 +141,7 @@ void ATWNexusBuilding::HandleHPRegen()
 	{
 		GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
 	}
-	
+
 	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Regen : %.2f / %.2f"), CurrentHP, MaxHP);
 }
 
@@ -206,7 +205,7 @@ void ATWNexusBuilding::HandleWoodProduction()
 		return;
 	}
 
-	if (CurrentHP <= 0)
+	if (CurrentHP <= 0.0f)
 	{
 		return;
 	}
@@ -222,7 +221,7 @@ void ATWNexusBuilding::HandleDestroyedByDamage()
 	}
 
 	ClearAllBuildingTimers();
-	
+
 	if (ATWGameMode* TWGameMode = GetWorld()->GetAuthGameMode<ATWGameMode>())
 	{
 		TWGameMode->HandlePlayerDefeat(OwnerPlayerSlot);
@@ -237,4 +236,9 @@ void ATWNexusBuilding::ClearAllBuildingTimers()
 	GetWorldTimerManager().ClearTimer(RegenDelayTimerHandle);
 	GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
 	GetWorldTimerManager().ClearTimer(WoodProductionTimerHandle);
+}
+
+FVector ATWNexusBuilding::GetHeroSpawnLocation(float ForwardDistance) const
+{
+	return GetActorLocation() + (GetActorForwardVector() * ForwardDistance);
 }

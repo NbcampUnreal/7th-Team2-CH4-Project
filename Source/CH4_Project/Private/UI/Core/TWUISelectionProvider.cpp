@@ -250,25 +250,14 @@ FOnUISelectionChanged& UTWUISelectionProvider::GetOnSelectionChangedDelegate()
 void UTWUISelectionProvider::SeedDefaultCommandMap()
 {
 	EntityCommandMap.Reset();
-
-	EntityCommandMap.Add(TEXT("Engineer"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold"), TEXT("BuildMenu") });
-	EntityCommandMap.Add(TEXT("Barracks"), { TEXT("TrainFootman"), TEXT("TrainArcher") });
-	EntityCommandMap.Add(TEXT("Footman"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold") });
-	EntityCommandMap.Add(TEXT("Archer"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold") });
+	EntityCommandMap.Add(TEXT("DragonKnight"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold"), TEXT("HeroSkill") });
+	EntityCommandMap.Add(TEXT("Markman"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold"), TEXT("HeroSkill") });
+	EntityCommandMap.Add(TEXT("Astrologian"), { TEXT("Move"), TEXT("Attack"), TEXT("Hold"), TEXT("HeroSkill") });
 }
 
 void UTWUISelectionProvider::SeedDefaultContextCommandMap()
 {
 	ContextCommandMap.Reset();
-
-	ContextCommandMap.Add(
-		TEXT("Build"),
-		{
-			TEXT("BuildBarracks"),
-			TEXT("BuildArcheryRange"),
-			TEXT("Back")
-		}
-	);
 }
 
 void UTWUISelectionProvider::ResetCommandContext()

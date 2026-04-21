@@ -14,7 +14,8 @@ class CH4_PROJECT_API ATWNexusBuilding : public ATWBaseBuilding
 public:
 	virtual void BeginPlay() override;
 	virtual void ApplyDamageToBuilding(const float InDamageAmount) override;
-
+	UFUNCTION(BlueprintCallable, Category="Nexus|Spawn")
+	FVector GetHeroSpawnLocation(float ForwardDistance = 350.0f) const;
 protected:
 	FTimerHandle RegenDelayTimerHandle;
 	FTimerHandle RegenTickTimerHandle;
@@ -25,7 +26,7 @@ protected:
 
 	void StartHPRegen();
 	void HandleHPRegen();
-	
+
 	void StartWoodProduction();
 	void HandleWoodProduction();
 

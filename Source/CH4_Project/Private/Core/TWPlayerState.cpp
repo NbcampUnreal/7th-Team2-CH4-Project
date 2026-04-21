@@ -5,6 +5,7 @@
 #include "Component/TWTeamComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Building/TWTroopSpawnBuilding.h"
+#include "Building/TWNexusBuilding.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Subsystems/TWUnitSubsystem.h"
@@ -34,13 +35,82 @@ ATWPlayerState::ATWPlayerState()
 
 void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
 {
+	const int32 PrevSlot = PlayerSlot;
 	PlayerSlot = InPlayerSlot;
 
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[PlayerState] SetPlayerSlot ENTER | PS=%s | PrevSlot=%d | NewSlot=%d | HasAuthority=%d | World=%s"),
+		*GetNameSafe(this),
+		PrevSlot,
+		PlayerSlot,
+		HasAuthority() ? 1 : 0,
+		*GetNameSafe(GetWorld())
+	);
+
 	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[PlayerState] SetPlayerSlot | UnitSubsystem=%s"),
+		IsValid(UnitSubsystem) ? TEXT("Valid") : TEXT("Null")
+	);
+
 	if (IsValid(UnitSubsystem))
 	{
 		UnitSubsystem->AddPlayer(PlayerSlot);
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[PlayerState] AddPlayer CALLED | Slot=%d"),
+			PlayerSlot
+		);
 	}
+	else
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[PlayerState] AddPlayer SKIPPED | Slot=%d | Reason=UnitSubsystemNull"),
+			PlayerSlot
+		);
+	}
+}
+void ATWPlayerState::SetLobbyNickname(const FString& InNickname)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	LobbyNickname = InNickname.Left(24).TrimStartAndEnd();
+	if (!LobbyNickname.IsEmpty())
+	{
+		SetPlayerName(LobbyNickname);
+	}
+}
+
+void ATWPlayerState::SetSelectedHeroUnitId(FName InHeroUnitId)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	SelectedHeroUnitId = InHeroUnitId;
+}
+
+void ATWPlayerState::SetAssignedStartNexus(ATWNexusBuilding* InNexus)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AssignedStartNexus = InNexus;
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
@@ -485,6 +555,9 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, ReplicatedWoodUpkeep);
 	DOREPLIFETIME(ATWPlayerState, ReplicatedOreUpkeep);
 	DOREPLIFETIME(ATWPlayerState, GameResult);
+	DOREPLIFETIME(ATWPlayerState, LobbyNickname);
+	DOREPLIFETIME(ATWPlayerState, SelectedHeroUnitId);
+	DOREPLIFETIME(ATWPlayerState, AssignedStartNexus);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()

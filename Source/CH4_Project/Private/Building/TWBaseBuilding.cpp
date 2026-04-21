@@ -19,7 +19,7 @@ ATWBaseBuilding::ATWBaseBuilding()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	
 	bReplicates = true;
-	SetReplicatingMovement(false);
+	SetReplicateMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
@@ -56,7 +56,12 @@ void ATWBaseBuilding::PostInitializeComponents()
 void ATWBaseBuilding::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (TeamComponent)
+	{
+		TeamComponent->SetTeamID(OwnerPlayerSlot);
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		if (UTWGridSubSystem* GridSub = World->GetSubsystem<UTWGridSubSystem>())
@@ -66,7 +71,7 @@ void ATWBaseBuilding::BeginPlay()
 			GridSub->OccupyArea(Anchor, Size, this);
 		}
 	}
-	
+
 	if (UWorld* World = GetWorld())
 	{
 		if (auto* BuildingManager = World->GetSubsystem<UTWBuildingManagerSubsystem>())
@@ -74,7 +79,7 @@ void ATWBaseBuilding::BeginPlay()
 			BuildingManager->RegisterBuilding(OwnerPlayerSlot, this);
 		}
 	}
-	
+
 	if (!HasAuthority())
 	{
 		return;
@@ -88,7 +93,7 @@ void ATWBaseBuilding::BeginPlay()
 	MaxHP = FMath::Max(1.0f, BuildingData->MaxHP);
 	CurrentHP = MaxHP;
 	MaxBuildTime = BuildingData->BuildTime;
-	
+
 	if (MaxBuildTime > 0.0f)
 	{
 		StartConstruction();
@@ -98,6 +103,24 @@ void ATWBaseBuilding::BeginPlay()
 		CurrentHP = MaxHP;
 		BuildingState = ETWBuildingState::Completed;
 		OnRep_BuildingState();
+	}
+}
+
+void ATWBaseBuilding::OnRep_OwnerPlayerSlot()
+{
+	if (TeamComponent)
+	{
+		TeamComponent->SetTeamID(OwnerPlayerSlot);
+	}
+
+	if (TeamColorComponent)
+	{
+		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
+
+		if (BuildingState == ETWBuildingState::UnderConstruction)
+		{
+			OnRep_BuildingState();
+		}
 	}
 }
 
@@ -269,19 +292,6 @@ void ATWBaseBuilding::HandleDestroyedByDamage()
 	}
 
 	Destroy();
-}
-
-void ATWBaseBuilding::OnRep_OwnerPlayerSlot()
-{
-	if (TeamColorComponent)
-	{
-		TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
-		
-		if (BuildingState == ETWBuildingState::UnderConstruction)
-		{
-			OnRep_BuildingState();
-		}
-	}
 }
 
 void ATWBaseBuilding::OnRep_BuildingState()

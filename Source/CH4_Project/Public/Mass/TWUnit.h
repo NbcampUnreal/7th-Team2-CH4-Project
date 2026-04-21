@@ -29,9 +29,9 @@ protected:
 	virtual void PostInitializeComponents() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category=Component)
 	TObjectPtr<USceneComponent> SceneComponent;
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category=Component)
 	TObjectPtr<USkeletalMeshComponent> SkeletalMeshComponent;
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category=Component)
 	TObjectPtr<UMassAgentComponent> MassAgentComponent;

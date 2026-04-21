@@ -35,6 +35,12 @@ protected:
 	void OnLobbyExitButtonClicked();
 	
 public:
+	UFUNCTION(BlueprintCallable)
+	void SubmitNickname(const FString& InNickname);
+
+	UFUNCTION(BlueprintCallable)
+	void SelectHero(FName InHeroUnitId);
+	
 	UFUNCTION()
 	void UpdateUserList();
 	

@@ -98,6 +98,22 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	UE_LOG(LogTemp, Warning, TEXT("I'm Exit!"));
 }
 
+void UTWLobby_Layout::SubmitNickname(const FString& InNickname)
+{
+	if (ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LPC->Server_SetLobbyNickname(InNickname);
+	}
+}
+
+void UTWLobby_Layout::SelectHero(FName InHeroUnitId)
+{
+	if (ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer()))
+	{
+		LPC->Server_SetSelectedHeroUnitId(InHeroUnitId);
+	}
+}
+
 void UTWLobby_Layout::UpdateUserList()
 {
 	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
