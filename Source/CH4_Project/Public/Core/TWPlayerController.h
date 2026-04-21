@@ -44,15 +44,20 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_Debug = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputMappingContext> IMC_BuildingCommand = nullptr;
 
 	bool bUnitCommandContextActive = false;
 	bool bBuildContextActive = false;
 	bool bBuildShortcutModeActive = false;
+	bool bBuildingCommandContextActive = false;
 
 	void SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority, bool bShouldBeActive, bool& bCurrentActive);
 	void RefreshDynamicMappingContexts();
 	bool ShouldUseUnitCommandContext() const;
 	bool ShouldUseBuildContext() const;
+	bool ShouldUseBuildingCommandContext() const;
 
 #pragma region Input
 protected:
@@ -112,28 +117,26 @@ private:
 	bool HandleScreenEdgeScrolling(float DeltaSeconds);
 #pragma endregion
 
-#pragma region 병력 스폰 대기열
+#pragma region 병력 스폰 대기열 / 인구 수 대기열
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestSpawnTroop = nullptr;
+	TObjectPtr<UInputAction> QueueHotkeyQAction = nullptr;
 
-	UFUNCTION()
-	void HandleTestSpawnTroop(const FInputActionValue& Value);
-
-	UFUNCTION(Server, Reliable)
-	void ServerTestSpawnTroop();
-#pragma endregion
-
-#pragma region 인구 수 대기열
-protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_TestIncreasePopulation = nullptr;
+	TObjectPtr<UInputAction> QueueHotkeyWAction = nullptr;
 
-	UFUNCTION()
-	void HandleTestIncreasePopulation(const FInputActionValue& Value);
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyEAction = nullptr;
 
-	UFUNCTION(Server, Reliable)
-	void ServerTestIncreasePopulation();
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	TObjectPtr<UInputAction> QueueHotkeyAAction = nullptr;
+
+	void OnQueueHotkeyQ(const FInputActionValue& Value);
+	void OnQueueHotkeyW(const FInputActionValue& Value);
+	void OnQueueHotkeyE(const FInputActionValue& Value);
+	void OnQueueHotkeyA(const FInputActionValue& Value);
+	
+	void HandleBuildingProductionSlot(int32 SlotIndex);
 #pragma endregion
 
 #pragma region 넥서스 데미지
@@ -425,4 +428,16 @@ private:
 	FVector2D CurrentFrameRawMousePosition = FVector2D::ZeroVector;
 	bool bHasValidRawMousePositionThisFrame = false;
 	bool bWasEdgeScrollingLastFrame = false;
+	
+#pragma region Cheat
+	
+public:
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_CheatAddResource(EResourceType ResourceType, int32 Amount);
+	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_CheatTimeScale(float TimeMultiplier);
+	
+#pragma endregion
+	
 };

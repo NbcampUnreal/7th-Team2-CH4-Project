@@ -72,6 +72,7 @@ private:
 	int32 CapturingTeamID = -1;
 
 	// 영역 내 액터 관리
+	UPROPERTY()
 	TSet<AActor*> OverlappingActors;
 
 	// 델리게이트 함수

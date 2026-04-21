@@ -19,17 +19,34 @@ void UTWPlayerUIControllerComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!bEnableRealtimeSelectionRefresh)
-	{
-		return;
-	}
-
 	if (!OwnerController || !OwnerController->IsLocalController())
 	{
 		return;
 	}
 
 	if (!PlayerUIBridge)
+	{
+		return;
+	}
+	
+	if (bEnableRealtimeTopBarClockRefresh)
+	{
+		TopBarClockRefreshAccumulator += DeltaTime;
+
+		if (TopBarClockRefreshAccumulator >= TopBarClockRefreshInterval)
+		{
+			TopBarClockRefreshAccumulator = 0.0f;
+
+			const int32 CurrentElapsedSeconds = PlayerUIBridge->GetCurrentElapsedSeconds();
+			if (CurrentElapsedSeconds != LastRenderedTopBarSeconds)
+			{
+				LastRenderedTopBarSeconds = CurrentElapsedSeconds;
+				PlayerUIBridge->RefreshTopBarOnly();
+			}
+		}
+	}
+	
+	if (!bEnableRealtimeSelectionRefresh)
 	{
 		return;
 	}
@@ -213,5 +230,17 @@ bool UTWPlayerUIControllerComponent::IsPointerOverHUD() const
 	}
 
 	return HUDRoot->IsHovered();
+}
+
+bool UTWPlayerUIControllerComponent::TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const
+{
+	OutCommandId = NAME_None;
+
+	if (!PlayerUIBridge)
+	{
+		return false;
+	}
+
+	return PlayerUIBridge->TryGetVisibleCommandIdAtIndex(Index, OutCommandId);
 }
 

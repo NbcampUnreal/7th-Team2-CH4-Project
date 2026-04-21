@@ -33,6 +33,9 @@ public:
 private:
 	FTimerHandle CaptureTimerHandle;
 	
+    FVector GridOrigin;
+    FVector2D GridFullSize;
+	
 #pragma region Outline
 public:
 	void DrawCameraFrustum();

@@ -585,6 +585,24 @@ void UTWPlayerUIBridge::Initialize(
 	}
 }
 
+void UTWPlayerUIBridge::RefreshTopBarOnly()
+{
+	if (HUDCoordinator)
+	{
+		HUDCoordinator->RefreshTopBar();
+	}
+}
+
+int32 UTWPlayerUIBridge::GetCurrentElapsedSeconds() const
+{
+	if (!ResourceProvider)
+	{
+		return 0;
+	}
+
+	return ResourceProvider->GetElapsedSeconds();
+}
+
 void UTWPlayerUIBridge::RefreshAll()
 {
 	RefreshSelection();
@@ -666,6 +684,19 @@ bool UTWPlayerUIBridge::TryResolveCommandIdFromHotkey(const FKey& InKey, FName& 
 	}
 
 	return false;
+}
+
+bool UTWPlayerUIBridge::TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const
+{
+	OutCommandId = NAME_None;
+
+	if (!CurrentVisibleCommandIds.IsValidIndex(Index))
+	{
+		return false;
+	}
+
+	OutCommandId = CurrentVisibleCommandIds[Index];
+	return !OutCommandId.IsNone();
 }
 
 void UTWPlayerUIBridge::ResetContext()

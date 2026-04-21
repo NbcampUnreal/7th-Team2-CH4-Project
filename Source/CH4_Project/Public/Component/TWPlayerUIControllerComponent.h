@@ -52,6 +52,8 @@ public:
 	void RefreshBuildModeNotification();
 	bool IsPointerOverHUD() const;
 	UTWPlayerUIBridge* GetPlayerUIBridge() const { return PlayerUIBridge; }
+	
+	bool TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const;
 
 protected:
 	UPROPERTY()
@@ -88,4 +90,13 @@ protected:
 	float SelectionRefreshInterval = 0.30f;
 
 	float SelectionRefreshAccumulator = 0.0f;
+	
+	UPROPERTY(EditAnywhere, Category="UI|TopBar Refresh")
+	bool bEnableRealtimeTopBarClockRefresh = true;
+
+	UPROPERTY(EditAnywhere, Category="UI|TopBar Refresh", meta=(ClampMin="0.01"))
+	float TopBarClockRefreshInterval = 0.10f;
+
+	float TopBarClockRefreshAccumulator = 0.0f;
+	int32 LastRenderedTopBarSeconds = INDEX_NONE;
 };

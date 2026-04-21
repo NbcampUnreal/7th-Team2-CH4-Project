@@ -42,13 +42,16 @@ public:
 	void RefreshAll();
 	void RefreshSelection();
 	void RefreshResources();
+	void RefreshTopBarOnly();
+	int32 GetCurrentElapsedSeconds() const;
 
 	// 기존 외부 호환용. 현재 구조에서는 실질적으로 사용하지 않음.
 	bool HandleContextCommand(FName CommandId);
 
 	const FUICommandMetaRow* FindCommandMetaRow(FName CommandId) const;
 	bool TryResolveCommandIdFromHotkey(const FKey& InKey, FName& OutCommandId) const;
-
+	bool TryGetVisibleCommandIdAtIndex(int32 Index, FName& OutCommandId) const;
+	
 	// 기존 외부 호환용 no-op
 	void ResetContext();
 	void PushContext(FName InContextId);

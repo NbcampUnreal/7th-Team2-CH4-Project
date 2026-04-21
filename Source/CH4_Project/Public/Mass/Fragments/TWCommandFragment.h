@@ -53,7 +53,8 @@ struct CH4_PROJECT_API FTWCommandFragment : public FMassFragment
 	void SetTarget(const FMassEntityHandle& InTarget) { Target = InTarget; }
 	ATWBaseBuilding* GetTargetBuilding() const { return TargetBuilding.Get(); }
 	void SetTargetBuilding(ATWBaseBuilding* InTargetBuilding) { TargetBuilding = InTargetBuilding; }
-	
+	FVector GetMoveDestination() const { return MoveDestination; }
+	void SetMoveDestination(const FVector& InMoveDestination) { MoveDestination = InMoveDestination; }
 protected:
 	UPROPERTY(Transient)
 	ETWMassCommand Type = ETWMassCommand::None;
@@ -63,5 +64,8 @@ protected:
 	FMassEntityHandle Target;
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
+	UPROPERTY(Transient)
+	FVector MoveDestination = {0,0,0};
 };
+
 

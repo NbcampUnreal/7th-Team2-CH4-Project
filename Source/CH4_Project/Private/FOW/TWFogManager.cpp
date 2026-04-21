@@ -7,6 +7,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "TextureResource.h" // RenderTarget 읽기를 위해 필요
+#include "Core/TWPlayerController.h"
 
 ATWFogManager::ATWFogManager()
 {
@@ -133,11 +134,11 @@ void ATWFogManager::UpdateFog()
 
 void ATWFogManager::UpdateEnemyVisibility()
 {
-    APlayerController* PC = GetWorld()->GetFirstPlayerController();
-    if (!PC || !PC->IsLocalController()) return;
+    ATWPlayerController* TWPC = Cast<ATWPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (!TWPC || !TWPC->IsLocalController()) return;
 
-    ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
-    if (!PS || !CurrentFogRT) return;
+    ATWPlayerState* TWPS = TWPC->GetPlayerState<ATWPlayerState>();
+    if (!TWPS || !CurrentFogRT) return;
     
     FTextureResource* TextureResource = CurrentFogRT->GetResource();
     if (!TextureResource)
@@ -147,6 +148,12 @@ void ATWFogManager::UpdateEnemyVisibility()
     }
 
     FTextureRenderTargetResource* RenderTargetResource = static_cast<FTextureRenderTargetResource*>(TextureResource);
+    
+    // 현재 렌더타겟의 데이터를 CPU 메모리에 복사해둠
+    RenderTargetResource->ReadPixels(CachedFogPixels);
+    CachedRTSizeX = CurrentFogRT->SizeX;
+    CachedRTSizeY = CurrentFogRT->SizeY;
+    
     TArray<FColor> RawPixels;
     if (!RenderTargetResource->ReadPixels(RawPixels))
     {
@@ -156,7 +163,7 @@ void ATWFogManager::UpdateEnemyVisibility()
     TArray<AActor*> TaggedUnits;
     UGameplayStatics::GetAllActorsWithTag(GetWorld(), TEXT("Unit"), TaggedUnits);
 
-    int32 LocalPlayerTeamID = PS->PlayerSlot;
+    int32 LocalPlayerTeamID = TWPS->PlayerSlot;
     int32 RTSizeX = CurrentFogRT->SizeX;
     int32 RTSizeY = CurrentFogRT->SizeY;
 
@@ -193,4 +200,23 @@ void ATWFogManager::UpdateEnemyVisibility()
             }
         }
     }
+}
+
+// 건설 시 시야 확인을 위한 로직 
+bool ATWFogManager::IsLocationVisible(const FVector& WorldLocation)
+{
+    if (CachedFogPixels.Num() == 0) return true;
+
+    FVector2D UnitUV = WorldToUV(WorldLocation);
+    if (UnitUV.X < 0.f || UnitUV.X > 1.f || UnitUV.Y < 0.f || UnitUV.Y > 1.f) return false;
+
+    int32 PixelX = FMath::Clamp(static_cast<int32>(UnitUV.X * CachedRTSizeX), 0, CachedRTSizeX - 1);
+    int32 PixelY = FMath::Clamp(static_cast<int32>(UnitUV.Y * CachedRTSizeY), 0, CachedRTSizeY - 1);
+    int32 PixelIndex = (PixelY * CachedRTSizeX) + PixelX;
+
+    if (CachedFogPixels.IsValidIndex(PixelIndex))
+    {
+        return CachedFogPixels[PixelIndex].R > 25;
+    }
+    return false;
 }

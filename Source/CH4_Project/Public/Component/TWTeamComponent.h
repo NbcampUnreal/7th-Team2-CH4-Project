@@ -13,10 +13,12 @@ class CH4_PROJECT_API UTWTeamComponent : public UActorComponent
 public:    
 	UTWTeamComponent();
 	
+protected:
 	virtual void BeginPlay() override;
-
+	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
+public:
 	UFUNCTION()
 	void OnRep_TeamID();
 
@@ -30,5 +32,7 @@ protected:
 	// Replicated를 통해 동기화
 	UPROPERTY(ReplicatedUsing = OnRep_TeamID, EditAnywhere, BlueprintReadWrite, Category = "Team")
 	int32 TeamID = -1;
+	
+	uint8 bIsTeamInitialized : 1;
 
 };

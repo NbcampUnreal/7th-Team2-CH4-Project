@@ -12,6 +12,7 @@
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Replication/Agent/TWReplicatedAgent.h"
+#include "Runtime/MassEntity/Internal/MassArchetypeData.h"
 #if UE_REPLICATION_COMPILE_CLIENT_CODE
 void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
@@ -82,12 +83,39 @@ void FTWMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Added
 
 void FTWMassClientBubbleHandler::PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize)
 {
-	PostReplicatedChangeHelper(
-		ChangedIndices,
-		[this](const FMassEntityView& EntityView, const FTWReplicatedAgent& Item)
+
+	FMassEntityManager& EntityManager = Serializer->GetEntityManagerChecked();
+
+	UMassReplicationSubsystem* ReplicationSubsystem = Serializer->GetReplicationSubsystem();
+	check(ReplicationSubsystem);
+
+	// Go through the changed Entities and update their Mass data
+	for (int32 Idx : ChangedIndices)
+	{
+		const FTWMassFastArrayItem& ChangedItem = (*Agents)[Idx];
+
+		const FMassReplicationEntityInfo* EntityInfo = ReplicationSubsystem->FindMassEntityInfo(ChangedItem.Agent.GetNetID());
+
+		checkf(EntityInfo, TEXT("EntityInfo must be valid if the Agent has already been added (which it must have been to get PostReplicatedChange"));
+		checkf(EntityInfo->ReplicationID >= ChangedItem.ReplicationID, TEXT("ReplicationID out of sync, this should never happen!"));
+
+		// Currently we don't think this should be needed, but are leaving it in for bomb proofing.
+		if (ensure(EntityInfo->ReplicationID == ChangedItem.ReplicationID))
 		{
-			PostReplicatedChangeEntity(EntityView, Item);
-		});
+			const FMassArchetypeHandle ArchetypeHandle = EntityManager.GetArchetypeForEntity(EntityInfo->Entity);
+			if (!FMassArchetypeHelper::ArchetypeDataFromHandle(ArchetypeHandle))
+			{
+				continue;
+			}
+			
+			FMassEntityView EntityView(EntityManager, EntityInfo->Entity);
+			PostReplicatedChangeEntity(EntityView, ChangedItem.Agent);
+		}
+	}
+	
+	
+	
+	
 }
 
 void FTWMassClientBubbleHandler::PostReplicatedChangeEntity(const FMassEntityView& EntityView,

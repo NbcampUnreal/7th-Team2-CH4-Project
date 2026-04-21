@@ -3,6 +3,7 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/Canvas.h"
+#include "Subsystems/TWGridSubSystem.h"
 
 ATWMiniMap::ATWMiniMap()
 {
@@ -28,9 +29,23 @@ void ATWMiniMap::BeginPlay()
 		{
 			CaptureComp->TextureTarget = MinimapRT;
 		}
-		
-		CaptureComp->OrthoWidth = CaptureWidth;
-		
+
+		if (UTWGridSubSystem* GridSub = GetWorld()->GetSubsystem<UTWGridSubSystem>())
+		{
+			GridOrigin = GridSub->GetGridOrigin();
+			GridFullSize = GridSub->GetGridFullSize();
+
+			FVector CenterPos = GridOrigin + FVector(GridFullSize.X * 0.5f, GridFullSize.Y * 0.5f, 5000.f);
+			SetActorLocation(CenterPos);
+
+			CaptureWidth = GridFullSize.X;
+			CaptureComp->OrthoWidth = CaptureWidth;
+		}
+		else
+		{
+			CaptureComp->OrthoWidth = CaptureWidth;
+		}
+        
 		CaptureComp->bCaptureEveryFrame = false;
 		CaptureComp->bCaptureOnMovement = false;
 	}
