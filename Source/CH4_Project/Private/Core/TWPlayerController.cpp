@@ -433,6 +433,7 @@ void ATWPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	check(IsValid(LeftMouseAction));
 	check(IsValid(RightMouseAction));
+	check(IsValid(IA_Menu));
 
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
