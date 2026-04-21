@@ -148,6 +148,12 @@ void ATWFogManager::UpdateEnemyVisibility()
     }
 
     FTextureRenderTargetResource* RenderTargetResource = static_cast<FTextureRenderTargetResource*>(TextureResource);
+    
+    // 현재 렌더타겟의 데이터를 CPU 메모리에 복사해둠
+    RenderTargetResource->ReadPixels(CachedFogPixels);
+    CachedRTSizeX = CurrentFogRT->SizeX;
+    CachedRTSizeY = CurrentFogRT->SizeY;
+    
     TArray<FColor> RawPixels;
     if (!RenderTargetResource->ReadPixels(RawPixels))
     {
@@ -194,4 +200,23 @@ void ATWFogManager::UpdateEnemyVisibility()
             }
         }
     }
+}
+
+// 건설 시 시야 확인을 위한 로직 
+bool ATWFogManager::IsLocationVisible(const FVector& WorldLocation)
+{
+    if (CachedFogPixels.Num() == 0) return true;
+
+    FVector2D UnitUV = WorldToUV(WorldLocation);
+    if (UnitUV.X < 0.f || UnitUV.X > 1.f || UnitUV.Y < 0.f || UnitUV.Y > 1.f) return false;
+
+    int32 PixelX = FMath::Clamp(static_cast<int32>(UnitUV.X * CachedRTSizeX), 0, CachedRTSizeX - 1);
+    int32 PixelY = FMath::Clamp(static_cast<int32>(UnitUV.Y * CachedRTSizeY), 0, CachedRTSizeY - 1);
+    int32 PixelIndex = (PixelY * CachedRTSizeX) + PixelX;
+
+    if (CachedFogPixels.IsValidIndex(PixelIndex))
+    {
+        return CachedFogPixels[PixelIndex].R > 25;
+    }
+    return false;
 }

@@ -1,12 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
-#include "Subsystems/TWGridSubSystem.h"
+﻿#include "Subsystems/TWGridSubSystem.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "Landscape.h"
 #include "EngineUtils.h"
 #include "Log/TWLogCategory.h"
+#include "FOW/TWFogManager.h"
 
 void UTWGridSubSystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -151,6 +149,17 @@ FVector UTWGridSubSystem::GridToWorldPosition(const FIntPoint& GridLocation) con
 
 bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize) const
 {
+	// 안개 매니저를 찾아 시야 확인 준비
+	ATWFogManager* FogManager = nullptr;
+	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
+	{
+		if (ATWFogManager* FoundActor = *It)
+		{
+			FogManager = FoundActor;
+			break;
+		}
+	}
+	
 	for (int32 Y = 0; Y < BuildingSize.Y; Y++)
 	{
 		for (int32 X = 0; X < BuildingSize.X; X++)
@@ -160,6 +169,16 @@ bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint Building
 			if (!CanBuildAt(TargetGrid))
 			{
 				return false;
+			}
+			
+			// 건설하려는 그리드 지점이 안개 속인지 검사
+			if (FogManager)
+			{
+				FVector GridWorldPos = GridToWorldPosition(TargetGrid);
+				if (!FogManager->IsLocationVisible(GridWorldPos))
+				{
+					return false;
+				}
 			}
 		}
 	}
