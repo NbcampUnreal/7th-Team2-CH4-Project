@@ -30,7 +30,6 @@ void UTWOrientationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManag
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassDesiredMovementFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddConstSharedRequirement<FMassSmoothOrientationParameters>(EMassFragmentPresence::All);
 }
 
 void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
@@ -47,8 +46,6 @@ void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
 			return;
 		}
 		
-		const FMassSmoothOrientationParameters& OrientationParams = Context.GetConstSharedFragment<
-			FMassSmoothOrientationParameters>();
 
 		const TConstArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetFragmentView<
 			FMassMoveTargetFragment>();
@@ -117,7 +114,7 @@ void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
 				const FVector CurrentForward = CurrentTransform.GetRotation().GetForwardVector();
 				const FVector::FReal CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
 
-				const float EndOfPathAnticipationDistance = OrientationParams.EndOfPathDuration * MoveTarget.
+				const float EndOfPathAnticipationDistance = EndOfPathDuration * MoveTarget.
 					DesiredSpeed.
 					Get();
 
@@ -134,21 +131,21 @@ void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
 							FMath::Clamp(MoveTarget.DistanceToGoal / EndOfPathAnticipationDistance, 0.0f, 1.0f));
 						// zero at end of the path
 
-						MoveTargetWeight = FMath::Lerp(OrientationParams.Standing.MoveTargetWeight,
-						                               OrientationParams.Moving.MoveTargetWeight, Fade);
-						VelocityWeight = FMath::Lerp(OrientationParams.Standing.VelocityWeight,
-						                             OrientationParams.Moving.VelocityWeight, Fade);
+						MoveTargetWeight = FMath::Lerp(Standing.MoveTargetWeight,
+						                               Moving.MoveTargetWeight, Fade);
+						VelocityWeight = FMath::Lerp(Standing.VelocityWeight,
+						                             Moving.VelocityWeight, Fade);
 					}
 					else
 					{
-						MoveTargetWeight = OrientationParams.Moving.MoveTargetWeight;
-						VelocityWeight = OrientationParams.Moving.VelocityWeight;
+						MoveTargetWeight = Moving.MoveTargetWeight;
+						VelocityWeight = Moving.VelocityWeight;
 					}
 				}
 				else // Stand
 				{
-					MoveTargetWeight = OrientationParams.Standing.MoveTargetWeight;
-					VelocityWeight = OrientationParams.Standing.VelocityWeight;
+					MoveTargetWeight = Standing.MoveTargetWeight;
+					VelocityWeight = Standing.VelocityWeight;
 				}
 
 				const FVector::FReal VelocityHeading = UE::MassNavigation::GetYawFromDirection(
@@ -161,7 +158,7 @@ void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
 				DesiredMovement.DesiredFacing = FQuat(FVector::UpVector, DesiredHeading);
 
 				const FVector::FReal NewHeading = UE::MassNavigation::ExponentialSmoothingAngle(
-					CurrentHeading, DesiredHeading, DeltaTime, OrientationParams.OrientationSmoothingTime);
+					CurrentHeading, DesiredHeading, DeltaTime, OrientationSmoothingTime);
 
 				FQuat Rotation(FVector::UpVector, NewHeading);
 				CurrentTransform.SetRotation(Rotation);
