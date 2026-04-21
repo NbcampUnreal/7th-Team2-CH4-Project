@@ -64,6 +64,15 @@ public:
     void RegisterVision(UTWVisionComponent* Comp);
     void UnregisterVision(UTWVisionComponent* Comp);
     
+    // 시야 체크를 위해 캐싱된 픽셀 데이터
+    TArray<FColor> CachedFogPixels;
+    int32 CachedRTSizeX = 0;
+    int32 CachedRTSizeY = 0;
+    
+    // 월드 좌표를 받아 현재 시야 확보 여부를 반환
+    UFUNCTION(BlueprintPure, Category = "Fog")
+    bool IsLocationVisible(const FVector& WorldLocation);
+    
 private:
     void UpdateFog();
     
