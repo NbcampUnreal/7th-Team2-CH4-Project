@@ -14,6 +14,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWidget.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Widgets/TWAlertWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -45,6 +46,7 @@
 #include "Core/TWGameMode.h"
 #include "HeroUnit/TWHeroUnitBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "Log/TWLogCategory.h"
 
 namespace
 {
@@ -430,7 +432,7 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(LeftMouseAction));
 	check(IsValid(RightMouseAction));
 	check(IsValid(IA_Menu));
-
+	
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
@@ -2753,6 +2755,21 @@ void ATWPlayerController::Server_RequestDefeat_Implementation()
 	if (GM && PS)
 	{
 		GM->HandlePlayerDefeat(PS->PlayerSlot);
+	}
+}
+
+void ATWPlayerController::Client_ShowAlertMessage_Implementation(const FString& AlertMessage)
+{
+	if (AlertWidgetClass)
+	{
+		UTWAlertWidget* AlertUI = CreateWidget<UTWAlertWidget>(this, AlertWidgetClass);
+		
+		if (AlertUI)
+		{
+			AlertUI->SetAlertText(AlertMessage);
+			
+			AlertUI->AddToViewport();
+		}
 	}
 }
 
