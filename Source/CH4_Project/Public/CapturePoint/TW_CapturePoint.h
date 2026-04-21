@@ -14,6 +14,13 @@ class UTWTeamComponent;
 class UTWVisionComponent;
 class ATWPlayerState;
 
+UENUM()
+enum class ECapturePointTier
+{
+	Small UMETA(DisplayName = "Small Point"),
+	Big	UMETA(DisplayName = "Big Point"),
+};
+
 UCLASS()
 class CH4_PROJECT_API ATW_CapturePoint : public AActor
 {
@@ -40,6 +47,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, Category = "Component|TeamColor")
 	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Capture|Settings")
+	ECapturePointTier PointTier = ECapturePointTier::Small;
 	
 	UPROPERTY(EditAnywhere, Category = "Capture")
 	float MaxGauge = 100.0f;
@@ -125,6 +135,9 @@ private:
 	void OnRep_CapturingTeamID();
 	
 	void UpdateWidgetUI();
+	void NotifyEnemyTeam(int32 InCapturingTeamID);
+	
+	uint8 bHasNotifiedCaptureStart : 1;
 	
 #pragma endregion
 	

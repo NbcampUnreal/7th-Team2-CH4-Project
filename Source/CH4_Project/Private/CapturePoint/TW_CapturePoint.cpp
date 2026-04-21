@@ -7,6 +7,7 @@
 #include "TimerManager.h"
 #include "Component/TWTeamColorComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "GameFramework/GameStateBase.h"
@@ -175,21 +176,20 @@ void ATW_CapturePoint::CheckCaptureStatus()
             }
             CurrentGauge = FMath::Min(CurrentGauge + (CaptureSpeed * CheckInterval), MaxGauge);
             
+            if (PointTier == ECapturePointTier::Big && !bHasNotifiedCaptureStart && CurrentGauge > 0.0f)
+            {
+                bHasNotifiedCaptureStart = true;
+                NotifyEnemyTeam(CurrentUnitTeam);
+            }
+            
             if (CurrentGauge >= MaxGauge)
             {
                 MyTeamComp->SetTeamID(CurrentUnitTeam);
                 
+                bHasNotifiedCaptureStart = false;
+                
                 if (CurrentlyInArea.Num() > 0 && CurrentlyInArea[0])
                 {
-                    // if (APawn* CapturePawn = Cast<APawn>(CurrentlyInArea[0]))
-                    // {
-                    //     // 이 유닛을 소유한 플레이어의 State를 가져옴
-                    //     if (ATWPlayerState* PS = Cast<ATWPlayerState>(CapturePawn->GetPlayerState()))
-                    //     {
-                    //         SetOwningPlayer(PS);
-                    //     }
-                    // }
-                    
                     if (AGameStateBase* GameState = GetWorld()->GetGameState())
                     {
                         for (APlayerState* PS : GameState->PlayerArray)
@@ -215,14 +215,25 @@ void ATW_CapturePoint::CheckCaptureStatus()
     }
     else
     {
+        if (ActorCount == 0)
+        {
+            bHasNotifiedCaptureStart = false;
+        }
+   
         if (CurrentGauge > 0.0f)
         {
             CurrentGauge = FMath::Max(CurrentGauge - (DecaySpeed * CheckInterval), 0.0f);
+            
+            if (CurrentGauge <= 0.0f)
+            {
+                bHasNotifiedCaptureStart = false;
+            }
         }
         else if (ActorCount == 0 && CurrentGauge <= 0.0f)
         {
             StopCaptureTimer();
             CapturingTeamID = -1;
+            UpdateWidgetUI();
             return;
         }
     }
@@ -347,6 +358,31 @@ void ATW_CapturePoint::UpdateWidgetUI()
     if (UTWCaptureGaugeWidget* GaugeWidget = Cast<UTWCaptureGaugeWidget>(GaugeWidgetComp->GetUserWidgetObject()))
     {
         GaugeWidget->UpdateGauge(CurrentGauge, MaxGauge, CapturingTeamID);
+    }
+}
+
+void ATW_CapturePoint::NotifyEnemyTeam(int32 InCapturingTeamID)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    
+    if (AGameStateBase* GameState = GetWorld()->GetGameState())
+    {
+        for (APlayerState* PS : GameState->PlayerArray)
+        {
+            if (ATWPlayerState* TWPS = Cast<ATWPlayerState>(PS))
+            {
+                if (TWPS->PlayerSlot != InCapturingTeamID)
+                {
+                    if (ATWPlayerController* EnemyPC = Cast<ATWPlayerController>(TWPS->GetPlayerController()))
+                    {
+                        EnemyPC->Client_ShowAlertMessage(TEXT("상대방이 중앙 점령지를 점령하고 있습니다."));
+                    }
+                }
+            }
+        }
     }
 }
 
