@@ -39,6 +39,7 @@ void UTWTargetSearchProcessor::ConfigureQueries(const TSharedRef<FMassEntityMana
 	EntityQuery.AddRequirement<FTWUnitFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassNavMeshShortPathFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FTWAttackFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FTWCommandFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddConstSharedRequirement<FMassMovementParameters>();
 	EntityQuery.AddTagRequirement<FTWMassSearchingTag>(EMassFragmentPresence::All);
@@ -71,6 +72,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 		const TConstArrayView<FTWStatusFragment> StatusList = Context.GetFragmentView<FTWStatusFragment>();
 		const TConstArrayView<FTWUnitFragment> UnitList = Context.GetFragmentView<FTWUnitFragment>();
 		const TArrayView<FTWAttackFragment> AttackList = Context.GetMutableFragmentView<FTWAttackFragment>();
+		const TArrayView<FTWCommandFragment> CommandList = Context.GetMutableFragmentView<FTWCommandFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<
 			FMassMoveTargetFragment>();
 		const TArrayView<FMassNavMeshShortPathFragment> NavMeshShortPathFragments =
@@ -109,7 +111,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 #pragma region Stand
 					UWorld* World = Context.GetWorld();
-					MoveTargetList[EntityIdx].Center = EntityLocation;
+					CommandList[EntityIdx].SetMoveDestination(EntityLocation);
 					MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
 
 					UE::MassNavigation::ActivateActionStand(
@@ -133,7 +135,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 #pragma region Stand
 					UWorld* World = Context.GetWorld();
-					MoveTargetList[EntityIdx].Center = EntityLocation;
+					CommandList[EntityIdx].SetMoveDestination(EntityLocation);
 					MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
 
 					UE::MassNavigation::ActivateActionStand(
@@ -149,7 +151,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					AttackList[EntityIdx].LastSearchTime = TimeSeconds;
 				}
 			}
-			else if (Context.DoesArchetypeHaveTag<FTWMassMovingTag>()) //어택땅
+			else
 			{
 				FVector EntityLocation = TransformList[EntityIdx].GetTransform().GetLocation();
 				FMassEntityHandle Target;
@@ -169,9 +171,11 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					AttackList[EntityIdx].TargetEntity = Target;
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassChasingTag>(Entity);
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					CommandList[EntityIdx].SetMoveDestination(
+						EntityManager.GetFragmentDataPtr<FTransformFragment>(Target)->GetTransform().GetLocation());
 
-					MoveTargetList[EntityIdx].Center = EntityManager.GetFragmentDataPtr<FTransformFragment>(Target)->
-					                                                 GetTransform().GetLocation();
+
 					EntitiesToSignalPathInit.Add(Entity);
 				}
 				else if (UnitSubsystem->FindNearestEnemyBuilding(
@@ -185,7 +189,8 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					AttackList[EntityIdx].TargetBuilding = TargetBuilding;
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassChasingTag>(Entity);
-					MoveTargetList[EntityIdx].Center = TargetBuilding->GetTransform().GetLocation();
+					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
+					CommandList[EntityIdx].SetMoveDestination(TargetBuilding->GetTransform().GetLocation());
 					EntitiesToSignalPathInit.Add(Entity);
 				}
 				else

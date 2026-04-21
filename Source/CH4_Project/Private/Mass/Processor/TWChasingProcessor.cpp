@@ -147,15 +147,12 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 				if (FVector::DistSquared(EntityLocation, EnemyLocation) <
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
-					check(CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget||
-						CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
-
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassChasingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
 #pragma region Stand
 					UWorld* World = Context.GetWorld();
-					MoveTargetList[EntityIdx].Center = EntityLocation;
+					CommandList[EntityIdx].SetMoveDestination(EntityLocation);
 					MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
 
 					UE::MassNavigation::ActivateActionStand(
@@ -165,7 +162,7 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 						MoveTargetList[EntityIdx],
 						NavMeshShortPathFragments[EntityIdx]);
 #pragma endregion
-					
+					 
 					continue;
 				}
 
@@ -180,7 +177,7 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 					FVector::DistSquared(EntityLocation, EnemyLocation) <
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::SearchingRange)))
 				{
-					MoveTargetList[EntityIdx].Center = EnemyLocation;
+					CommandList[EntityIdx].SetMoveDestination(EnemyLocation);
 					EntitiesToSignalPathInit.Add(Entity);
 				}else
 				{
@@ -212,7 +209,7 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 					Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
 #pragma region Stand
 					UWorld* World = Context.GetWorld();
-					MoveTargetList[EntityIdx].Center = EntityLocation;
+					CommandList[EntityIdx].SetMoveDestination(EntityLocation);
 					MoveTargetList[EntityIdx].CreateNewAction(EMassMovementAction::Stand, *World);
 
 					UE::MassNavigation::ActivateActionStand(
@@ -237,7 +234,8 @@ void UTWChasingProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 					FVector::DistSquared(EntityLocation, BuildingLocation) <
 					FMath::Square(StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::SearchingRange)))
 				{
-					MoveTargetList[EntityIdx].Center = BuildingLocation;
+					CommandList[EntityIdx].SetMoveDestination(BuildingLocation);
+					
 					EntitiesToSignalPathInit.Add(Entity);
 				}else
 				{

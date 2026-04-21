@@ -111,7 +111,7 @@ void UTWNavMeshPathFollowProcessor::SignalEntities(FMassEntityManager& EntityMan
 			if (Signals.Contains(PathInitSignal))
 			{
 				if (!RequestPath(
-					MoveTargetFragments[EntityIdx].Center,
+					CommandFragments[EntityIdx].GetMoveDestination(),
 					Context.GetWorld(),
 					RadiusFragments[EntityIdx],
 					TransformFragments[EntityIdx].GetTransform().GetLocation(),

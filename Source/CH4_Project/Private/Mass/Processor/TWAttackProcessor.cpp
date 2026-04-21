@@ -241,12 +241,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					{
 						AttackList[EntityIdx].bIsTargetSet = false;
 						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
-						
-					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)
-					{
-						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
-						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
-					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToTarget)
+					}else 
 					{
 						Context.Defer().AddTag<FTWMassMovingTag>(Entity);
 						Context.Defer().AddTag<FTWMassChasingTag>(Entity);
