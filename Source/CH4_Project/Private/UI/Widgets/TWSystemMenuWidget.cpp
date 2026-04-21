@@ -3,10 +3,12 @@
 
 #include "UI/Widgets/TWSystemMenuWidget.h"
 #include "Components/Button.h"
+#include "Core/TWPlayerController.h"
 
 UTWSystemMenuWidget::UTWSystemMenuWidget(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
 {
+
 }
 
 void UTWSystemMenuWidget::NativeConstruct()
@@ -19,9 +21,10 @@ void UTWSystemMenuWidget::NativeConstruct()
 
 void UTWSystemMenuWidget::OnExitButtonClicked()
 {
-	APlayerController* PC = GetOwningPlayer();
+	ATWPlayerController* PC = Cast<ATWPlayerController>(GetOwningPlayer());
 	if (PC)
 	{
+		PC->Server_RequestDefeat();
 		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Absolute);
 	}
 }

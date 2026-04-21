@@ -23,8 +23,8 @@ protected:
 	void OnExitButtonClicked();
 
 	
-private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USysteMenuWidget, meta = (AllowPrivateAccess, BindWidget))
+protected:
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> ExitButton;
 };
 

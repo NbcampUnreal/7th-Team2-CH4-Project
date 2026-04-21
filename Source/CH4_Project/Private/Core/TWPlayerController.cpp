@@ -42,6 +42,7 @@
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "DrawDebugHelpers.h"
+#include "Core/TWGameMode.h"
 #include "HeroUnit/TWHeroUnitBase.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -2716,6 +2717,16 @@ void ATWPlayerController::ToggleMenu()
 			RefreshUIBridge();
 			RefreshDynamicMappingContexts();
 		}
+	}
+}
+
+void ATWPlayerController::Server_RequestDefeat_Implementation()
+{
+	ATWGameMode* GM = GetWorld()->GetAuthGameMode<ATWGameMode>();
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (GM && PS)
+	{
+		GM->HandlePlayerDefeat(PS->PlayerSlot);
 	}
 }
 

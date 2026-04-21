@@ -359,6 +359,10 @@ protected:
 public:
 	UFUNCTION(Client, Reliable)
 	void Client_ShowMenu(bool Open);
+	
+public:
+	UFUNCTION(Server, Reliable)
+	void Server_RequestDefeat();
 
 #pragma endregion
 

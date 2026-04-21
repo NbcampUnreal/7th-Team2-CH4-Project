@@ -106,12 +106,11 @@ void ATWGameMode::TryBindBuilding(ATWBaseBuilding* InBuilding)
 
 void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 {
-	int32 CurrentPlayerCount = GameState->PlayerArray.Num();
-	UE_LOG(LogTemp, Warning, TEXT("Current Player Count: %d"), CurrentPlayerCount);
+	int32 TotalPlayerCount = GameState->PlayerArray.Num();
+	UE_LOG(LogTemp, Warning, TEXT("Current Player Count: %d"), TotalPlayerCount);
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		int32 FinalResult = -1;
 		ATWPlayerController* PC = Cast<ATWPlayerController>(It->Get());
 		if (!PC)
 		{
@@ -123,24 +122,22 @@ void ATWGameMode::HandlePlayerDefeat(int32 DefeatedPlayerSlot)
 		{
 			continue;
 		}
+		int32 TargetPlayerSlot = PS->PlayerSlot;
+		int32 FinalResult = -1;
 		
-		if (CurrentPlayerCount <= 1)
+		if (TotalPlayerCount <= 1)
 		{
 			FinalResult = 1;
 		}
-		else if (CurrentPlayerCount == 2)
+		else if (TotalPlayerCount == 2)
 		{
-			FinalResult = (PS->PlayerSlot == DefeatedPlayerSlot) ? 0 : 1;
+			FinalResult = (TargetPlayerSlot == DefeatedPlayerSlot) ? 0 : 1;
 		}
 		else
 		{
-			if (PS->PlayerSlot == DefeatedPlayerSlot)
+			if (TargetPlayerSlot == DefeatedPlayerSlot)
 			{
 				FinalResult = 0;
-			}
-			else
-			{
-				continue;
 			}
 		}
 		if (FinalResult != -1)
