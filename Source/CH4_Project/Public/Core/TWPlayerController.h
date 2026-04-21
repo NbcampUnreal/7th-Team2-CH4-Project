@@ -19,6 +19,7 @@ class UTWPlayerUIControllerComponent;
 class UTWPlayerSelectionVisualComponent;
 class ATWHeroUnitBase;
 class UUserWidget;
+class UTWAlertWidget;
 
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
@@ -348,6 +349,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> DefeatWidgetClass;
 	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UTWAlertWidget> AlertWidgetClass;
+	
 public:
 	UFUNCTION(Client, Reliable)
 	void Client_ShowGameResult(int32 GameResult);
@@ -372,6 +376,9 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_RequestDefeat();
 
+	
+	UFUNCTION(Client, Reliable)
+	void Client_ShowAlertMessage(const FString& AlertMessage);
 #pragma endregion
 
 public:
