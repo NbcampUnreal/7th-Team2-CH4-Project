@@ -264,12 +264,7 @@ void ATWPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(IMC_Common, 0);
 		}
-#if WITH_EDITOR
-		if (IMC_Debug)
-		{
-			Subsystem->AddMappingContext(IMC_Debug, -1);
-		}
-#endif
+
 	}
 
 	FInputModeGameAndUI InputMode;
@@ -456,8 +451,6 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(QueueHotkeyZAction));
 	check(IsValid(QueueHotkeyXAction));
 	check(IsValid(QueueHotkeyCAction));
-	
-	check(IsValid(IA_TestDamageBlockingBuilding));
 
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInputComponent)
@@ -491,8 +484,6 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(QueueHotkeyZAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyZ);
 	EnhancedInputComponent->BindAction(QueueHotkeyXAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyX);
 	EnhancedInputComponent->BindAction(QueueHotkeyCAction, ETriggerEvent::Started, this, &ThisClass::OnQueueHotkeyC);
-	
-	EnhancedInputComponent->BindAction(IA_TestDamageBlockingBuilding, ETriggerEvent::Started, this, &ThisClass::HandleTestDamageBlockingBuilding);
 }
 
 #pragma region 마우스
@@ -2757,41 +2748,6 @@ void ATWPlayerController::ToggleMenu()
 void ATWPlayerController::Client_ShowMenu_Implementation(bool Open)
 {
 	
-}
-#pragma endregion
-
-#pragma region 넥서스 데미지
-void ATWPlayerController::HandleTestDamageBlockingBuilding(const FInputActionValue& Value)
-{
-	ServerTestDamageBlockingBuilding();
-}
-
-void ATWPlayerController::ServerTestDamageBlockingBuilding_Implementation()
-{
-	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
-	if (!TWPS)
-	{
-		return;
-	}
-
-	const int32 MyPlayerSlot = TWPS->PlayerSlot;
-
-	for (TActorIterator<ATWNexusBuilding> It(GetWorld()); It; ++It)
-	{
-		ATWNexusBuilding* NexusBuilding = *It;
-		if (!NexusBuilding)
-		{
-			continue;
-		}
-
-		if (NexusBuilding->OwnerPlayerSlot == MyPlayerSlot)
-		{
-			continue;
-		}
-
-		NexusBuilding->ApplyDamageToBuilding(10);
-		return;
-	}
 }
 #pragma endregion
 
