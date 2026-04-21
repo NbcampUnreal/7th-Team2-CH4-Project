@@ -13,6 +13,21 @@
 struct FTWUpgradeTableRowBase;
 class UTWTeamComponent;
 
+USTRUCT(BlueprintType)
+struct FTWUpgradeBonusDelta
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName UnitID = NAME_None;
+
+	UPROPERTY()
+	uint8 StatusType = 0;
+
+	UPROPERTY()
+	float NewValue = 0.f;
+};
+
 UCLASS()
 class CH4_PROJECT_API ATWPlayerState : public APlayerState
 {
@@ -131,6 +146,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Upgrade")
 	TMap<FName, FTWUnitStatus> UnitUpgradeBonusMap;
+	
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastApplyUpgradeBonusDeltas(const TArray<FTWUpgradeBonusDelta>& InDeltas);
 
 public:
 	int32 GetUpgradeLevelByID(const FName UpgradeID) const;

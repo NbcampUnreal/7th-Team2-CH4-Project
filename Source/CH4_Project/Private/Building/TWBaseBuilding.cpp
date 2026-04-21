@@ -19,7 +19,7 @@ ATWBaseBuilding::ATWBaseBuilding()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	
 	bReplicates = true;
-	SetReplicateMovement(false);
+	SetReplicatingMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
