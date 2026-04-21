@@ -23,6 +23,7 @@ void ATWLobbyPlayerState::SetIsReady(bool bInReady)
 void ATWLobbyPlayerState::SetIsHost(bool bInHost)
 {
 	bIsHost = bInHost;
+	OnRep_IsHost();
 }
 
 void ATWLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -45,11 +46,17 @@ void ATWLobbyPlayerState::OnRep_IsReady()
 
 void ATWLobbyPlayerState::OnRep_IsHost()
 {
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
+	APlayerController* PC = GetPlayerController();
+	if (!PC) return;
 	
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
+	bool Host = IsHost();
 	if (LPC && LPC->LobbyWidgetInstance)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Current Host : %s"), IsHost() ? TEXT("True") : TEXT("False"));
+		LPC->LobbyWidgetInstance->ShowPlayButton(Host);
 		LPC->LobbyWidgetInstance->UpdateUserImage();
 	}
 }
+
 

@@ -57,11 +57,11 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		
 		UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 	}
-
+	
 	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
 	if (LPS)
 	{
-		if (GetNumPlayers() == 1)
+		if (LGS->GetCurrentPlayerCount() == 1)
 		{
 			LPS->SetIsHost(true);
 			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());

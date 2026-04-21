@@ -45,6 +45,11 @@ void UTWLobby_Layout::NativeConstruct()
 	ReadyImages.Add(ReadyImage2);
 	ReadyImages.Add(ReadyImage3);
 	ReadyImages.Add(ReadyImage4);
+	
+	if (PlayButton->IsVisible())
+	{
+		PlayButton->SetVisibility(ESlateVisibility::Hidden);
+	}
 }
 
 void UTWLobby_Layout::OnPlayButtonClicked()
@@ -70,6 +75,7 @@ void UTWLobby_Layout::OnReadyButtonClicked()
 	{
 		LPC->Server_SetReady(true);
 	}
+	UE_LOG(LogTemp, Warning, TEXT("I'm Ready!"));
 }
 
 void UTWLobby_Layout::OnCancelButtonClicked()
@@ -79,6 +85,7 @@ void UTWLobby_Layout::OnCancelButtonClicked()
 	{
 		LPC->Server_SetReady(false);
 	}
+	UE_LOG(LogTemp, Warning, TEXT("I'm Not Ready!"));
 }
 
 void UTWLobby_Layout::OnLobbyExitButtonClicked()
@@ -88,12 +95,15 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	{
 		LPC->ExitLobby();
 	}
+	UE_LOG(LogTemp, Warning, TEXT("I'm Exit!"));
 }
 
 void UTWLobby_Layout::UpdateUserList()
 {
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
 	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
 	if (!LGS) return;
+	
 	int32 PlayerCount = LGS->GetCurrentPlayerCount();
 	UE_LOG(LogTemp, Warning, TEXT("UpdateUserList >>> CurrentPlayerCount : %d"), PlayerCount);
 	
@@ -110,6 +120,7 @@ void UTWLobby_Layout::UpdateUserList()
 			NickNameSlots[i]->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
+	
 	UE_LOG(LogTemp, Log, TEXT("UI Updated: Current Players = %d"), PlayerCount);
 }
 
@@ -154,10 +165,12 @@ void UTWLobby_Layout::ShowPlayButton(bool bIsShow)
 {
 	if (bIsShow)
 	{
+		UE_LOG(LogTemp, Warning, TEXT(" Play Button : 지금 보이게 하는 중"));
 		PlayButton->SetVisibility(ESlateVisibility::Visible);
 	}
 	else
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[ Play Button : 지금 안 보이게 하는 중 ]"));
 		PlayButton->SetVisibility(ESlateVisibility::Hidden);
 	}
 }

@@ -9,7 +9,8 @@
 
 ATWLobbyGameState::ATWLobbyGameState()
 {
-	
+	CurrentPlayerCount = -1;
+	bReplicates = true;
 }
 
 void ATWLobbyGameState::SetCurrentPlayerCount(int32 InCurrentPlayerCount)
