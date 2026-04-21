@@ -423,8 +423,9 @@ bool ATWPlayerController::ShouldUseBuildingCommandContext() const
 	}
 
 	return
-		(Cast<ATWTroopSpawnBuilding>(TargetBuilding ) != nullptr) ||
-		(Cast<ATWPopulationBuilding>(TargetBuilding ) != nullptr);
+		(Cast<ATWTroopSpawnBuilding>(TargetBuilding) != nullptr) ||
+		(Cast<ATWPopulationBuilding>(TargetBuilding) != nullptr) ||
+		(Cast<ATWUpgradeBuilding>(TargetBuilding) != nullptr);
 }
 
 void ATWPlayerController::SetupInputComponent()
@@ -1402,18 +1403,6 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 #pragma region 병력 스폰
 void ATWPlayerController::OnQueueHotkeyQ(const FInputActionValue&)
 {
-	ATWBaseBuilding* TargetBuilding = GetSelectedBuilding();
-	if (!IsValid(TargetBuilding))
-	{
-		return;
-	}
-
-	if (Cast<ATWPopulationBuilding>(TargetBuilding))
-	{
-		HandleCommandById(TEXT("IncreasePopulation"));
-		return;
-	}
-
 	HandleBuildingProductionSlot(0);
 }
 
@@ -1438,8 +1427,8 @@ void ATWPlayerController::HandleBuildingProductionSlot(int32 SlotIndex)
 		return;
 	}
 
-	ATWTroopSpawnBuilding* TroopBuilding = Cast<ATWTroopSpawnBuilding>(GetSelectedBuilding());
-	if (!IsValid(TroopBuilding))
+	ATWBaseBuilding* TargetBuilding = GetSelectedBuilding();
+	if (!IsValid(TargetBuilding))
 	{
 		return;
 	}
