@@ -6,27 +6,29 @@
 ATWHeroProjectile::ATWHeroProjectile()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = false;
 
-	CollisionComponent = CreateDefaultSubobject<USphereComponent>("CollisionComponent");
+	CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComponent"));
 	CollisionComponent->InitSphereRadius(10.0f);
-	
-	CollisionComponent->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
-	CollisionComponent->SetGenerateOverlapEvents(true);
-	
-	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &ATWHeroProjectile::OnOverlap);
+	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CollisionComponent->SetGenerateOverlapEvents(false);
 	RootComponent = CollisionComponent;
 	
-	ProjectileMesh= CreateDefaultSubobject<UStaticMeshComponent>("ProjectileMesh");
+	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
 	ProjectileMesh->SetupAttachment(RootComponent);
+	ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ProjectileMesh->SetGenerateOverlapEvents(false);
+	ProjectileMesh->SetCastShadow(false);
 	
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovement->UpdatedComponent = CollisionComponent;
-	ProjectileMovement->InitialSpeed = this->InitSpeed;
-	ProjectileMovement->MaxSpeed = this->MaxSpeed;
+	ProjectileMovement->InitialSpeed = InitSpeed;
+	ProjectileMovement->MaxSpeed = MaxSpeed;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 	ProjectileMovement->ProjectileGravityScale = 0.f;
 	
-	InitialLifeSpan = 0.0f;
+	InitialLifeSpan = 2.0f;
 }
 
 void ATWHeroProjectile::BeginPlay()
@@ -34,27 +36,61 @@ void ATWHeroProjectile::BeginPlay()
 	Super::BeginPlay();
 }
 
-void ATWHeroProjectile::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherOverlappedComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ATWHeroProjectile::OnOverlap(
+	UPrimitiveComponent* OverlappedComponent,
+	AActor* OtherActor,
+	UPrimitiveComponent* OtherOverlappedComponent,
+	int32 OtherBodyIndex,
+	bool bFromSweep,
+	const FHitResult& SweepResult)
 {
-	if (OtherActor || OtherActor != this)
+	if (!OtherActor || OtherActor == this)
 	{
 		return;
 	}
-	
+
 	if (OverlappedActor.Contains(OtherActor))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("이미 관통한 액터"));
 		return;
 	}
-	
+
+	OverlappedActor.Add(OtherActor);
+
 	if (OtherActor->ActorHasTag(FName("Environment")))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("지형에 부딛혀 Projectile제거"));
 		Destroy();
 		return;
 	}
 	
-	UE_LOG(LogTemp, Warning, TEXT("액터 최초 관통"));
-	OverlappedActor.Add(OtherActor);
+	Destroy();
+}
+
+void ATWHeroProjectile::InitializeVisualProjectile(const FVector& InTargetLocation)
+{
+	TargetLocation = InTargetLocation;
+
+	const FVector StartLocation = GetActorLocation();
+	const FVector MoveDirection = TargetLocation - StartLocation;
+	const float Distance = MoveDirection.Size();
+
+	if (MoveDirection.IsNearlyZero())
+	{
+		SetLifeSpan(0.15f);
+		return;
+	}
+
+	SetActorRotation(MoveDirection.Rotation());
+
+	if (ProjectileMovement)
+	{
+		ProjectileMovement->Velocity = MoveDirection.GetSafeNormal() * ProjectileMovement->InitialSpeed;
+	}
+
+	const float TravelSpeed =
+		ProjectileMovement
+		? FMath::Max(1.f, ProjectileMovement->InitialSpeed)
+		: FMath::Max(1.f, InitSpeed);
+
+	const float LifeTime = FMath::Clamp((Distance / TravelSpeed) + 0.1f, 0.15f, 5.0f);
+	SetLifeSpan(LifeTime);
 }

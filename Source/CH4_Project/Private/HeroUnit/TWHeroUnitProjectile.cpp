@@ -16,31 +16,47 @@ ATWHeroUnitProjectile::ATWHeroUnitProjectile()
 void ATWHeroUnitProjectile::UseSkill()
 {
 	UE_LOG(LogTemp, Warning, TEXT("UseSkill() 호출됨"));
-	if (TryStartCooldown())
+
+	if (!GetSkillReady())
 	{
-		SetIndicatorVisible(false);
-		
-		static const FString ContextString(TEXT("ProjectileHeroContext"));
-		FTWHeroTableRowBase* SkillData = SkillDataTable->FindRow<FTWHeroTableRowBase>(SkillOwnHero, ContextString);
-		UE_LOG(LogTemp, Warning, TEXT("스킬데이터 불러와졌습니다."));
-		
-		if (SkillData && SkillData->ProjectileClass)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("투사체 생성합니다."));
-			FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
-			
-			FVector FireDir = CurrentTargetLocation - SpawnLocation;
-			FireDir.Z = ProjectileZ;
-			
-			GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, SpawnLocation, FireDir.Rotation());
-			
-			SetIndicatorVisible(false);
-		}
+		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
+		return;
 	}
-	else
+
+	static const FString ContextString(TEXT("ProjectileHeroContext"));
+	FTWHeroTableRowBase* SkillData =
+		SkillDataTable ? SkillDataTable->FindRow<FTWHeroTableRowBase>(SkillOwnHero, ContextString) : nullptr;
+
+	if (!SkillData || !SkillData->ProjectileClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임 or 데이터 찾을 수 없음)"));
+		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (데이터/ProjectileClass 없음)"));
+		return;
 	}
+
+	if (!ProjectileSpawnPoint || !GetWorld())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (SpawnPoint/World 없음)"));
+		return;
+	}
+
+	const FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+
+	FVector FireDir = CurrentTargetLocation - SpawnLocation;
+	FireDir.Z = ProjectileZ;
+
+	AActor* SpawnedProjectile =
+		GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, SpawnLocation, FireDir.Rotation());
+
+	if (!SpawnedProjectile)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("투사체 생성 실패"));
+		return;
+	}
+
+	SetIndicatorVisible(false);
+	CommitSkillCooldown();
+
+	UE_LOG(LogTemp, Warning, TEXT("투사체 생성 및 쿨다운 시작"));
 }
 
 void ATWHeroUnitProjectile::UpdateIndicator(FVector MouseLocation)

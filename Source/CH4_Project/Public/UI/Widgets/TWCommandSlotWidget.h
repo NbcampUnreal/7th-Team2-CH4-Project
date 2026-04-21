@@ -47,6 +47,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TextHotkey = nullptr;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextDescription = nullptr;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> IconImage = nullptr;

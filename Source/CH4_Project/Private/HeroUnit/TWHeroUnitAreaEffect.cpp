@@ -67,43 +67,47 @@ void ATWHeroUnitAreaEffect::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 void ATWHeroUnitAreaEffect::UseSkill()
 {
-	if (TryStartCooldown())
+	if (!GetSkillReady())
 	{
-		
-		if (DynamicIndicatorMaterial)
+		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
+		return;
+	}
+
+	if (!DynamicIndicatorMaterial)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (Indicator Material 없음)"));
+		return;
+	}
+
+	// 실게임의 실제 데미지 판정은 PlayerController -> UnitSubsystem 서버 로직에서 처리
+	// 여기서는 범위 표시 연출만 담당
+	DynamicIndicatorMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::Red);
+
+	FTimerHandle ClearTimerHandle;
+	GetWorldTimerManager().SetTimer(
+		ClearTimerHandle,
+		[this]()
 		{
-			DynamicIndicatorMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::Green);
-		}
-		
-		FTimerHandle WarningTimerHandle;
-		GetWorldTimerManager().SetTimer(WarningTimerHandle, [this]()
-		{
+			SetIndicatorVisible(false);
+			SetRangeVisible(false);
+
 			if (DynamicIndicatorMaterial)
 			{
-				// 여기에 공격판정을 넣으면 됨
-				UE_LOG(LogTemp, Warning, TEXT("메테오 폭발!!"));
-				
-				// 공격판정 된느지 확인하려고 넣은 매쉬색상 변경 없어도됨
-				DynamicIndicatorMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::Red);
+				DynamicIndicatorMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::Green);
 			}
-			
-			// 공격 판정이 일어난 구역 확인하려고 넣은 타이머 없애버리면 됨
-			FTimerHandle ClearTimerHandle;
-			GetWorldTimerManager().SetTimer(ClearTimerHandle, [this]()
-			{
-				SetIndicatorVisible(false);
-				if (DynamicIndicatorMaterial)
-				{
-					DynamicIndicatorMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor::Green);
-				}
-			}, 1.0f, false);
+		},
+		0.35f,
+		false
+	);
 
-		}, 3.0f, false);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임 or 데이터 찾을 수 없음)"));
-	}
+	CommitSkillCooldown();
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("Astrologian area effect visual triggered at %s"),
+		*CurrentTargetLocation.ToString()
+	);
 }
 
 void ATWHeroUnitAreaEffect::UpdateIndicator(FVector MouseLocation)
