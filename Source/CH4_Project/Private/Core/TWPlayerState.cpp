@@ -328,6 +328,23 @@ void ATWPlayerState::OnRep_ReplicatedOreUpkeep()
 	NotifyUIResourceStateChanged();
 }
 
+void ATWPlayerState::MulticastApplyUpgradeBonusDeltas_Implementation(const TArray<FTWUpgradeBonusDelta>& InDeltas)
+{
+	for (const FTWUpgradeBonusDelta& Delta : InDeltas)
+	{
+		if (Delta.UnitID.IsNone())
+		{
+			continue;
+		}
+
+		FTWUnitStatus& BonusStatus = UnitUpgradeBonusMap.FindOrAdd(Delta.UnitID);
+		BonusStatus.SetStatus(
+			static_cast<ETWStatusType>(Delta.StatusType),
+			Delta.NewValue
+		);
+	}
+}
+
 int32 ATWPlayerState::GetUpgradeLevelByID(const FName UpgradeID) const
 {
 	if (const int32* FoundLevel = UpgradeLevelsByID.Find(UpgradeID))
@@ -352,6 +369,9 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 
 	int32& UpgradeLevel = UpgradeLevelsByID.FindOrAdd(UpgradeRow.UpgradeID);
 	UpgradeLevel += 1;
+	
+	TArray<FTWUpgradeBonusDelta> BonusDeltas;
+	BonusDeltas.Reserve(UpgradeRow.TargetUnits.Num());
 
 	for (const TPair<FName, int32>& Pair : UpgradeRow.TargetUnits)
 	{
@@ -359,11 +379,18 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 
 		const float CurrentValue = BonusStatus.GetStatus(UpgradeRow.TargetStatus);
 		const float AddValue = static_cast<float>(Pair.Value);
+		const float NewValue = CurrentValue + AddValue;
 
 		BonusStatus.SetStatus(
 			UpgradeRow.TargetStatus,
-			CurrentValue + AddValue
+			NewValue
 		);
+		
+		FTWUpgradeBonusDelta Delta;
+		Delta.UnitID = Pair.Key;
+		Delta.StatusType = static_cast<uint8>(UpgradeRow.TargetStatus);
+		Delta.NewValue = NewValue;
+		BonusDeltas.Add(Delta);
 
 		UE_LOG(
 			LogTemp,
@@ -373,7 +400,7 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 			*Pair.Key.ToString(),
 			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
 			Pair.Value,
-			CurrentValue + AddValue
+			NewValue
 		);
 	}
 
@@ -401,6 +428,11 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 				PlayerSlot
 			);
 		}
+	}
+	
+	if (BonusDeltas.Num() > 0)
+	{
+		MulticastApplyUpgradeBonusDeltas(BonusDeltas);
 	}
 }
 

@@ -78,10 +78,12 @@ void UTWPlayerUnitContainer::ApplyStatus(FName UnitID, const FTWUnitStatus& Unit
 						StatusFragment->GetMutableStatus().GetStatus(ETWStatusType::Health);
 
 					StatusFragment->SetStatus(UnitStatus);
+					
+					const float NewMaxHP = UnitStatus.GetStatus(ETWStatusType::Health);
 
 					StatusFragment->GetMutableStatus().SetStatus(
 						ETWStatusType::Health,
-						CurrentHealth
+						FMath::Clamp(CurrentHealth, 0.f, NewMaxHP)
 					);
 
 					// TODO Apply Move Speed
