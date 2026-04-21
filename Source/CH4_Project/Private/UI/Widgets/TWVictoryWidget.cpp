@@ -21,7 +21,7 @@ void UTWVictoryWidget::OnExitButtonClicked()
 	APlayerController* PC = GetOwningPlayer();
 	if (PC)
 	{
-		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Relative);
+		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Absolute);
 		UE_LOG(LogTemp, Warning, TEXT("--- Logout ---"));
 	}
 }
