@@ -6,10 +6,12 @@
 #include "Data/TWResourceBuildingDataAsset.h"
 #include "TimerManager.h"
 #include "Component/TWTeamColorComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
+#include "UI/Widgets/TWCaptureGaugeWidget.h"
 
 ATW_CapturePoint::ATW_CapturePoint()
 {
@@ -32,6 +34,12 @@ ATW_CapturePoint::ATW_CapturePoint()
     {
         MyVisionComp->VisionRadius = VisionRad;
     }
+    
+    GaugeWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("GaugeWidget"));
+    GaugeWidgetComp->SetupAttachment(RootComponent);
+    GaugeWidgetComp->SetWidgetSpace(EWidgetSpace::World);
+    GaugeWidgetComp->SetDrawSize(FVector2D(150.0f, 30.0f));
+    GaugeWidgetComp->SetRelativeLocation(FVector(0.0f, 0.0f, 200.0f));
 }
 
 void ATW_CapturePoint::BeginPlay()
@@ -218,7 +226,7 @@ void ATW_CapturePoint::CheckCaptureStatus()
             return;
         }
     }
-    
+    UpdateWidgetUI();
     UE_LOG(LogTemp, Log, TEXT("=== [SERVER] Progress: %.1f%% (Present Teams: %d) ==="), CurrentGauge, TeamCount);
 }
 
@@ -228,6 +236,7 @@ void ATW_CapturePoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(ATW_CapturePoint, CurrentGauge);
     DOREPLIFETIME(ATW_CapturePoint, OwningPlayerState);
     DOREPLIFETIME(ATW_CapturePoint, OwnerPlayerSlot);
+    DOREPLIFETIME(ATW_CapturePoint, CapturingTeamID);
 }
 
 void ATW_CapturePoint::SetOwningPlayer(ATWPlayerState* NewPlayerState)
@@ -320,3 +329,25 @@ void ATW_CapturePoint::OnRep_OwnerPlayerSlot()
         TeamColorComponent->ApplyTeamColor(OwnerPlayerSlot);
     }
 }
+
+#pragma region UI
+
+void ATW_CapturePoint::OnRep_CurrentGauge()
+{
+    UpdateWidgetUI();
+}
+
+void ATW_CapturePoint::OnRep_CapturingTeamID()
+{
+    UpdateWidgetUI();
+}
+
+void ATW_CapturePoint::UpdateWidgetUI()
+{
+    if (UTWCaptureGaugeWidget* GaugeWidget = Cast<UTWCaptureGaugeWidget>(GaugeWidgetComp->GetUserWidgetObject()))
+    {
+        GaugeWidget->UpdateGauge(CurrentGauge, MaxGauge, CapturingTeamID);
+    }
+}
+
+#pragma endregion
