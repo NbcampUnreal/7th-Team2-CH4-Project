@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "TW_CapturePoint.generated.h"
 
+class UWidgetComponent;
 class UTWTeamColorComponent;
 class UTWResourceBuildingDataAsset;
 class UBoxComponent;
@@ -43,7 +44,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Capture")
 	float MaxGauge = 100.0f;
 	
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Capture")
+	UPROPERTY(ReplicatedUsing=OnRep_CurrentGauge, BlueprintReadOnly, Category = "Capture")
 	float CurrentGauge = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Capture")
@@ -68,7 +69,7 @@ private:
 	void CheckCaptureStatus();
 	
 private:
-	UPROPERTY(VisibleAnywhere, Category = "Capture")
+	UPROPERTY(ReplicatedUsing=OnRep_CapturingTeamID, VisibleAnywhere, Category = "Capture")
 	int32 CapturingTeamID = -1;
 
 	// 영역 내 액터 관리
@@ -109,4 +110,22 @@ public:
 	UFUNCTION()
 	void OnRep_OwnerPlayerSlot();
 #pragma endregion
+	
+#pragma region UI
+	
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> GaugeWidgetComp;
+	
+	UFUNCTION()
+	void OnRep_CurrentGauge();
+
+private:
+	UFUNCTION()
+	void OnRep_CapturingTeamID();
+	
+	void UpdateWidgetUI();
+	
+#pragma endregion
+	
 };
