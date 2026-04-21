@@ -12,6 +12,7 @@
 #include "Title/TWTitlePlayerController.h"
 #include "GameFramework/GameStateBase.h"
 #include "Lobby/TWLobbyGameMode.h"
+#include "Components/Image.h"
 
 UTWLobby_Layout::UTWLobby_Layout(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
@@ -32,6 +33,18 @@ void UTWLobby_Layout::NativeConstruct()
 	NickNameSlots.Add(NickName_2);
 	NickNameSlots.Add(NickName_3);
 	NickNameSlots.Add(NickName_4);
+	
+	HostImages.Empty();
+	HostImages.Add(HostImage1);
+	HostImages.Add(HostImage2);
+	HostImages.Add(HostImage3);
+	HostImages.Add(HostImage4);
+	
+	ReadyImages.Empty();
+	ReadyImages.Add(ReadyImage1);
+	ReadyImages.Add(ReadyImage2);
+	ReadyImages.Add(ReadyImage3);
+	ReadyImages.Add(ReadyImage4);
 }
 
 void UTWLobby_Layout::OnPlayButtonClicked()
@@ -79,22 +92,58 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 
 void UTWLobby_Layout::UpdateUserList()
 {
-	for (UHorizontalBox* NickSlot : NickNameSlots)
+	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
+	if (!LGS) return;
+	int32 PlayerCount = LGS->GetCurrentPlayerCount();
+	UE_LOG(LogTemp, Warning, TEXT("UpdateUserList >>> CurrentPlayerCount : %d"), PlayerCount);
+	
+	for (int32 i = 0; i < NickNameSlots.Num(); i++)
 	{
-		if (NickSlot)
+		if (i < PlayerCount)
 		{
-			NickSlot->SetVisibility(ESlateVisibility::Collapsed);
+			UE_LOG(LogTemp, Warning, TEXT("지금 보이게 하는 중"));
+			NickNameSlots[i]->SetVisibility(ESlateVisibility::Visible);
 		}
-		
-		ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
-		
-		if (LGS)
+		else
 		{
-			for (int32 i = 0; i< LGS->PlayerArray.Num(); i++)
+			UE_LOG(LogTemp, Warning, TEXT("[ 지금 안 보이게 하는 중 ]"));
+			NickNameSlots[i]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("UI Updated: Current Players = %d"), PlayerCount);
+}
+
+void UTWLobby_Layout::UpdateUserImage()
+{
+	AGameStateBase* GS = GetWorld()->GetGameState();
+	if (!GS) return;
+	
+	for (int32 i = 0; i < NickNameSlots.Num(); i++)
+	{
+		if (NickNameSlots[i]->GetVisibility() == ESlateVisibility::Visible)
+		{
+			if (GS->PlayerArray.IsValidIndex(i))
 			{
-				if (NickNameSlots.IsValidIndex(i) && NickNameSlots[i])
+				ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(GS->PlayerArray[i]);
+				if (!LPS) continue;
+				
+				if (HostImages.IsValidIndex(i) && HostImages[i])
 				{
-					NickNameSlots[i]->SetVisibility(ESlateVisibility::Visible);
+					if (LPS->IsHost())
+					{
+						HostImages[i]->SetVisibility(ESlateVisibility::Visible);
+					}
+				}
+				if (ReadyImages.IsValidIndex(i) && ReadyImages[i])
+				{
+					if (!LPS->IsHost() && LPS->IsReady())
+					{
+						ReadyImages[i]->SetVisibility(ESlateVisibility::Visible);
+					}
+					else
+					{
+						ReadyImages[i]->SetVisibility(ESlateVisibility::Collapsed);
+					}
 				}
 			}
 		}

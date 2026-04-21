@@ -9,6 +9,7 @@
 class UButton;
 class UVerticalBox;
 class UHorizontalBox;
+class UImage;
 
 UCLASS()
 class CH4_PROJECT_API UTWLobby_Layout : public UUserWidget
@@ -37,35 +38,71 @@ public:
 	UFUNCTION()
 	void UpdateUserList();
 	
+	UFUNCTION()
+	void UpdateUserImage();
+	
 	void ShowPlayButton(bool bIsShow);
 	
-private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
+protected:
+#pragma region 버튼 연결
+	UPROPERTY(EditDefaultsOnly, Category = USLobyWidget, meta = (BindWidget))
 	TObjectPtr<UButton> PlayButton;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
+	UPROPERTY(EditDefaultsOnly, Category = USLobyWidget, meta = (BindWidget))
 	TObjectPtr<UButton> ReadyButton;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
+	UPROPERTY(EditDefaultsOnly, Category = USLobyWidget, meta = (BindWidget))
 	TObjectPtr<UButton> CancelButton;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobyWidget, meta = (AllowPrivateAccess, BindWidget))
+	UPROPERTY(EditDefaultsOnly, Category = USLobyWidget, meta = (BindWidget))
 	TObjectPtr<UButton> LobbyExitButton;
+#pragma endregion
 	
+#pragma region 이름 및 상태 표시 연결
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_1;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> HostImage1;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> ReadyImage1;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_2;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> HostImage2;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> ReadyImage2;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_3;
-
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> HostImage3;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> ReadyImage3;
+	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_4;
 	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> HostImage4;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> ReadyImage4;
+#pragma endregion
 	
 	UPROPERTY()
 	TArray<UHorizontalBox*> NickNameSlots;
+	
+	UPROPERTY()
+	TArray<UImage*> HostImages;
+	
+	UPROPERTY()
+	TArray<UImage*> ReadyImages;
 };
 

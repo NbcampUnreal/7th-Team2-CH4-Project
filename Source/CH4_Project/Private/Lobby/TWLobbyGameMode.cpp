@@ -30,7 +30,7 @@ void ATWLobbyGameMode::PreLogin(
 	if (CurrentPlayerCount >= 4)
 	{
 		ErrorMessage = TEXT("Server is Full");
-		UE_LOG(LogTemp, Error, TEXT("Login Failed : Server is Full(%d/4)"), CurrentPlayerCount);
+		UE_LOG(LogTemp, Warning, TEXT("Login Failed : Server is Full(%d/4)"), CurrentPlayerCount);
 	}
 }
 
@@ -39,8 +39,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	UE_LOG(LogTemp, Error, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *GetNameSafe(NewPlayer));
-
+	UE_LOG(LogTemp, Warning, TEXT("!!! C++ PostLogin EXECUTED !!! Target: %s"), *GetNameSafe(NewPlayer));
 	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
 	if (!LGS || !NewPlayer)
 	{
@@ -51,24 +50,28 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	{
 		return;
 	}
+	
+	if (LGS)
+	{
+		LGS->SetCurrentPlayerCount(GetNumPlayers());
+		
+		UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+	}
 
 	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
 	if (LPS)
 	{
 		if (GetNumPlayers() == 1)
 		{
-			UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
 			LPS->SetIsHost(true);
-			UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
+			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("Player Numbers : %d"), GetNumPlayers());
 			LPS->SetIsHost(false);
-			UE_LOG(LogTemp, Error, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
+			UE_LOG(LogTemp, Warning, TEXT("!!! SetIsHost : %d !!!"), LPS->IsHost());
 		}
 	}
-
 	CheckStartCondition();
 }
 
@@ -76,7 +79,14 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 void ATWLobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
-
+	
+	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
+	if (LGS)
+	{
+		LGS->SetCurrentPlayerCount(GetNumPlayers());
+		
+		UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+	}
 	AssignNewHost();
 	CheckStartCondition();
 }
@@ -122,7 +132,7 @@ void ATWLobbyGameMode::StartGame()
 {
 	if (GameLevelName.IsNone())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
+		UE_LOG(LogTemp, Warning, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
 		return;
 	}
 
@@ -135,11 +145,8 @@ void ATWLobbyGameMode::StartGame()
 	}
 
 	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
-		*TravelURL,
-		bUseSeamlessTravel ? TEXT("true") : TEXT("false")
+		LogTemp,Warning,TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
+		*TravelURL, bUseSeamlessTravel ? TEXT("true") : TEXT("false")
 	);
 
 	if (UWorld* World = GetWorld())

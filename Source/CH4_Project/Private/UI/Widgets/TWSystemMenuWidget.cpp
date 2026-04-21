@@ -22,6 +22,6 @@ void UTWSystemMenuWidget::OnExitButtonClicked()
 	APlayerController* PC = GetOwningPlayer();
 	if (PC)
 	{
-		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Relative);
+		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Absolute);
 	}
 }

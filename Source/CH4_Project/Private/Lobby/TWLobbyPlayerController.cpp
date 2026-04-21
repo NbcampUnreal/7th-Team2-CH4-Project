@@ -58,10 +58,9 @@ void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 }
 
 
-
 void ATWLobbyPlayerController::ExitLobby()
 {
-	ClientTravel(TEXT("L_Title"), ETravelType::TRAVEL_Relative);
+	ClientTravel(TEXT("L_Title"), ETravelType::TRAVEL_Absolute);
 }
 
 void ATWLobbyPlayerController::CreateLobbyWidget()

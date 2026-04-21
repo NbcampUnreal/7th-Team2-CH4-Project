@@ -35,16 +35,21 @@ void ATWLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void ATWLobbyPlayerState::OnRep_IsReady()
 {
-	ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
 	
-	if (PC && PC->LobbyWidgetInstance)
+	if (LPC && LPC->LobbyWidgetInstance)
 	{
-		PC->LobbyWidgetInstance->UpdateUserList();
+		LPC->LobbyWidgetInstance->UpdateUserImage();
 	}
 }
 
 void ATWLobbyPlayerState::OnRep_IsHost()
 {
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
 	
+	if (LPC && LPC->LobbyWidgetInstance)
+	{
+		LPC->LobbyWidgetInstance->UpdateUserImage();
+	}
 }
 

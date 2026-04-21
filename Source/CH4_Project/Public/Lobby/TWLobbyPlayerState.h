@@ -36,6 +36,5 @@ protected:
 	
 	UFUNCTION()
 	void OnRep_IsHost();
-	
 };
 
