@@ -54,6 +54,23 @@ void ATWLobbyPlayerState::SetSelectedHeroUnitId(FName InHeroUnitId)
 	SelectedHeroUnitId = InHeroUnitId;
 }
 
+void ATWLobbyPlayerState::PostNetInit()
+{
+	Super::PostNetInit();
+	
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (LPC && LPC->LobbyWidgetInstance)
+	{
+		LPC->LobbyWidgetInstance->UpdateUserList();
+		LPC->LobbyWidgetInstance->UpdateUserImage();
+		
+		if (GetPlayerController() == LPC)
+		{
+			LPC->LobbyWidgetInstance->ShowPlayButton(IsHost());
+		}
+	}
+}
+
 void ATWLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 {
 	Super::CopyProperties(PlayerState);

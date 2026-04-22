@@ -48,7 +48,7 @@ void ATWTitlePlayerController::JoinServer()
 {
 	/*UGameplayStatics::OpenLevel(GetWorld(), "L_Lobby");*/
 	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] JoinServer Start ==="));
-	const FString URL = "127.0.0.1:17777";
+	const FString URL = "127.0.0.1:7777";
 	ClientTravel(URL, TRAVEL_Absolute);
 	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] ClientTravel Called with URL: %s ==="), *URL);
 	/*ClientTravel("L_LobbyLevel", TRAVEL_Absolute);*/

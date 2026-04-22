@@ -31,7 +31,7 @@ void UTWTitle_Layout::OnStartButtonClicked()
 
 void UTWTitle_Layout::OnHostButtonClicked()
 {
-	UGameplayStatics::OpenLevel(GetWorld(), FName("L_Lobby"), true, "listen");
+	UGameplayStatics::OpenLevel(GetWorld(), FName("L_Lobby"), true, "listen?port=7777");
 }
 
 void UTWTitle_Layout::OnExitButtonClicked()
