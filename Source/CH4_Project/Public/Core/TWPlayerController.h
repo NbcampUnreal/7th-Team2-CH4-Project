@@ -88,6 +88,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> HoldCommandAction = nullptr;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> HeroSkillCommandAction = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	float ScreenEdgeEnterMargin = 10.0f;
@@ -105,7 +107,8 @@ protected:
 	void OnMoveCommandAction(const FInputActionValue& InputActionValue);
 	void OnAttackCommandAction(const FInputActionValue& InputActionValue);
 	void OnHoldCommandAction(const FInputActionValue& InputActionValue);
-
+	void OnHeroSkillCommandAction(const FInputActionValue& InputActionValue);
+	
 	UFUNCTION(Server, Reliable)
 	void ServerHandleMoveCommand(const FVector& CommandLocation);
 
