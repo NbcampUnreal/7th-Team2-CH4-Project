@@ -1,7 +1,7 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Mass/Fragments/TWAvoidanceFragments.h"
 #include "Mass/Processor/TWAvoidanceProcessors.h"
+#include "Mass/Fragments/TWAvoidanceFragments.h"
 #include "DrawDebugHelpers.h"
 #include "MassEntityView.h"
 #include "MassExecutionContext.h"
@@ -1321,14 +1321,13 @@ void UTWStandingAvoidanceProcessor::Execute(FMassEntityManager& EntityManager, F
 			FMath::ExponentialSmoothingApprox(Ghost.Velocity, FVector::ZeroVector, DeltaTime, StandingParams.GhostVelocityDampingTime);
 			
 			Ghost.Location += Ghost.Velocity * DeltaTime;
-
 			// Don't let the ghost location too far from move target center.
-			const FVector DirToCenter = Ghost.Location - MoveTarget.Center;
-			const FVector::FReal DistToCenter = DirToCenter.Length();
-			if (DistToCenter > StandingParams.GhostToTargetMaxDeviation)
-			{
-				Ghost.Location = MoveTarget.Center + DirToCenter * (StandingParams.GhostToTargetMaxDeviation / DistToCenter);
-			}
+			// const FVector DirToCenter = Ghost.Location - MoveTarget.Center;
+			// const FVector::FReal DistToCenter = DirToCenter.Length();
+			// if (DistToCenter > StandingParams.GhostToTargetMaxDeviation)
+			// {
+			// 	Ghost.Location = MoveTarget.Center + DirToCenter * (StandingParams.GhostToTargetMaxDeviation / DistToCenter);
+			// }
 		}
 	});
 	

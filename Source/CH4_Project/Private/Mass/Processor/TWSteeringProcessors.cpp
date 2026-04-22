@@ -301,7 +301,7 @@ void UTWSteerToMoveTargetProcessor::Execute(FMassEntityManager& EntityManager, F
 						// If the current steering target is from approaching a move target, use the same speed logic as movement to ensure smooth transition.
 						const FVector::FReal Range = FMath::Max(1., LookAheadDistance - StandingSteeringParams.DeadZoneRadius);
 						const FVector::FReal SpeedFade = FMath::Clamp((Distance - StandingSteeringParams.DeadZoneRadius) / Range, 0., 1.);
-						DesiredSpeed = MoveTarget.DesiredSpeed.Get() * UE::MassNavigation::CalcDirectionalSpeedScale(CurrentForward, SteerDirection) * UE::MassNavigation::ArrivalSpeedEnvelope(SpeedFade);
+						DesiredSpeed = 0.;//MoveTarget.DesiredSpeed.Get() * UE::MassNavigation::CalcDirectionalSpeedScale(CurrentForward, SteerDirection) * UE::MassNavigation::ArrivalSpeedEnvelope(SpeedFade);
 					}
 					else
 					{
@@ -313,7 +313,7 @@ void UTWSteerToMoveTargetProcessor::Execute(FMassEntityManager& EntityManager, F
 					  
 					// @todo: This current completely overrides steering, we probably should have one processor that resets the steering at the beginning of the frame.
 					Steering.DesiredVelocity = SteerDirection * DesiredSpeed;
-					Force.Value = SteerK * (/*Steering.DesiredVelocity*/ - DesiredMovement.DesiredVelocity); // Goal force
+					Force.Value = SteerK * (Steering.DesiredVelocity - DesiredMovement.DesiredVelocity); // Goal force
 					Force.Value = Force.Value.GetClampedToMaxSize(MovementParams.MaxAcceleration); 
 				}
 				else
