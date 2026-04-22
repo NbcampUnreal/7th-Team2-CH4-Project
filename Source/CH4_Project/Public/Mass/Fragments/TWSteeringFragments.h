@@ -61,7 +61,7 @@ struct FTWMovingSteeringParameters : public FMassConstSharedFragment
 
 	/** How much we look ahead when steering. Affects how steeply we steer towards the goal and when to start to slow down at the end of the path. */
 	UPROPERTY(EditAnywhere, Category = "Moving", meta = (ClampMin = "0", ForceUnits="s"))
-	float LookAheadTime = 1.0f;
+	float LookAheadTime = 0.1f;
 
 	/** Allow directional and catchup speed variance. */
 	UPROPERTY(EditAnywhere, Category = "Moving")

@@ -310,10 +310,10 @@ void UTWSteerToMoveTargetProcessor::Execute(FMassEntityManager& EntityManager, F
 						// Not using the directional scaling so that the steps we take to avoid are done quickly, and the behavior is reactive.
 						DesiredSpeed = MoveTarget.DesiredSpeed.Get() * UE::MassNavigation::ArrivalSpeedEnvelope(SpeedFade);
 					}
-					
+					  
 					// @todo: This current completely overrides steering, we probably should have one processor that resets the steering at the beginning of the frame.
 					Steering.DesiredVelocity = SteerDirection * DesiredSpeed;
-					Force.Value = SteerK * (Steering.DesiredVelocity - DesiredMovement.DesiredVelocity); // Goal force
+					Force.Value = SteerK * (/*Steering.DesiredVelocity*/ - DesiredMovement.DesiredVelocity); // Goal force
 					Force.Value = Force.Value.GetClampedToMaxSize(MovementParams.MaxAcceleration); 
 				}
 				else
