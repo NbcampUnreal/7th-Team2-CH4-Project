@@ -19,6 +19,7 @@ public:
 	void SetIsHost(bool bInHost);
 	void SetLobbyNickname(const FString& InNickname);
 	void SetSelectedHeroUnitId(FName InHeroUnitId);
+	void PostNetInit();
 	
 	// Getter
 	FORCEINLINE bool IsReady() const {return bIsReady;}

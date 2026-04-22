@@ -15,6 +15,16 @@ void ATWLobbyPlayerController::BeginPlay()
 	if (IsLocalController())
 	{
 		CreateLobbyWidget();
+		if (LobbyWidgetInstance)
+		{
+			LobbyWidgetInstance->UpdateUserList();
+			LobbyWidgetInstance->UpdateUserImage();
+			
+			if (ATWLobbyPlayerState* LPS = GetPlayerState<ATWLobbyPlayerState>())
+			{
+				LobbyWidgetInstance->ShowPlayButton(LPS->IsHost());
+			}
+		}
 	}
 }
 
