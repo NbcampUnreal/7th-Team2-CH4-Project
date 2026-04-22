@@ -36,6 +36,8 @@ private:
     FVector GridOrigin;
     FVector2D GridFullSize;
 	
+	int32 CachedLocalTeamSlot = -1; // 추가
+	
 #pragma region Outline
 public:
 	void DrawCameraFrustum();
@@ -48,5 +50,35 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap")
 	float FrustumThickness = 2.0f;
+#pragma endregion
+	
+#pragma region Icon
+	void DrawIconsOnMinimap();
+	FVector2D WorldToMinimap(FVector WorldPos, FVector2D CanvasSize) const;
+	bool ShouldShow(int32 TeamID, FVector WorldPos, int32 LocalTeamSlot, class ATWFogManager* FogManager) const;
+
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	UTextureRenderTarget2D* IconRT; // 유닛/건물 전용 렌더 타겟
+
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	float UnitIconSize = 10.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	float BuildingIconSize = 20.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	float CapturePointIconSize = 15.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	FLinearColor MyTeamColor = FLinearColor::Green;
+
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	FLinearColor EnemyTeamColor = FLinearColor::Red;
+	
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	FLinearColor NeutralColor = FLinearColor::Yellow; // 중립 점령지 색상
+	
+	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
+	float IconThickness = 15.f;
 #pragma endregion
 };

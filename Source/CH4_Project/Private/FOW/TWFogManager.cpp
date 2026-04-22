@@ -6,8 +6,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
-#include "TextureResource.h" // RenderTarget 읽기를 위해 필요
+#include "TextureResource.h"
 #include "Core/TWPlayerController.h"
+#include "Subsystems/TWGridSubSystem.h"
 
 ATWFogManager::ATWFogManager()
 {
@@ -19,6 +20,15 @@ void ATWFogManager::BeginPlay()
     Super::BeginPlay();
     UWorld* World = GetWorld();
     if (!World) return;
+    
+    if (UTWGridSubSystem* GridSub = World->GetSubsystem<UTWGridSubSystem>())
+    {
+        FVector GridOrigin = GridSub->GetGridOrigin();
+        FVector2D GridFullSize = GridSub->GetGridFullSize();
+
+        MapOrigin = FVector2D(GridOrigin.X, GridOrigin.Y);
+        MapSize = GridFullSize;
+    }
     
     if (CurrentFogRT && ExploredFogRT)
     {
@@ -49,12 +59,22 @@ void ATWFogManager::BeginPlay()
         }
     }
 
-    if (DrawMaterial) DrawMID = UMaterialInstanceDynamic::Create(DrawMaterial, this);
-    if (CombineMaterial) CombineMID = UMaterialInstanceDynamic::Create(CombineMaterial, this);
+    if (DrawMaterial)
+    {
+        DrawMID = UMaterialInstanceDynamic::Create(DrawMaterial, this);
+    }
+    
+    if (CombineMaterial)
+    {
+        CombineMID = UMaterialInstanceDynamic::Create(CombineMaterial, this);
+    }
     
     if (FogMPC)
     {
-        UKismetMaterialLibrary::SetVectorParameterValue(World, FogMPC, TEXT("MapSize"), FLinearColor(MapSize.X, MapSize.Y, 0, 0));
+        UKismetMaterialLibrary::SetVectorParameterValue(World, FogMPC, 
+         TEXT("MapSize"), FLinearColor(MapSize.X, MapSize.Y, 0, 0));
+        UKismetMaterialLibrary::SetVectorParameterValue(World, FogMPC, 
+            TEXT("MapOrigin"), FLinearColor(MapOrigin.X, MapOrigin.Y, 0, 0));
     }
 }
 
@@ -84,8 +104,8 @@ void ATWFogManager::UnregisterVision(UTWVisionComponent* Comp)
 
 FVector2D ATWFogManager::WorldToUV(FVector WorldPos)
 {
-    float U = ((WorldPos.X - MapOrigin.X) / MapSize.X) + 0.5f;
-    float V = ((WorldPos.Y - MapOrigin.Y) / MapSize.Y) + 0.5f;
+    float U = (WorldPos.X - MapOrigin.X) / MapSize.X;
+    float V = (WorldPos.Y - MapOrigin.Y) / MapSize.Y;
     return FVector2D(U, V);
 }
 
@@ -94,13 +114,22 @@ void ATWFogManager::UpdateFog()
     if (!CurrentFogRT || !ExploredFogRT || !DrawMID || !CombineMID) return;
     
     APlayerController* PC = GetWorld()->GetFirstPlayerController();
-    if (!PC) return;
+    if (!PC)
+    {
+        return;
+    }
     
     ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
-    if (!PS) return;
+    if (!PS)
+    {
+        return;
+    }
     
     int32 MyLocalTeamSlot = PS->PlayerSlot;
-    if (MyLocalTeamSlot < 0) return;
+    if (MyLocalTeamSlot < 0)
+    {
+        return;
+    }
     
     UKismetRenderingLibrary::ClearRenderTarget2D(GetWorld(), CurrentFogRT, FLinearColor::Black);
     
@@ -135,10 +164,16 @@ void ATWFogManager::UpdateFog()
 void ATWFogManager::UpdateEnemyVisibility()
 {
     ATWPlayerController* TWPC = Cast<ATWPlayerController>(GetWorld()->GetFirstPlayerController());
-    if (!TWPC || !TWPC->IsLocalController()) return;
-
+    if (!TWPC || !TWPC->IsLocalController())
+    {
+        return;
+    }
+    
     ATWPlayerState* TWPS = TWPC->GetPlayerState<ATWPlayerState>();
-    if (!TWPS || !CurrentFogRT) return;
+    if (!TWPS || !CurrentFogRT)
+    {
+        return;
+    }
     
     FTextureResource* TextureResource = CurrentFogRT->GetResource();
     if (!TextureResource)
@@ -169,8 +204,11 @@ void ATWFogManager::UpdateEnemyVisibility()
 
     for (AActor* UnitActor : TaggedUnits)
     {
-        if (!IsValid(UnitActor)) continue;
-
+        if (!IsValid(UnitActor))
+        {
+            continue;
+        }
+        
         UTWTeamComponent* TeamComp = UnitActor->FindComponentByClass<UTWTeamComponent>();
         if (TeamComp && TeamComp->GetTeamID() == LocalPlayerTeamID)
         {
@@ -202,14 +240,40 @@ void ATWFogManager::UpdateEnemyVisibility()
     }
 }
 
+bool ATWFogManager::IsLocationExplored(const FVector& WorldLocation)
+{
+    if (CachedExploredPixels.Num() == 0)
+    {
+        return true;
+    }
+    
+    FVector2D UV = WorldToUV(WorldLocation);
+    if (UV.X < 0.f || UV.X > 1.f || UV.Y < 0.f || UV.Y > 1.f)
+    {
+        return false;
+    }
+    
+    int32 PixelX = FMath::Clamp((int32)(UV.X * CachedRTSizeX), 0, CachedRTSizeX - 1);
+    int32 PixelY = FMath::Clamp((int32)(UV.Y * CachedRTSizeY), 0, CachedRTSizeY - 1);
+    int32 Idx = PixelY * CachedRTSizeX + PixelX;
+
+    return CachedExploredPixels.IsValidIndex(Idx) && CachedExploredPixels[Idx].R > 25;
+}
+
 // 건설 시 시야 확인을 위한 로직 
 bool ATWFogManager::IsLocationVisible(const FVector& WorldLocation)
 {
-    if (CachedFogPixels.Num() == 0) return true;
-
+    if (CachedFogPixels.Num() == 0)
+    {
+        return true;
+    }
+    
     FVector2D UnitUV = WorldToUV(WorldLocation);
-    if (UnitUV.X < 0.f || UnitUV.X > 1.f || UnitUV.Y < 0.f || UnitUV.Y > 1.f) return false;
-
+    if (UnitUV.X < 0.f || UnitUV.X > 1.f || UnitUV.Y < 0.f || UnitUV.Y > 1.f)
+    {
+        return false;
+    }
+    
     int32 PixelX = FMath::Clamp(static_cast<int32>(UnitUV.X * CachedRTSizeX), 0, CachedRTSizeX - 1);
     int32 PixelY = FMath::Clamp(static_cast<int32>(UnitUV.Y * CachedRTSizeY), 0, CachedRTSizeY - 1);
     int32 PixelIndex = (PixelY * CachedRTSizeX) + PixelX;
