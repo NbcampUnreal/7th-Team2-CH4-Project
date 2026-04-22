@@ -204,35 +204,13 @@ namespace
 
 		return false;
 	}
-	static void DrawUnitSelectableRadiusDebug(UWorld* World, const FVector& UnitLocation, const FColor& Color)
+	
+	static bool IsHeroUnitId(const FName UnitId)
 	{
-		if (!World)
-		{
-			return;
-		}
-
-		DrawDebugSphere(
-			World,
-			UnitLocation,
-			SingleSelectionHitRadius,
-			24,
-			Color,
-			false,
-			0.0f,
-			0,
-			2.5f
-		);
-
-		DrawDebugLine(
-			World,
-			UnitLocation,
-			UnitLocation + FVector(0.f, 0.f, 120.f),
-			Color,
-			false,
-			0.0f,
-			0,
-			2.5f
-		);
+		return
+			UnitId == TEXT("DragonKnight") ||
+			UnitId == TEXT("Markman") ||
+			UnitId == TEXT("Astrologian");
 	}
 }
 
@@ -1224,6 +1202,14 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 	{
 		return;
 	}
+	
+	UMassEntitySubsystem* EntitySubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+	if (!EntitySubsystem)
+	{
+		return;
+	}
+
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 
 	const FVector RectCenter = (StartLocation + EndLocation) * 0.5f;
 	FVector2D RectMin = FVector2D::ZeroVector;
@@ -1280,9 +1266,44 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		};
 
 	TArray<FMassEntityHandle> OwnedEntities;
-	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, OwnedEntities, TWPS->PlayerSlot) && OwnedEntities.Num() > 0)
+	TArray<FMassEntityHandle> OwnedHeroEntities;
+	TArray<FMassEntityHandle> OwnedNormalEntities;
+
+	if (UnitSubsystem->GetEntitiesInRectangle(StartLocation, EndLocation, OwnedEntities, TWPS->PlayerSlot))
 	{
-		ApplyUnitSelection(OwnedEntities, TWPS->PlayerSlot);
+		for (const FMassEntityHandle& Entity : OwnedEntities)
+		{
+			if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+			{
+				continue;
+			}
+
+			const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+			if (!UnitFragment)
+			{
+				continue;
+			}
+
+			if (IsHeroUnitId(UnitFragment->GetUnitID()))
+			{
+				OwnedHeroEntities.Add(Entity);
+			}
+			else
+			{
+				OwnedNormalEntities.Add(Entity);
+			}
+		}
+	}
+
+	if (OwnedHeroEntities.Num() > 0)
+	{
+		ApplyUnitSelection(OwnedHeroEntities, TWPS->PlayerSlot);
+		return;
+	}
+
+	if (OwnedNormalEntities.Num() > 0)
+	{
+		ApplyUnitSelection(OwnedNormalEntities, TWPS->PlayerSlot);
 		return;
 	}
 
@@ -1292,9 +1313,13 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		return;
 	}
 
-	FMassEntityHandle BestEnemyEntity;
-	float BestEnemyDistanceSq = TNumericLimits<float>::Max();
-	int32 BestEnemyOwnerSlot = INDEX_NONE;
+	FMassEntityHandle BestEnemyHeroEntity;
+	float BestEnemyHeroDistanceSq = TNumericLimits<float>::Max();
+	int32 BestEnemyHeroOwnerSlot = INDEX_NONE;
+
+	FMassEntityHandle BestEnemyNormalEntity;
+	float BestEnemyNormalDistanceSq = TNumericLimits<float>::Max();
+	int32 BestEnemyNormalOwnerSlot = INDEX_NONE;
 
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -1318,6 +1343,17 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 
 		for (const FMassEntityHandle& EnemyEntity : EnemyEntities)
 		{
+			if (!EntityManager.IsEntityValid(EnemyEntity) || !EntityManager.IsEntityActive(EnemyEntity))
+			{
+				continue;
+			}
+
+			const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EnemyEntity);
+			if (!UnitFragment)
+			{
+				continue;
+			}
+
 			FVector EnemyLocation = FVector::ZeroVector;
 			if (!TryGetEntityWorldLocation(World, EnemyEntity, EnemyLocation))
 			{
@@ -1330,18 +1366,37 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 			}
 
 			const float DistanceSq = FVector::DistSquared2D(EnemyLocation, RectCenter);
-			if (DistanceSq < BestEnemyDistanceSq)
+
+			if (IsHeroUnitId(UnitFragment->GetUnitID()))
 			{
-				BestEnemyDistanceSq = DistanceSq;
-				BestEnemyEntity = EnemyEntity;
-				BestEnemyOwnerSlot = OtherPS->PlayerSlot;
+				if (DistanceSq < BestEnemyHeroDistanceSq)
+				{
+					BestEnemyHeroDistanceSq = DistanceSq;
+					BestEnemyHeroEntity = EnemyEntity;
+					BestEnemyHeroOwnerSlot = OtherPS->PlayerSlot;
+				}
+			}
+			else
+			{
+				if (DistanceSq < BestEnemyNormalDistanceSq)
+				{
+					BestEnemyNormalDistanceSq = DistanceSq;
+					BestEnemyNormalEntity = EnemyEntity;
+					BestEnemyNormalOwnerSlot = OtherPS->PlayerSlot;
+				}
 			}
 		}
 	}
 
-	if (BestEnemyEntity.IsSet())
+	if (BestEnemyHeroEntity.IsSet())
 	{
-		ApplyUnitSelection({ BestEnemyEntity }, BestEnemyOwnerSlot);
+		ApplyUnitSelection({ BestEnemyHeroEntity }, BestEnemyHeroOwnerSlot);
+		return;
+	}
+
+	if (BestEnemyNormalEntity.IsSet())
+	{
+		ApplyUnitSelection({ BestEnemyNormalEntity }, BestEnemyNormalOwnerSlot);
 		return;
 	}
 
@@ -2539,8 +2594,7 @@ bool ATWPlayerController::IsOwnedHeroCurrentlySelected() const
 			continue;
 		}
 		
-		const FString UnitIdString = UnitId.ToString();
-		if (UnitIdString.Contains(TEXT("Hero")))
+		if (IsHeroUnitId(UnitId))
 		{
 			return true;
 		}
