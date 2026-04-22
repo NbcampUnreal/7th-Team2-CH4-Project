@@ -4,6 +4,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
+#include "Log/TWLogCategory.h"
 #include "UI/Data/TWSelectionQueueItemObject.h"
 
 void UTWSelectionQueueItemWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
@@ -13,7 +14,7 @@ void UTWSelectionQueueItemWidget::NativeOnListItemObjectSet(UObject* ListItemObj
 	const UTWSelectionQueueItemObject* ItemObject = Cast<UTWSelectionQueueItemObject>(ListItemObject);
 	if (!ItemObject)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[QueueItemWidget] Invalid ListItemObject"));
+		UE_LOG(LogTWUI, Warning, TEXT("[QueueItemWidget] Invalid ListItemObject"));
 		return;
 	}
 
@@ -49,30 +50,10 @@ void UTWSelectionQueueItemWidget::ApplyCurveVisual(int32 QueueIndex, int32 Total
 
 	// 너무 과한 왜곡 방지용. 기본 배율 유지
 	SetRenderScale(FVector2D(1.f, 1.f));
-
-	UE_LOG(
-		LogTemp,
-		Verbose,
-		TEXT("[QueueItemWidget] Curve Applied - Index=%d / Total=%d / OffsetY=%.2f"),
-		QueueIndex,
-		TotalCount,
-		CurveOffsetY
-	);
 }
 
 void UTWSelectionQueueItemWidget::SetQueueItemData(const FProductionQueueItemViewModel& InData)
 {
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[QueueItemWidget] PayloadId=%s / DisplayName=%s / IconNull=%d / Active=%d / StackCount=%d"),
-		*InData.PayloadId.ToString(),
-		*InData.DisplayName,
-		InData.Icon.IsNull() ? 1 : 0,
-		InData.bIsActive ? 1 : 0,
-		InData.StackCount
-	);
-
 	if (QueueIconImage)
 	{
 		QueueIconImage->SetVisibility(ESlateVisibility::Visible);

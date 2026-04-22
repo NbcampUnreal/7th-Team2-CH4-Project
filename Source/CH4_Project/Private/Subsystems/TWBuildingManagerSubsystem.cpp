@@ -1,5 +1,6 @@
 ﻿#include "Subsystems/TWBuildingManagerSubsystem.h"
 #include "Building/TWBaseBuilding.h"
+#include "Log/TWLogCategory.h"
 
 void UTWBuildingManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -21,7 +22,7 @@ void UTWBuildingManagerSubsystem::RegisterBuilding(int32 PlayerSlot, ATWBaseBuil
 	}
 	
 	WorldBuildingMap.FindOrAdd(PlayerSlot).Buildings.AddUnique(Building);
-	UE_LOG(LogTemp, Warning, TEXT("Registering Building | ID: %d, Total: %d"), PlayerSlot, WorldBuildingMap[PlayerSlot].Buildings.Num());
+	UE_LOG(LogTWSubsystem, Warning, TEXT("Registering Building | ID: %d, Total: %d"), PlayerSlot, WorldBuildingMap[PlayerSlot].Buildings.Num());
 }
 
 void UTWBuildingManagerSubsystem::UnregisterBuilding(int32 PlayerSlot, ATWBaseBuilding* Building)
@@ -34,7 +35,7 @@ void UTWBuildingManagerSubsystem::UnregisterBuilding(int32 PlayerSlot, ATWBaseBu
 	if (WorldBuildingMap.Contains(PlayerSlot))
 	{
 		WorldBuildingMap[PlayerSlot].Buildings.RemoveSingleSwap(Building);
-		UE_LOG(LogTemp, Warning, TEXT("Unregistering Building | ID: %d, Remain: %d"), PlayerSlot, WorldBuildingMap[PlayerSlot].Buildings.Num());
+		UE_LOG(LogTWSubsystem, Warning, TEXT("Unregistering Building | ID: %d, Remain: %d"), PlayerSlot, WorldBuildingMap[PlayerSlot].Buildings.Num());
 	}
 }
 

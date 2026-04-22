@@ -10,6 +10,7 @@
 #include "TimerManager.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "Core/TWPlayerController.h"
+#include "Log/TWLogCategory.h"
 
 ATWPlayerState::ATWPlayerState()
 {
@@ -40,41 +41,16 @@ void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
 	const int32 PrevSlot = PlayerSlot;
 	PlayerSlot = InPlayerSlot;
 
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[PlayerState] SetPlayerSlot ENTER | PS=%s | PrevSlot=%d | NewSlot=%d | HasAuthority=%d | World=%s"),
-		*GetNameSafe(this),
-		PrevSlot,
-		PlayerSlot,
-		HasAuthority() ? 1 : 0,
-		*GetNameSafe(GetWorld())
-	);
-
 	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[PlayerState] SetPlayerSlot | UnitSubsystem=%s"),
-		IsValid(UnitSubsystem) ? TEXT("Valid") : TEXT("Null")
-	);
 
 	if (IsValid(UnitSubsystem))
 	{
 		UnitSubsystem->AddPlayer(PlayerSlot);
-
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[PlayerState] AddPlayer CALLED | Slot=%d"),
-			PlayerSlot
-		);
 	}
 	else
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWResource,
 			Error,
 			TEXT("[PlayerState] AddPlayer SKIPPED | Slot=%d | Reason=UnitSubsystemNull"),
 			PlayerSlot
@@ -124,14 +100,6 @@ void ATWPlayerState::SetHeroRespawnPending(bool bInPending)
 	}
 
 	bHeroRespawnPending = bInPending;
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[PlayerState] HeroRespawnPending changed | Slot=%d | Pending=%d"),
-		PlayerSlot,
-		bHeroRespawnPending ? 1 : 0
-	);
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
@@ -153,16 +121,6 @@ void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 A
 	}
 
 	Resources[Index] += Amount;
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("Player %d | Wood: %d | Ore: %d | Mithril: %d"),
-		PlayerSlot,
-		GetResourceAmount(EResourceType::Wood),
-		GetResourceAmount(EResourceType::Ore),
-		GetResourceAmount(EResourceType::Mithril)
-	);
 
 	NotifyUIResourceStateChanged();
 }
@@ -234,7 +192,7 @@ void ATWPlayerState::SetCurrentPopulationFromContainer(const int32 InAmount)
 	RefreshTroopUpkeepTimer();
 
 	UE_LOG(
-		LogTemp,
+		LogTWResource,
 		Log,
 		TEXT("PlayerSlot: %d | CurrentPopulation(Container): %d / %d (Max: %d)"),
 		PlayerSlot,
@@ -280,15 +238,6 @@ void ATWPlayerState::AddPopulationLimit(const int32 InAmount)
 	PopulationLimit += InAmount;
 	PopulationLimit = FMath::Min(PopulationLimit, MaxPopulation);
 	PopulationLimit = FMath::Max(1, PopulationLimit);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("PlayerSlot: %d | PopulationLimit: %d / %d"),
-		PlayerSlot,
-		PopulationLimit,
-		MaxPopulation
-	);
 
 	NotifyUIResourceStateChanged();
 }
@@ -376,13 +325,9 @@ void ATWPlayerState::HandleTroopUpkeep()
 		TroopBuilding->SetQueuePausedByUpkeep(bPaidUpkeep == 0);
 	}
 
-	if (bPaidUpkeep == 1)
+	if (bPaidUpkeep != 1)
 	{
-		UE_LOG(LogTemp, Log, TEXT("PlayerSlot: %d | 유지비 지불 성공"), PlayerSlot);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("PlayerSlot: %d | 유지비 부족 - 다음 체크까지 대기열 정지"), PlayerSlot);
+		UE_LOG(LogTWResource, Warning, TEXT("PlayerSlot: %d | 유지비 부족 - 다음 체크까지 대기열 정지"), PlayerSlot);
 	}
 }
 
@@ -482,26 +427,7 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 		Delta.StatusType = static_cast<uint8>(UpgradeRow.TargetStatus);
 		Delta.NewValue = NewValue;
 		BonusDeltas.Add(Delta);
-
-		UE_LOG(
-			LogTemp,
-			Log,
-			TEXT("[플레이어 상태] 업그레이드 적용 | UpgradeID: %s | UnitID: %s | StatusType: %s | 증가값: %d | 누적값: %.2f"),
-			*UpgradeRow.UpgradeID.ToString(),
-			*Pair.Key.ToString(),
-			*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
-			Pair.Value,
-			NewValue
-		);
 	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[플레이어 상태] 업그레이드 레벨 | UpgradeID: %s | Level: %d"),
-		*UpgradeRow.UpgradeID.ToString(),
-		UpgradeLevel
-	);
 
 	UTWUnitSubsystem* UnitSubsystem = GetUnitSubsystem();
 	if (IsValid(UnitSubsystem))
@@ -509,15 +435,6 @@ void ATWPlayerState::ApplyUpgradeRow(const FTWUpgradeTableRowBase& UpgradeRow)
 		for (const TPair<FName, int32>& Pair : UpgradeRow.TargetUnits)
 		{
 			UnitSubsystem->ApplyStatus(Pair.Key, PlayerSlot);
-
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("[플레이어 상태] 기존 유닛 재적용 요청 | UpgradeID: %s | UnitID: %s | PlayerSlot: %d"),
-				*UpgradeRow.UpgradeID.ToString(),
-				*Pair.Key.ToString(),
-				PlayerSlot
-			);
 		}
 	}
 	

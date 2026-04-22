@@ -7,6 +7,7 @@
 #include "Core/TWGameMode.h"
 #include "Core/TWPlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "Log/TWLogCategory.h"
 #include "Math/UnrealMathUtility.h"
 
 ATWHeroUnitBase::ATWHeroUnitBase()
@@ -24,7 +25,7 @@ void ATWHeroUnitBase::BeginPlay()
 	Super::BeginPlay();
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Warning,
 		TEXT("[HeroActor BeginPlay] Name=%s NetMode=%d HasAuthority=%s World=%s"),
 		*GetName(),
@@ -196,7 +197,7 @@ void ATWHeroUnitBase::TryRequestHeroRespawn()
 	if (!OwnerPS)
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWHero,
 			Warning,
 			TEXT("[%s] TryRequestHeroRespawn failed: OwnerPS not found | OwnerSlot=%d"),
 			*GetName(),
@@ -226,7 +227,7 @@ void ATWHeroUnitBase::TryRequestHeroRespawn()
 	);
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Warning,
 		TEXT("[%s] Hero respawn requested | OwnerSlot=%d | HeroId=%s"),
 		*GetName(),
@@ -245,7 +246,7 @@ void ATWHeroUnitBase::HandleHeroDeath(AActor* DamageCauser)
 	bHeroDead = true;
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Warning,
 		TEXT("[%s] Hero died | OwnerSlot=%d | HeroId=%s | Causer=%s"),
 		*GetName(),
@@ -267,16 +268,6 @@ void ATWHeroUnitBase::ReceiveHeroDamage(float InDamageAmount, AActor* DamageCaus
 	}
 
 	CurrentHeroHP = FMath::Max(0.f, CurrentHeroHP - InDamageAmount);
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[%s] Hero Damage Applied: %.1f / CurrentHP: %.1f / Causer: %s"),
-		*GetName(),
-		InDamageAmount,
-		CurrentHeroHP,
-		DamageCauser ? *DamageCauser->GetName() : TEXT("None")
-	);
 
 	if (CurrentHeroHP <= 0.f)
 	{
@@ -330,7 +321,7 @@ bool ATWHeroUnitBase::TryApplyDamageToActor(AActor* TargetActor, float DamageAmo
 	if (ATWBaseBuilding* TargetBuilding = Cast<ATWBaseBuilding>(TargetActor))
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWHero,
 			Warning,
 			TEXT("[%s] Building target ignored by hero skill damage: %s"),
 			*GetName(),
@@ -370,7 +361,7 @@ void ATWHeroUnitBase::ApplyHeroBuffMultiplier(float InMultiplier)
 	bHeroBuffApplied = true;
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Log,
 		TEXT("[%s] Self Buff Applied: Damage=%.1f Armor=%.1f AttackSpeed=%.1f MoveSpeed=%.1f"),
 		*GetName(),
@@ -392,7 +383,7 @@ void ATWHeroUnitBase::RestoreHeroBuff()
 	bHeroBuffApplied = false;
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Log,
 		TEXT("[%s] Self Buff Restored"),
 		*GetName()

@@ -4,6 +4,7 @@
 #include "EngineUtils.h"
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
+#include "Log/TWLogCategory.h"
 
 struct FTWHeroTableRowBase;
 
@@ -13,11 +14,11 @@ ATWHeroUnitBuff::ATWHeroUnitBuff()
 
 void ATWHeroUnitBuff::UseSkill()
 {
-	UE_LOG(LogTemp, Warning, TEXT("UseSkill() 호출됨"));
+	UE_LOG(LogTWHero, Warning, TEXT("UseSkill() 호출됨"));
 
 	if (!GetSkillReady())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
 		return;
 	}
 
@@ -27,7 +28,7 @@ void ATWHeroUnitBuff::UseSkill()
 
 	if (!SkillData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (데이터 없음)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (데이터 없음)"));
 		return;
 	}
 
@@ -80,7 +81,7 @@ void ATWHeroUnitBuff::UseSkill()
 	CommitSkillCooldown();
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Log,
 		TEXT("버프 스킬 시전! Radius=%.1f Multiplier=%.2f Duration=%.1f"),
 		SkillData->SkillRange,
@@ -94,7 +95,7 @@ void ATWHeroUnitBuff::UseSkill()
 		[this]()
 		{
 			EndSelfBuff();
-			UE_LOG(LogTemp, Log, TEXT("자기 자신 버프 종료"));
+			UE_LOG(LogTWHero, Log, TEXT("자기 자신 버프 종료"));
 		},
 		SkillData->BuffDuration,
 		false

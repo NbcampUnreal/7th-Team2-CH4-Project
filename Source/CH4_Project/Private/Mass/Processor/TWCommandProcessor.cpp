@@ -10,6 +10,7 @@
 #include "MassNavMeshNavigationFragments.h"
 #include "MassMovementFragments.h"
 #include "MassSignalSubsystem.h"
+#include "Log/TWLogCategory.h"
 #include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
 #include "Mass/Fragments/TWTransformOffsetFragment.h"
@@ -116,7 +117,7 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 						UE::Math::TVector<double> MyLocation = TransformFragments[EntityIdx].GetTransform().
 							GetLocation();
 						UE::Math::TVector<double> TargetLocation = CommandFragments[EntityIdx].GetLocation();
-						UE_LOG(LogTemp, Warning, TEXT("%lf, %lf, %lf -> %lf, %lf, %lf"), MyLocation.X, MyLocation.Y,
+						UE_LOG(LogTWEntity, Warning, TEXT("%lf, %lf, %lf -> %lf, %lf, %lf"), MyLocation.X, MyLocation.Y,
 						       MyLocation.Z, TargetLocation.X, TargetLocation.Y, TargetLocation.Z)
 					}
 

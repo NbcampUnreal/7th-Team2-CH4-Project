@@ -3,6 +3,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Kismet/GameplayStatics.h"
+#include "Log/TWLogCategory.h"
 
 
 ATWHeroTestController::ATWHeroTestController()
@@ -22,7 +23,7 @@ void ATWHeroTestController::BeginPlay()
 
     if (ControlledHero)
     {
-        UE_LOG(LogTemp, Warning, TEXT("HeroController 캐스트 성공"));
+        UE_LOG(LogTWHero, Warning, TEXT("HeroController 캐스트 성공"));
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
         {
             if (DefaultMappingContext)
@@ -33,7 +34,7 @@ void ATWHeroTestController::BeginPlay()
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("HeroController 캐스트 실패"));
+        UE_LOG(LogTWHero, Error, TEXT("HeroController 캐스트 실패"));
     }
 }
 
@@ -68,25 +69,25 @@ void ATWHeroTestController::OnSkillAction()
     
     if (!ControlledHero->GetSkillReady())
     {
-        UE_LOG(LogTemp, Error, TEXT("쿨다운 중입니다"));
+        UE_LOG(LogTWHero, Warning, TEXT("쿨다운 중입니다"));
         return;
     }
 
     if (ControlledHero->IsIndicatorRequired())
     {
-        UE_LOG(LogTemp, Warning, TEXT("인디케이터 필요 스킬 사용"));
+        UE_LOG(LogTWHero, Warning, TEXT("인디케이터 필요 스킬 사용"));
         bIsTargetingMode = !bIsTargetingMode;
         ControlledHero->SetIndicatorVisible(bIsTargetingMode);
         
         if (ControlledHero->IsRangeRequired())
         {
-            UE_LOG(LogTemp, Warning, TEXT("범위 표시 필요 스킬 사용"));
+            UE_LOG(LogTWHero, Warning, TEXT("범위 표시 필요 스킬 사용"));
             ControlledHero->SetRangeVisible(bIsTargetingMode);
         }
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("즉시 시전 스킬 사용"));
+        UE_LOG(LogTWHero, Warning, TEXT("즉시 시전 스킬 사용"));
         ControlledHero->CurrentTargetLocation = GetMouseWorldLocation();
         ControlledHero->UseSkill();
         bIsTargetingMode = false;
@@ -97,7 +98,7 @@ void ATWHeroTestController::OnConfirmAction()
 {
     if (bIsTargetingMode && ControlledHero)
     {
-        UE_LOG(LogTemp, Error, TEXT("스킬 시전"));
+        UE_LOG(LogTWHero, Warning, TEXT("스킬 시전"));
         ControlledHero->CurrentTargetLocation = GetMouseWorldLocation();
         ControlledHero->UseSkill();
         bIsTargetingMode = false;
@@ -108,7 +109,7 @@ void ATWHeroTestController::OnCancelAction()
 {
     if (bIsTargetingMode && ControlledHero)
     {
-        UE_LOG(LogTemp, Error, TEXT("스킬 사용 취소"));
+        UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 취소"));
         bIsTargetingMode = false;
         ControlledHero->SetIndicatorVisible(bIsTargetingMode);
     }

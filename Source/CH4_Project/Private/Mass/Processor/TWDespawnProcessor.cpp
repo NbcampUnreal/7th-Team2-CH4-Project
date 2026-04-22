@@ -8,6 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "MassActorSubsystem.h"
 #include "MassSignalSubsystem.h"
+#include "Log/TWLogCategory.h"
 #include "Mass/TWUnit.h"
 #include "Mass/Fragments/TWAttackFragment.h"
 #include "Mass/Fragments/TWCommandFragment.h"
@@ -72,7 +73,7 @@ void UTWDespawnProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 				StatusList[EntityIdx].SetIsDeath(true);
 				EntityManager.Defer().AddTag<FTWMassDeadTag>(Entity);
 
-				UE_LOG(LogTemp, Warning, TEXT("Entity Dead!"))
+				UE_LOG(LogTWEntity, Warning, TEXT("Entity Dead!"))
 			}
 
 

@@ -3,6 +3,7 @@
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Building/TWBaseBuilding.h"
+#include "Log/TWLogCategory.h"
 #include "Subsystems/TWUnitSubsystem.h"
 
 UTWUISelectionProvider::UTWUISelectionProvider()
@@ -229,7 +230,7 @@ void UTWUISelectionProvider::HandleCommandInput(const FName& InCommandId, const 
 	}
 
 	UE_LOG(
-		LogTemp,
+		LogTWUI,
 		Log,
 		TEXT("[TWUISelectionProvider] Execute Command: %s (Context=%s)"),
 		*InCommandId.ToString(),

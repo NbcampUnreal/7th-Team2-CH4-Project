@@ -6,6 +6,7 @@
 #include "Lobby/TWLobbyPlayerController.h"
 #include "Lobby/TWLobby_Layout.h"
 #include "Core/TWPlayerState.h"
+#include "Log/TWLogCategory.h"
 #include "Net/UnrealNetwork.h"
 
 ATWLobbyPlayerState::ATWLobbyPlayerState()
@@ -114,7 +115,7 @@ void ATWLobbyPlayerState::OnRep_IsHost()
 	bool Host = IsHost();
 	if (LPC && LPC->LobbyWidgetInstance)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Current Host : %s"), IsHost() ? TEXT("True") : TEXT("False"));
+		UE_LOG(LogTWLobby, Warning, TEXT("Current Host : %s"), IsHost() ? TEXT("True") : TEXT("False"));
 		LPC->LobbyWidgetInstance->ShowPlayButton(Host);
 		LPC->LobbyWidgetInstance->UpdateUserImage();
 	}

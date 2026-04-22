@@ -23,6 +23,7 @@
 #include "Mass/Fragments/TWStatusFragment.h"
 #include "Mass/Replication/BubbleInfo/TWMassClientBubbleInfo.h"
 #include "TimerManager.h"
+#include "Log/TWLogCategory.h"
 
 namespace
 {
@@ -1061,7 +1062,7 @@ bool UTWUnitSubsystem::SpawnUnitById(
 	const FTWUnitTableRowBase* UnitRow = GetUnitTableRowBase(UnitId);
 	if (!UnitRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UnitSubsystem] SpawnUnitById failed: UnitRow not found (%s)"), *UnitId.ToString());
+		UE_LOG(LogTWSubsystem, Warning, TEXT("[UnitSubsystem] SpawnUnitById failed: UnitRow not found (%s)"), *UnitId.ToString());
 		return false;
 	}
 
@@ -1082,7 +1083,7 @@ bool UTWUnitSubsystem::SpawnHeroUnitById(
 
 	if (!IsHeroUnitId(HeroUnitId))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[UnitSubsystem] SpawnHeroUnitById failed: Not hero id (%s)"), *HeroUnitId.ToString());
+		UE_LOG(LogTWSubsystem, Warning, TEXT("[UnitSubsystem] SpawnHeroUnitById failed: Not hero id (%s)"), *HeroUnitId.ToString());
 		return false;
 	}
 

@@ -290,13 +290,6 @@ void ATWPlayerController::OnPossess(APawn* InPawn)
 
 	bHasPendingStartFocusLocation = false;
 	PendingStartFocusLocation = FVector::ZeroVector;
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[PlayerController] FocusStart applied on possess | NewLocation=%s"),
-		*NewLocation.ToString()
-	);
 }
 
 void ATWPlayerController::Tick(float DeltaSeconds)
@@ -359,7 +352,7 @@ void ATWPlayerController::ClientFocusStartLocation_Implementation(const FVector&
 		PendingStartFocusLocation = InWorldLocation;
 
 		UE_LOG(
-			LogTemp,
+			LogTWCommand,
 			Warning,
 			TEXT("[PlayerController] FocusStart deferred: Pawn not ready | Target=%s"),
 			*InWorldLocation.ToString()
@@ -374,13 +367,6 @@ void ATWPlayerController::ClientFocusStartLocation_Implementation(const FVector&
 
 	bHasPendingStartFocusLocation = false;
 	PendingStartFocusLocation = FVector::ZeroVector;
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[PlayerController] FocusStart applied | NewLocation=%s"),
-		*NewLocation.ToString()
-	);
 }
 
 void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority,
@@ -898,10 +884,6 @@ void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& 
 		});
 
 	EntityManager.AppendCommands(CommandBuffer);
-
-	UE_LOG(LogTemp, Log, TEXT("[Move] SelectedEntities=%d / Target=%s"),
-	       ServerSelectedEntities.Num(),
-	       *NavCommandLocation.ToString());
 }
 
 bool ATWPlayerController::TryFindAttackableBuildingCandidate(
@@ -1039,14 +1021,6 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 				else if (IsValid(TargetBuilding))
 				{
 					CommandType = ETWMassCommand::AttackToTarget;
-
-					UE_LOG(
-						LogTemp,
-						Log,
-						TEXT("[AttackPreview] Building target candidate found: %s / Location=%s"),
-						*GetNameSafe(TargetBuilding),
-						*TargetLocation.ToString()
-					);
 				}
 			}
 
@@ -1097,10 +1071,6 @@ void ATWPlayerController::ServerHandleAttackCommand_Implementation(const FVector
 		});
 
 	EntityManager.AppendCommands(CommandBuffer);
-
-	UE_LOG(LogTemp, Log, TEXT("[Attack] SelectedEntities=%d / Target=%s"),
-	       ServerSelectedEntities.Num(),
-	       *NavCommandLocation.ToString());
 }
 
 void ATWPlayerController::ServerHandleHoldCommand_Implementation()
@@ -1780,7 +1750,7 @@ bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMa
 	const ATWHeroUnitBase* OwnedHero = GetOwnedHeroUnit();
 	if (!IsValid(OwnedHero))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] OwnedHero actor not found"));
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] OwnedHero actor not found"));
 		return false;
 	}
 
@@ -1792,7 +1762,7 @@ bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMa
 	TArray<FMassEntityHandle> NearbyEntities;
 	if (!UnitSubsystem->GetEntitiesInRectangle(AreaMin, AreaMax, NearbyEntities, PS->PlayerSlot))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] No nearby entities around hero actor"));
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] No nearby entities around hero actor"));
 		return false;
 	}
 
@@ -2290,11 +2260,9 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 	const FName HeroUnitId = InHeroUnitId;
 	if (HeroUnitId.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroUnitId is None"));
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] HeroUnitId is None"));
 		return;
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] UnitId=%s"), *HeroUnitId.ToString());
 
 	UTWUnitSubsystem* UnitSubsystem = GetWorld()->GetSubsystem<UTWUnitSubsystem>();
 	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
@@ -2306,21 +2274,21 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 	FMassEntityHandle HeroEntity;
 	if (!TryFindOwnedHeroEntityByUnitId(HeroUnitId, HeroEntity))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroEntity not found for UnitId=%s"), *HeroUnitId.ToString());
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] HeroEntity not found for UnitId=%s"), *HeroUnitId.ToString());
 		return;
 	}
 
 	const FTWHeroTableRowBase* HeroRow = FindHeroSkillRow(HeroUnitId);
 	if (!HeroRow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] HeroRow not found: %s"), *HeroUnitId.ToString());
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] HeroRow not found: %s"), *HeroUnitId.ToString());
 		return;
 	}
 
 	FVector HeroLocation = FVector::ZeroVector;
 	if (!UnitSubsystem->TryGetUnitWorldLocation(HeroEntity, HeroLocation))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill][Server] hero location resolve failed"));
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill][Server] hero location resolve failed"));
 		return;
 	}
 
@@ -2351,15 +2319,6 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
 		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
 		ClientRefreshSelectedUnitStatusAndUI();
-
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[HeroSkill][Server] DragonKnight buff applied | Radius=%.1f Multiplier=%.2f Duration=%.1f"),
-			ResolveHeroSkillDamageRadius(HeroRow),
-			HeroRow->StatMultiplier,
-			HeroRow->BuffDuration
-		);
 		return;
 	}
 
@@ -2419,17 +2378,6 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
 		ClientRefreshSelectedUnitStatusAndUI();
 
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[HeroSkill][Server] Astrologian area damage | Target=%s Radius=%.1f Damage=%.1f UnitHits=%d BuildingHits=%d"),
-			*InTargetLocation.ToString(),
-			AreaRadius,
-			SkillDamage,
-			HitUnitCount,
-			HitBuildingCount
-		);
-
 		return;
 	}
 
@@ -2480,23 +2428,13 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 
 		if (!HeroRow->ProjectileClass)
 		{
-			UE_LOG(LogTemp, Error, TEXT("[HeroSkill][Server] ProjectileClass NULL | UnitId=%s"), *HeroUnitId.ToString());
+			UE_LOG(LogTWCommand, Error, TEXT("[HeroSkill][Server] ProjectileClass NULL | UnitId=%s"), *HeroUnitId.ToString());
 		}
 
 		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
 		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
 		ClientRefreshSelectedUnitStatusAndUI();
-
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[HeroSkill][Server] Markman damage applied | UnitTarget=%s BuildingTarget=%s TargetPoint=%s SearchRadius=%.1f Damage=%.1f"),
-			bHasTargetEntity ? TEXT("true") : TEXT("false"),
-			bHasTargetBuilding ? TEXT("true") : TEXT("false"),
-			*FinalTargetLocation.ToString(),
-			AcquireRadius,
-			SkillDamage
-		);
+		
 		return;
 	}
 }
@@ -2508,14 +2446,6 @@ void ATWPlayerController::BeginHeroSkillTargeting(FName InHeroUnitId)
 	const float TargetRadius = ResolveHeroSkillTargetRadius(InHeroUnitId);
 	ApplyHeroSkillTargetDecalStyle(InHeroUnitId, TargetRadius);
 	UpdateHeroSkillTargetDecal(GetMouseWorldLocation());
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("[HeroSkill] Targeting Start: %s / Radius=%.1f"),
-		*InHeroUnitId.ToString(),
-		TargetRadius
-	);
 }
 
 void ATWPlayerController::ConfirmHeroSkillTargeting()
@@ -2530,7 +2460,7 @@ void ATWPlayerController::ConfirmHeroSkillTargeting()
 
 	if (HeroUnitId.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[HeroSkill] Confirm failed: PendingHeroSkillUnitId is None"));
+		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill] Confirm failed: PendingHeroSkillUnitId is None"));
 		HideHeroSkillTargetDecal();
 		bHeroSkillTargetingMode = false;
 		PendingHeroSkillUnitId = NAME_None;
@@ -3247,37 +3177,17 @@ bool ATWPlayerController::CanExecuteCommand(const FUICommandMetaRow* CommandMeta
 			ATWBaseBuilding* Selected = GetSelectedBuilding();
 			if (!IsValid(Selected))
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Produce blocked: no selected building | CommandId=%s"),
-					*CommandId.ToString()
-				);
 				return false;
 			}
 
 			const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
 			if (!LocalPS)
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Produce blocked: no local player state | CommandId=%s"),
-					*CommandId.ToString()
-				);
 				return false;
 			}
 
 			if (Selected->OwnerPlayerSlot != LocalPS->PlayerSlot)
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Produce blocked: selected building is not mine | CommandId=%s | BuildingOwner=%d | MySlot=%d"),
-					*CommandId.ToString(),
-					Selected->OwnerPlayerSlot,
-					LocalPS->PlayerSlot
-				);
 				return false;
 			}
 
@@ -3285,28 +3195,11 @@ bool ATWPlayerController::CanExecuteCommand(const FUICommandMetaRow* CommandMeta
 			if (CommandId == TEXT("IncreasePopulation"))
 			{
 				const bool bValidPopulationBuilding = (Cast<ATWPopulationBuilding>(Selected) != nullptr);
-				if (!bValidPopulationBuilding)
-				{
-					UE_LOG(
-						LogTemp,
-						Warning,
-						TEXT("[Command] Produce blocked: IncreasePopulation requires ATWPopulationBuilding")
-					);
-				}
 				return bValidPopulationBuilding;
 			}
 
 			// 일반 병력 생산 전용
 			const bool bValidTroopBuilding = (Cast<ATWTroopSpawnBuilding>(Selected) != nullptr);
-			if (!bValidTroopBuilding)
-			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Produce blocked: troop production requires ATWTroopSpawnBuilding | CommandId=%s"),
-					*CommandId.ToString()
-				);
-			}
 			return bValidTroopBuilding;
 		}
 
@@ -3315,50 +3208,22 @@ bool ATWPlayerController::CanExecuteCommand(const FUICommandMetaRow* CommandMeta
 			ATWBaseBuilding* Selected = GetSelectedBuilding();
 			if (!IsValid(Selected))
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Research blocked: no selected building | CommandId=%s"),
-					*CommandId.ToString()
-				);
 				return false;
 			}
 
 			const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
 			if (!LocalPS)
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Research blocked: no local player state | CommandId=%s"),
-					*CommandId.ToString()
-				);
 				return false;
 			}
 
 			if (Selected->OwnerPlayerSlot != LocalPS->PlayerSlot)
 			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Research blocked: selected building is not mine | CommandId=%s | BuildingOwner=%d | MySlot=%d"),
-					*CommandId.ToString(),
-					Selected->OwnerPlayerSlot,
-					LocalPS->PlayerSlot
-				);
 				return false;
 			}
 
 			const bool bValidUpgradeBuilding = (Cast<ATWUpgradeBuilding>(Selected) != nullptr);
-			if (!bValidUpgradeBuilding)
-			{
-				UE_LOG(
-					LogTemp,
-					Warning,
-					TEXT("[Command] Research blocked: selected building is not ATWUpgradeBuilding | CommandId=%s"),
-					*CommandId.ToString()
-				);
-			}
+			
 			return bValidUpgradeBuilding;
 		}
 
@@ -3388,13 +3253,6 @@ bool ATWPlayerController::TryHandleImmediateCommand(const FUICommandMetaRow* Com
 
 				ClearArmedCommandId();
 			}
-
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("건설 모드: %s"),
-				bBuildShortcutModeActive ? TEXT("ON") : TEXT("OFF")
-			);
 
 			if (PlayerUIControllerComponent)
 			{
@@ -3479,7 +3337,7 @@ bool ATWPlayerController::TryHandleServerRoutedCommand(const FUICommandMetaRow* 
 			if (!TryResolveBuildingCategoryFromPayload(CommandMeta->PayloadId, Category))
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command] Build payload resolve failed: %s"),
 					*CommandMeta->PayloadId.ToString()
@@ -3565,7 +3423,7 @@ void ATWPlayerController::ClearArmedCommandId()
 
 void ATWPlayerController::HandleCommandById(FName CommandId)
 {
-	UE_LOG(LogTemp, Log, TEXT("[Command] HandleCommandById: %s"), *CommandId.ToString());
+	UE_LOG(LogTWCommand, Log, TEXT("[Command] HandleCommandById: %s"), *CommandId.ToString());
 
 	if (CommandId.IsNone())
 	{
@@ -3575,7 +3433,7 @@ void ATWPlayerController::HandleCommandById(FName CommandId)
 	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
 	if (!CommandMeta)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Command] CommandMeta not found: %s"), *CommandId.ToString());
+		UE_LOG(LogTWCommand, Warning, TEXT("[Command] CommandMeta not found: %s"), *CommandId.ToString());
 		return;
 	}
 	if (CommandId == TEXT("HeroSkill"))
@@ -3624,7 +3482,7 @@ void ATWPlayerController::HandleCommandById(FName CommandId)
 	}
 
 	UE_LOG(
-		LogTemp,
+		LogTWCommand,
 		Warning,
 		TEXT("[Command] Unhandled command: %s / Type=%d / Route=%d"),
 		*CommandId.ToString(),
@@ -3643,14 +3501,14 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 	const FUICommandMetaRow* CommandMeta = FindCommandMetaRowFromTable(CommandId);
 	if (!CommandMeta)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Command][Server] CommandMeta not found: %s"), *CommandId.ToString());
+		UE_LOG(LogTWCommand, Warning, TEXT("[Command][Server] CommandMeta not found: %s"), *CommandId.ToString());
 		return;
 	}
 
 	ATWPlayerState* TWPS = GetPlayerState<ATWPlayerState>();
 	if (!TWPS)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Command][Server] PlayerState not found: %s"), *CommandId.ToString());
+		UE_LOG(LogTWCommand, Warning, TEXT("[Command][Server] PlayerState not found: %s"), *CommandId.ToString());
 		return;
 	}
 
@@ -3661,14 +3519,14 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 		ATWBaseBuilding* CurrentSelectedBuilding = GetSelectedBuilding();
 		if (!IsValid(CurrentSelectedBuilding))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[Command][Server] Produce failed: no selected building"));
+			UE_LOG(LogTWCommand, Warning, TEXT("[Command][Server] Produce failed: no selected building"));
 			return;
 		}
 
 		if (CurrentSelectedBuilding->OwnerPlayerSlot != TWPS->PlayerSlot)
 		{
 			UE_LOG(
-				LogTemp,
+				LogTWCommand,
 				Warning,
 				TEXT("[Command][Server] Produce rejected: selected building is not mine | CommandId=%s | BuildingOwner=%d | MySlot=%d"),
 				*CommandId.ToString(),
@@ -3714,7 +3572,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 			if (!IsValid(CurrentSelectedBuilding))
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command][Server] Research failed: no selected building | CommandId=%s"),
 					*CommandId.ToString()
@@ -3725,7 +3583,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 			if (CurrentSelectedBuilding->OwnerPlayerSlot != TWPS->PlayerSlot)
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command][Server] Research rejected: selected building is not mine | CommandId=%s | BuildingOwner=%d | MySlot=%d"),
 					*CommandId.ToString(),
@@ -3739,7 +3597,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 			if (!TargetUpgradeBuilding)
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command][Server] Research failed: selected building is not ATWUpgradeBuilding | CommandId=%s"),
 					*CommandId.ToString()
@@ -3750,7 +3608,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 			if (CommandMeta->PayloadId.IsNone() || CommandMeta->PayloadId == TEXT("None"))
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command][Server] Research failed: invalid payload for %s"),
 					*CommandId.ToString()
@@ -3767,7 +3625,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 			else
 			{
 				UE_LOG(
-					LogTemp,
+					LogTWCommand,
 					Warning,
 					TEXT("[Command][Server] Research request rejected | CommandId=%s | Payload=%s"),
 					*CommandId.ToString(),
@@ -3780,7 +3638,7 @@ void ATWPlayerController::ServerHandleCommandById_Implementation(FName CommandId
 	default:
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWCommand,
 			Warning,
 			TEXT("[Command][Server] Unsupported type: %s / Type=%d"),
 			*CommandId.ToString(),

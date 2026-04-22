@@ -2,6 +2,7 @@
 
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
+#include "Log/TWLogCategory.h"
 #include "UI/Widgets/TWCommandSlotWidget.h"
 
 void UTWCommandPanelWidget::NativeConstruct()
@@ -27,7 +28,6 @@ void UTWCommandPanelWidget::RebuildSlots()
 
 	if (!CommandSlotWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[RTSCommandPanelWidget] CommandSlotWidgetClass is null."));
 		return;
 	}
 

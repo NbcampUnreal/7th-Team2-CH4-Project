@@ -57,8 +57,6 @@ void ATWNexusBuilding::ApplyDamageToBuilding(const float InDamageAmount)
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Damage : %.2f / %.2f"), CurrentHP, MaxHP);
-
 	const UTWNexusBuildingDataAsset* NexusData = GetNexusBuildingData();
 	if (!NexusData)
 	{
@@ -141,8 +139,6 @@ void ATWNexusBuilding::HandleHPRegen()
 	{
 		GetWorldTimerManager().ClearTimer(RegenTickTimerHandle);
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("[Nexus] HP Regen : %.2f / %.2f"), CurrentHP, MaxHP);
 }
 
 void ATWNexusBuilding::StartWoodProduction()

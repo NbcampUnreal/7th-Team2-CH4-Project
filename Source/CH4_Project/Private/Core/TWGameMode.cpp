@@ -14,6 +14,7 @@
 #include "NavigationSystem.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "Log/TWLogCategory.h"
 
 void ATWGameMode::PostLogin(APlayerController* NewPlayer)
 {
@@ -63,7 +64,6 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 	ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
 	if (!PS)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[GameMode] InitializeJoinedPlayer skipped: PlayerState is null"));
 		return;
 	}
 
@@ -77,14 +77,6 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 		const int32 AssignedSlot = AllocateNextPlayerSlot();
 		PS->SetPlayerSlot(AssignedSlot);
 		PS->SetTeamID(AssignedSlot);
-
-		UE_LOG(
-			LogTemp,
-			Log,
-			TEXT("[GameMode] Player slot assigned | Slot=%d | HeroId=%s"),
-			AssignedSlot,
-			*PS->GetSelectedHeroUnitId().ToString()
-		);
 	}
 
 	ATWNexusBuilding* AssignedNexus = PS->GetAssignedStartNexus();
@@ -104,7 +96,7 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 	if (!IsValid(AssignedNexus))
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] InitializeJoinedPlayer failed: no start nexus available | Slot=%d"),
 			PS->PlayerSlot
@@ -120,7 +112,7 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 	if (!bAlreadyHasHero && !bSpawnedNow)
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] Initial hero spawn failed -> scheduling retry | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -137,16 +129,6 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 	}
 
 	TryFinalizeStartSetup();
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Player initialized complete | Slot=%d | Nexus=%s | HeroId=%s | HeroReady=%d"),
-		PS->PlayerSlot,
-		*GetNameSafe(AssignedNexus),
-		*PS->GetSelectedHeroUnitId().ToString(),
-		HasSpawnedInitialHeroForPlayer(PS) ? 1 : 0
-	);
 }
 
 bool ATWGameMode::HasAlreadyInitializedPlayer(const ATWPlayerState* PS) const
@@ -203,7 +185,7 @@ void ATWGameMode::ScheduleInitialHeroSpawnRetry(ATWPlayerState* PS, int32 Remain
 	if (RemainingRetryCount <= 0)
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Error,
 			TEXT("[GameMode] Initial hero spawn retry exhausted | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -224,7 +206,7 @@ void ATWGameMode::ScheduleInitialHeroSpawnRetry(ATWPlayerState* PS, int32 Remain
 	GetWorldTimerManager().SetTimer(RetryTimerHandle, RetryDelegate, InitialHeroSpawnRetryDelay, false);
 
 	UE_LOG(
-		LogTemp,
+		LogTWGameMode,
 		Warning,
 		TEXT("[GameMode] Initial hero spawn retry scheduled | Slot=%d | Remaining=%d"),
 		PS->PlayerSlot,
@@ -248,7 +230,7 @@ void ATWGameMode::RetryInitialHeroSpawn(ATWPlayerState* PS, int32 RemainingRetry
 	if (!IsValid(Nexus))
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] RetryInitialHeroSpawn skipped: nexus invalid | Slot=%d"),
 			PS->PlayerSlot
@@ -287,7 +269,7 @@ void ATWGameMode::RetryInitialHeroSpawn(ATWPlayerState* PS, int32 RemainingRetry
 		TryFinalizeStartSetup();
 
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Log,
 			TEXT("[GameMode] Initial hero spawn retry success | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -380,14 +362,6 @@ void ATWGameMode::AssignNexusOwnership(ATWNexusBuilding* Nexus, ATWPlayerState* 
 
 	Nexus->SetOwnerPlayerSlot(PS->PlayerSlot);
 	Nexus->SetOwnerPlayerState(PS);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Nexus ownership assigned | Nexus=%s | Slot=%d"),
-		*GetNameSafe(Nexus),
-		PS->PlayerSlot
-	);
 }
 
 FVector ATWGameMode::CalculateAllStartNexusCenter() const
@@ -565,7 +539,7 @@ bool ATWGameMode::SpawnSelectedHeroUnitForPlayer(ATWPlayerState* PS, ATWNexusBui
 	if (PS->GetSelectedHeroUnitId().IsNone())
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] SpawnSelectedHeroUnitForPlayer failed: HeroId is None | Slot=%d"),
 			PS->PlayerSlot
@@ -604,7 +578,7 @@ bool ATWGameMode::SpawnSelectedHeroUnitForPlayer(ATWPlayerState* PS, ATWNexusBui
 	if (!OwnerPC)
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] SpawnSelectedHeroUnitForPlayer failed: OwnerPC not found | Slot=%d"),
 			PS->PlayerSlot
@@ -648,18 +622,6 @@ bool ATWGameMode::SpawnSelectedHeroUnitForPlayer(ATWPlayerState* PS, ATWNexusBui
 			break;
 		}
 	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Hero spawn request | Slot=%d | HeroId=%s | Success=%d | SpawnLocation=%s | SpawnYaw=%.2f"),
-		PS->PlayerSlot,
-		*PS->GetSelectedHeroUnitId().ToString(),
-		bSpawned ? 1 : 0,
-		*SpawnLocation.ToString(),
-		SpawnRotation.Yaw
-	);
-
 	return bSpawned;
 }
 
@@ -680,15 +642,6 @@ void ATWGameMode::RequestRespawnHero(ATWPlayerState* PS, FName HeroUnitId, float
 
 	FTimerHandle RespawnTimerHandle;
 	GetWorldTimerManager().SetTimer(RespawnTimerHandle, RespawnDelegate, DelaySeconds, false);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Hero respawn scheduled | Slot=%d | HeroId=%s | Delay=%.2f"),
-		PS->PlayerSlot,
-		*HeroUnitId.ToString(),
-		DelaySeconds
-	);
 }
 
 void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
@@ -708,7 +661,7 @@ void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
 	if (!IsValid(Nexus))
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] RespawnHero failed: invalid nexus | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -725,7 +678,7 @@ void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
 		PS->SetHeroRespawnPending(false);
 
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Log,
 			TEXT("[GameMode] RespawnHero success | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -735,7 +688,7 @@ void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
 	else
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWGameMode,
 			Warning,
 			TEXT("[GameMode] RespawnHero failed | Slot=%d | HeroId=%s"),
 			PS->PlayerSlot,
@@ -948,13 +901,6 @@ void ATWGameMode::CleanupUnusedStartNexusBuildings()
 			continue;
 		}
 
-		UE_LOG(
-			LogTemp,
-			Log,
-			TEXT("[GameMode] Destroy unused start nexus | Nexus=%s"),
-			*GetNameSafe(Nexus)
-		);
-
 		Nexus->Destroy();
 	}
 }
@@ -978,14 +924,6 @@ void ATWGameMode::TryFinalizeStartSetup()
 
 	CleanupUnusedStartNexusBuildings();
 	bHasCleanedUpUnusedStartNexus = true;
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Start setup finalized | AssignedPlayers=%d | Required=%d"),
-		GetAssignedStartPlayerCount(),
-		RequiredStartPlayerCount
-	);
 }
 
 void ATWGameMode::MovePlayerCameraToAssignedStart(ATWPlayerController* PC, ATWNexusBuilding* Nexus)
@@ -1003,13 +941,4 @@ void ATWGameMode::MovePlayerCameraToAssignedStart(ATWPlayerController* PC, ATWNe
 
 	// 현재 PlayerController에 public으로 열려 있는 함수 사용
 	PC->ClientFocusStartLocation(FocusLocation);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[GameMode] Focus start location sent | PC=%s | Nexus=%s | Focus=%s"),
-		*GetNameSafe(PC),
-		*GetNameSafe(Nexus),
-		*FocusLocation.ToString()
-	);
 }

@@ -344,8 +344,6 @@ void ATWBaseBuilding::UpdateConstruction()
 	const float HPGainPerTick = (MaxHP / MaxBuildTime) * ConstructionTickInterval;
 	CurrentHP = FMath::Clamp(CurrentHP + HPGainPerTick, 0.0f, MaxHP);
 	
-	UE_LOG(LogTemp, Warning, TEXT("RemainBuildTime : %.2f"), CurrentBuildTime);
-	
 	if (CurrentBuildTime >= MaxBuildTime)
 	{
 		FinishConstruction();
@@ -358,7 +356,6 @@ void ATWBaseBuilding::FinishConstruction()
 	CurrentHP = MaxHP;
 	
 	GetWorld()->GetTimerManager().ClearTimer(ConstructionTimerHandle);
-	UE_LOG(LogTemp, Warning, TEXT("BuildCompleted"));
 	OnRep_BuildingState();
 }
 

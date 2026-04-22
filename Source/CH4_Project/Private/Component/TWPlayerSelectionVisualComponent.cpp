@@ -31,8 +31,6 @@ void UTWPlayerSelectionVisualComponent::InitializeVisuals(ATWPlayerController* I
 	HideAllRenderers();
 
 	bVisualsInitialized = true;
-
-	UE_LOG(LogTemp, Warning, TEXT("[SelectionVisualComponent] InitializeVisuals completed."));
 }
 
 void UTWPlayerSelectionVisualComponent::RefreshSelectionVisuals(

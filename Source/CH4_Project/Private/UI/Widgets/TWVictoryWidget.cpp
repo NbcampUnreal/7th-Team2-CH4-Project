@@ -22,6 +22,5 @@ void UTWVictoryWidget::OnExitButtonClicked()
 	if (PC)
 	{
 		PC->ClientTravel(TEXT("L_Title"), TRAVEL_Absolute);
-		UE_LOG(LogTemp, Warning, TEXT("--- Logout ---"));
 	}
 }

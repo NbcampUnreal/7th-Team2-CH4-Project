@@ -36,12 +36,12 @@ void UTWGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 		GridDimensions.X = FMath::CeilToInt(SizeX / CellSize);
 		GridDimensions.Y = FMath::CeilToInt(SizeY / CellSize);
 		
-		UE_LOG(LogNT, Warning, TEXT("Origin: %s, Dimensions: %s"), 
+		UE_LOG(LogTWSubsystem, Warning, TEXT("Origin: %s, Dimensions: %s"), 
 			*GridOrigin.ToString(), *GridDimensions.ToString());
 	}
 	else
 	{
-		UE_LOG(LogNT, Warning, TEXT("Landscape x"));
+		UE_LOG(LogTWSubsystem, Warning, TEXT("Landscape x"));
 		GridOrigin = FVector::ZeroVector;
 		GridDimensions = FIntPoint(200, 200);
 	}
@@ -51,7 +51,7 @@ void UTWGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 	GridData.Empty();
 	GridData.SetNum(TotalCells);
 	
-	UE_LOG(LogNT, Warning, TEXT("TotalCells: %d"), TotalCells);
+	UE_LOG(LogTWSubsystem, Warning, TEXT("TotalCells: %d"), TotalCells);
 	
 	FCollisionQueryParams QueryParams;	
 	QueryParams.bTraceComplex = true;
@@ -121,7 +121,6 @@ void UTWGridSubSystem::OnWorldBeginPlay(UWorld& InWorld)
 			}
 		}
 	}
-	UE_LOG(LogNT, Warning, TEXT("Z축 캐싱 완료"));
 }
 
 FIntPoint UTWGridSubSystem::WorldToGridPosition(const FVector& WorldLocation) const

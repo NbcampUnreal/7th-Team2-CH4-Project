@@ -6,6 +6,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "Log/TWLogCategory.h"
 
 ATWUpgradeBuilding::ATWUpgradeBuilding()
 {
@@ -22,43 +23,27 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 	
 	if (BuildingState != ETWBuildingState::Completed)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 요청 실패: 건설 완료 전"));
 		return 0;
 	}
 
 	if (!OwningPlayerState)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 요청 실패: OwningPlayerState 없음"));
 		return 0;
 	}
 
 	if (InUpgradeID.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 업그레이드 요청 실패: UpgradeID가 비어 있음"));
 		return 0;
 	}
 
 	if (MaxUpgradeQueueCount > 0 && UpgradeQueue.Num() >= MaxUpgradeQueueCount)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[업그레이드 건물] 업그레이드 요청 실패: 큐가 가득 참 | UpgradeID: %s | QueueCount: %d"),
-			*InUpgradeID.ToString(),
-			UpgradeQueue.Num()
-		);
 		return 0;
 	}
 
 	FTWUpgradeTableRowBase* UpgradeRow = GetUpgradeRow(InUpgradeID);
 	if (!UpgradeRow)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[업그레이드 건물] 업그레이드 요청 실패: 업그레이드 데이터 없음 | UpgradeID: %s"),
-			*InUpgradeID.ToString()
-		);
 		return 0;
 	}
 
@@ -66,7 +51,7 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 	if (OwningPlayerState->CanAffordCost(FinalCost) == 0)
 	{
 		UE_LOG(
-			LogTemp,
+			LogTWProduction,
 			Warning,
 			TEXT("[업그레이드 건물] 업그레이드 요청 실패: 자원 부족 | UpgradeID: %s"),
 			*InUpgradeID.ToString()
@@ -78,15 +63,6 @@ int8 ATWUpgradeBuilding::RequestStartUpgrade(const FName InUpgradeID)
 
 	UpgradeQueue.Add(UpgradeRow->UpgradeID.IsNone() ? InUpgradeID : UpgradeRow->UpgradeID);
 	ForceNetUpdate();
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[업그레이드 건물] 대기열 추가 성공 | UpgradeID: %s | QueueCount: %d"),
-		*(UpgradeRow->UpgradeID.IsNone() ? InUpgradeID : UpgradeRow->UpgradeID).ToString(),
-		UpgradeQueue.Num()
-	);
-
 	TryStartNextUpgrade();
 	return 1;
 }
@@ -192,13 +168,6 @@ void ATWUpgradeBuilding::TryStartNextUpgrade()
 
 	if (!UpgradeRow)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[업그레이드 건물] 다음 업그레이드 시작 실패: 데이터 없음 | UpgradeID: %s"),
-			*NextUpgradeID.ToString()
-		);
-
 		UpgradeQueue.RemoveAt(0);
 		ForceNetUpdate();
 
@@ -246,16 +215,6 @@ void ATWUpgradeBuilding::StartUpgradeInternal(const FName InUpgradeID, const FTW
 		CurrentUpgradeDuration,
 		false
 	);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[업그레이드 건물] 업그레이드 시작 | UpgradeID: %s | StatusType: %s | TargetUnitCount: %d | Duration: %.2f"),
-		*CurrentUpgradeID.ToString(),
-		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow.TargetStatus)),
-		UpgradeRow.TargetUnits.Num(),
-		CurrentUpgradeDuration
-	);
 }
 
 void ATWUpgradeBuilding::FinishUpgrade()
@@ -282,8 +241,6 @@ void ATWUpgradeBuilding::FinishUpgrade()
 
 	if (!OwningPlayerState)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[업그레이드 건물] 완료 처리 실패: OwningPlayerState 없음"));
-
 		UpgradeQueue.RemoveAt(0);
 		ResetUpgradeState();
 		TryStartNextUpgrade();
@@ -295,13 +252,6 @@ void ATWUpgradeBuilding::FinishUpgrade()
 
 	if (!UpgradeRow)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[업그레이드 건물] 완료 처리 실패: 데이터 없음 | UpgradeID: %s"),
-			*FinishedUpgradeID.ToString()
-		);
-
 		UpgradeQueue.RemoveAt(0);
 		ResetUpgradeState();
 		TryStartNextUpgrade();
@@ -309,16 +259,6 @@ void ATWUpgradeBuilding::FinishUpgrade()
 	}
 
 	OwningPlayerState->ApplyUpgradeRow(*UpgradeRow);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[업그레이드 건물] 업그레이드 완료 | UpgradeID: %s | StatusType: %s | Level: %d"),
-		*FinishedUpgradeID.ToString(),
-		*StaticEnum<ETWStatusType>()->GetNameStringByValue(static_cast<int64>(UpgradeRow->TargetStatus)),
-		OwningPlayerState->GetUpgradeLevelByID(FinishedUpgradeID)
-	);
-
 	UpgradeQueue.RemoveAt(0);
 
 	ResetUpgradeState();

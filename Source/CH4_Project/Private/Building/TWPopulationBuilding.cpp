@@ -4,6 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "GameFramework/GameStateBase.h"
+#include "Log/TWLogCategory.h"
 
 ATWPopulationBuilding::ATWPopulationBuilding()
 {
@@ -41,13 +42,13 @@ int32 ATWPopulationBuilding::RequestEnqueuePopulation()
 
 	if (CurrentQueueCount >= PopulationData->MaxQueueCount)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 가득 참"));
+		UE_LOG(LogTWProduction, Warning, TEXT("[인구수 건물] 대기열 가득 참"));
 		return 0;
 	}
 
 	if (OwningPlayerState->CanAffordCost(PopulationData->ProductionCost) == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 추가 실패: 자원 부족"));
+		UE_LOG(LogTWProduction, Warning, TEXT("[인구수 건물] 대기열 추가 실패: 자원 부족"));
 		return 0;
 	}
 
@@ -55,9 +56,6 @@ int32 ATWPopulationBuilding::RequestEnqueuePopulation()
 
 	CurrentQueueCount += 1;
 	ForceNetUpdate();
-	
-	UE_LOG(LogTemp, Warning, TEXT("[인구수 건물] 대기열 추가 | 현재 대기열 수: %d"), CurrentQueueCount);
-
 	TryStartNextProduction();
 	return 1;
 }
@@ -122,14 +120,6 @@ void ATWPopulationBuilding::TryStartNextProduction()
 
 	ForceNetUpdate();
 
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[인구수 건물] 생산 시작 | 생산 시간: %.2f초 | 현재 대기열 수: %d"),
-		CurrentProducingDuration,
-		CurrentQueueCount
-	);
-
 	GetWorldTimerManager().SetTimer(
 		PopulationQueueTimerHandle,
 		this,
@@ -168,8 +158,6 @@ void ATWPopulationBuilding::HandlePopulationQueue()
 	}
 
 	CurrentQueueCount = FMath::Max(0, CurrentQueueCount - 1);
-
-	UE_LOG(LogTemp, Log, TEXT("[인구수 건물] 현재 대기열 수: %d"), CurrentQueueCount);
 
 	ResetProductionState();
 	TryStartNextProduction();

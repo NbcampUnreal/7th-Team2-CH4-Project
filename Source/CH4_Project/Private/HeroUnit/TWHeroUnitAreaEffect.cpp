@@ -1,6 +1,7 @@
 #include "HeroUnit/TWHeroUnitAreaEffect.h"
 
 #include "Data/TWHeroTableRowBase.h"
+#include "Log/TWLogCategory.h"
 
 ATWHeroUnitAreaEffect::ATWHeroUnitAreaEffect()
 {
@@ -69,13 +70,13 @@ void ATWHeroUnitAreaEffect::UseSkill()
 {
 	if (!GetSkillReady())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
 		return;
 	}
 
 	if (!DynamicIndicatorMaterial)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (Indicator Material 없음)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (Indicator Material 없음)"));
 		return;
 	}
 
@@ -103,7 +104,7 @@ void ATWHeroUnitAreaEffect::UseSkill()
 	CommitSkillCooldown();
 
 	UE_LOG(
-		LogTemp,
+		LogTWHero,
 		Warning,
 		TEXT("Astrologian area effect visual triggered at %s"),
 		*CurrentTargetLocation.ToString()

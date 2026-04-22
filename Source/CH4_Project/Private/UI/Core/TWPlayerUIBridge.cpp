@@ -20,6 +20,7 @@
 #include "TimerManager.h"
 #include "HeroUnit/TWHeroUnitBase.h"
 #include "Engine/World.h"
+#include "Log/TWLogCategory.h"
 
 namespace TWCommandIds
 {
@@ -666,7 +667,7 @@ bool UTWPlayerUIBridge::HandleContextCommand(FName CommandId)
 
 void UTWPlayerUIBridge::HandleHUDCommandRequested(FName CommandId)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UIBridge] HUD command requested: %s"), *CommandId.ToString());
+	UE_LOG(LogTWUI, Log, TEXT("[UIBridge] HUD command requested: %s"), *CommandId.ToString());
 
 	if (CommandId.IsNone())
 	{

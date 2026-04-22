@@ -9,6 +9,7 @@
 #include "Core/TWPlayerState.h"
 #include "Core/TWGameMode.h"
 #include "EngineUtils.h"
+#include "Log/TWLogCategory.h"
 
 namespace
 {
@@ -158,7 +159,7 @@ void UTWBuildComponent::RequestBuild()
 	{
 		if (HasOwnedUpgradeBuilding(GetWorld(), TWPS->PlayerSlot))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
+			UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
 			return;
 		}
 	}
@@ -171,13 +172,13 @@ void UTWBuildComponent::RequestBuild()
 	
 	if (!GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
+		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
 		return;
 	}
 	
 	if (TWPS->CanAffordCost(DefaultBuilding->BuildingData->BuildCost) == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
+		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
 		return;
 	}
 	
@@ -235,20 +236,20 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 	{
 		if (HasOwnedUpgradeBuilding(GetWorld(), TWPS->PlayerSlot))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
+			UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 연구소는 1개만 건설할 수 있습니다."));
 			return;
 		}
 	}
 	
 	if (!GridSub->CanBuildArea(Anchor, BuildSize))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
+		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
 		return;
 	}
 	
 	if (TWPS->CanAffordCost(DefaultBuilding->BuildingData->BuildCost) == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
+		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 자원 부족"));
 		return;
 	}
 	
@@ -257,7 +258,7 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 	
 	if (!NewBuilding)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[건설] 설치 실패: SpawnActor 실패"));
+		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: SpawnActor 실패"));
 		return;
 	}
 	

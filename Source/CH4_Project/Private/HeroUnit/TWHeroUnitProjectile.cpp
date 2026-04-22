@@ -1,6 +1,7 @@
 #include "HeroUnit/TWHeroUnitProjectile.h"
 
 #include "Data/TWHeroTableRowBase.h"
+#include "Log/TWLogCategory.h"
 
 ATWHeroUnitProjectile::ATWHeroUnitProjectile()
 {
@@ -15,11 +16,11 @@ ATWHeroUnitProjectile::ATWHeroUnitProjectile()
 
 void ATWHeroUnitProjectile::UseSkill()
 {
-	UE_LOG(LogTemp, Warning, TEXT("UseSkill() 호출됨"));
+	UE_LOG(LogTWHero, Warning, TEXT("UseSkill() 호출됨"));
 
 	if (!GetSkillReady())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (쿨타임)"));
 		return;
 	}
 
@@ -29,13 +30,13 @@ void ATWHeroUnitProjectile::UseSkill()
 
 	if (!SkillData || !SkillData->ProjectileClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (데이터/ProjectileClass 없음)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (데이터/ProjectileClass 없음)"));
 		return;
 	}
 
 	if (!ProjectileSpawnPoint || !GetWorld())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("스킬 사용 불가 (SpawnPoint/World 없음)"));
+		UE_LOG(LogTWHero, Warning, TEXT("스킬 사용 불가 (SpawnPoint/World 없음)"));
 		return;
 	}
 
@@ -49,14 +50,14 @@ void ATWHeroUnitProjectile::UseSkill()
 
 	if (!SpawnedProjectile)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("투사체 생성 실패"));
+		UE_LOG(LogTWHero, Warning, TEXT("투사체 생성 실패"));
 		return;
 	}
 
 	SetIndicatorVisible(false);
 	CommitSkillCooldown();
 
-	UE_LOG(LogTemp, Warning, TEXT("투사체 생성 및 쿨다운 시작"));
+	UE_LOG(LogTWHero, Warning, TEXT("투사체 생성 및 쿨다운 시작"));
 }
 
 void ATWHeroUnitProjectile::UpdateIndicator(FVector MouseLocation)

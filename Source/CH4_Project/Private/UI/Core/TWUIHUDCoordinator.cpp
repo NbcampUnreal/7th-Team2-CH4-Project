@@ -1,6 +1,7 @@
 #include "UI/Core/TWUIHUDCoordinator.h"
 
 #include "Engine/DataTable.h"
+#include "Log/TWLogCategory.h"
 #include "UI/Core/TWResourceDataProvider.h"
 #include "UI/Core/TWSelectionDataProvider.h"
 #include "UI/Core/TWUISelectionProvider.h"
@@ -95,7 +96,7 @@ void UTWUIHUDCoordinator::BindHUDDelegates()
 		&UTWUIHUDCoordinator::HandleHUDCommandClicked
 	);
 
-	UE_LOG(LogTemp, Warning, TEXT("[HUDCoordinator] Bound HUD command click delegate"));
+	UE_LOG(LogTWUI, Warning, TEXT("[HUDCoordinator] Bound HUD command click delegate"));
 }
 
 void UTWUIHUDCoordinator::UnbindHUDDelegates()
@@ -110,7 +111,7 @@ void UTWUIHUDCoordinator::UnbindHUDDelegates()
 
 void UTWUIHUDCoordinator::HandleHUDCommandClicked(FName InCommandId)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[HUDCoordinator] HandleHUDCommandClicked: %s"), *InCommandId.ToString());
+	UE_LOG(LogTWUI, Warning, TEXT("[HUDCoordinator] HandleHUDCommandClicked: %s"), *InCommandId.ToString());
 
 	if (InCommandId.IsNone())
 	{

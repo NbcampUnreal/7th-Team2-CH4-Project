@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerState.h"
 #include "Lobby/TWLobby_Layout.h"
+#include "Log/TWLogCategory.h"
 
 ATWLobbyGameMode::ATWLobbyGameMode()
 {
@@ -29,7 +30,7 @@ void ATWLobbyGameMode::PreLogin(
 	if (CurrentPlayerCount >= 4)
 	{
 		ErrorMessage = TEXT("Server is Full");
-		UE_LOG(LogTemp, Warning, TEXT("Login Failed : Server is Full(%d/4)"), CurrentPlayerCount);
+		UE_LOG(LogTWLobby, Warning, TEXT("Login Failed : Server is Full(%d/4)"), CurrentPlayerCount);
 	}
 }
 
@@ -44,7 +45,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 
 	LGS->SetCurrentPlayerCount(GetNumPlayers());
-	UE_LOG(LogTemp, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+	UE_LOG(LogTWLobby, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 
 	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
 	if (!LPS)
@@ -88,7 +89,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		LPS->SetSelectedHeroUnitId(DebugHeroId);
 
 		UE_LOG(
-			LogTemp,
+			LogTWLobby,
 			Log,
 			TEXT("[LobbyDebug] Auto profile assigned | PlayerIndex=%d | Nickname=%s | HeroId=%s"),
 			JoinedPlayerIndex,
@@ -102,16 +103,16 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		switch (GetWorld()->GetNetMode())
 		{
 		case NM_Standalone:
-			UE_LOG(LogTemp, Warning, TEXT("NM_Standalone"));
+			UE_LOG(LogTWLobby, Warning, TEXT("NM_Standalone"));
 			break;
 		case NM_Client:
-			UE_LOG(LogTemp, Warning, TEXT("NM_Client!!"));
+			UE_LOG(LogTWLobby, Warning, TEXT("NM_Client!!"));
 			break;
 		case NM_ListenServer:
-			UE_LOG(LogTemp, Warning, TEXT("NM_ListenServer!!"));
+			UE_LOG(LogTWLobby, Warning, TEXT("NM_ListenServer!!"));
 			break;
 		case NM_DedicatedServer:
-			UE_LOG(LogTemp, Warning, TEXT("NM_DedicatedServer!!"));
+			UE_LOG(LogTWLobby, Warning, TEXT("NM_DedicatedServer!!"));
 			break;
 		default:
 			break;
@@ -129,7 +130,7 @@ void ATWLobbyGameMode::Logout(AController* Exiting)
 	if (LGS)
 	{
 		LGS->SetCurrentPlayerCount(GetNumPlayers());
-		UE_LOG(LogTemp, Warning, TEXT("Logout : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
+		UE_LOG(LogTWLobby, Warning, TEXT("Logout : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 	}
 
 	AssignNewHost();
@@ -148,7 +149,7 @@ bool ATWLobbyGameMode::CheckStartCondition()
 
 	if (LGS->PlayerArray.Num() < MinPlayersToStart)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("To Start Play need at least 2 player"));
+		UE_LOG(LogTWLobby, Warning, TEXT("To Start Play need at least 2 player"));
 		return false;
 	}
 
@@ -165,7 +166,7 @@ bool ATWLobbyGameMode::CheckStartCondition()
 		}
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("true") : TEXT("false"));
+	UE_LOG(LogTWLobby, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("true") : TEXT("false"));
 	return bAllReady;
 }
 
@@ -173,7 +174,7 @@ void ATWLobbyGameMode::StartGame()
 {
 	if (GameLevelName.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
+		UE_LOG(LogTWLobby, Warning, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
 		return;
 	}
 
@@ -186,7 +187,7 @@ void ATWLobbyGameMode::StartGame()
 	}
 
 	UE_LOG(
-		LogTemp,
+		LogTWLobby,
 		Warning,
 		TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
 		*TravelURL,

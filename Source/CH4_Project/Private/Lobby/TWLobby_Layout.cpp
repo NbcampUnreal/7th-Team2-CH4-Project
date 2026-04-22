@@ -62,10 +62,6 @@ void UTWLobby_Layout::OnPlayButtonClicked()
 	{
 		LPC->Server_RequestStartGame();
 	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Can Not Start!!!"));
-	}
 }
 
 void UTWLobby_Layout::OnReadyButtonClicked()
@@ -75,7 +71,6 @@ void UTWLobby_Layout::OnReadyButtonClicked()
 	{
 		LPC->Server_SetReady(true);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Ready!"));
 }
 
 void UTWLobby_Layout::OnCancelButtonClicked()
@@ -85,7 +80,6 @@ void UTWLobby_Layout::OnCancelButtonClicked()
 	{
 		LPC->Server_SetReady(false);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Not Ready!"));
 }
 
 void UTWLobby_Layout::OnLobbyExitButtonClicked()
@@ -95,7 +89,6 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	{
 		LPC->ExitLobby();
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Exit!"));
 }
 
 void UTWLobby_Layout::SubmitNickname(const FString& InNickname)
@@ -121,23 +114,18 @@ void UTWLobby_Layout::UpdateUserList()
 	if (!LGS) return;
 	
 	int32 PlayerCount = LGS->GetCurrentPlayerCount();
-	UE_LOG(LogTemp, Warning, TEXT("UpdateUserList >>> CurrentPlayerCount : %d"), PlayerCount);
 	
 	for (int32 i = 0; i < NickNameSlots.Num(); i++)
 	{
 		if (i < PlayerCount)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("지금 보이게 하는 중"));
 			NickNameSlots[i]->SetVisibility(ESlateVisibility::Visible);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[ 지금 안 보이게 하는 중 ]"));
 			NickNameSlots[i]->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
-	
-	UE_LOG(LogTemp, Log, TEXT("UI Updated: Current Players = %d"), PlayerCount);
 }
 
 void UTWLobby_Layout::UpdateUserImage()
@@ -181,12 +169,10 @@ void UTWLobby_Layout::ShowPlayButton(bool bIsShow)
 {
 	if (bIsShow)
 	{
-		UE_LOG(LogTemp, Warning, TEXT(" Play Button : 지금 보이게 하는 중"));
 		PlayButton->SetVisibility(ESlateVisibility::Visible);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[ Play Button : 지금 안 보이게 하는 중 ]"));
 		PlayButton->SetVisibility(ESlateVisibility::Hidden);
 	}
 }

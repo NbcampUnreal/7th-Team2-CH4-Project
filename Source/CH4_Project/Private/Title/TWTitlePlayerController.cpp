@@ -5,6 +5,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "Log/TWLogCategory.h"
 
 void ATWTitlePlayerController::BeginPlay()
 {
@@ -47,9 +48,9 @@ void ATWTitlePlayerController::BeginPlay()
 void ATWTitlePlayerController::JoinServer()
 {
 	/*UGameplayStatics::OpenLevel(GetWorld(), "L_Lobby");*/
-	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] JoinServer Start ==="));
+	UE_LOG(LogTWTitle, Error, TEXT("=== [DEBUG] JoinServer Start ==="));
 	const FString URL = "127.0.0.1:7777";
 	ClientTravel(URL, TRAVEL_Absolute);
-	UE_LOG(LogTemp, Error, TEXT("=== [DEBUG] ClientTravel Called with URL: %s ==="), *URL);
+	UE_LOG(LogTWTitle, Error, TEXT("=== [DEBUG] ClientTravel Called with URL: %s ==="), *URL);
 	/*ClientTravel("L_LobbyLevel", TRAVEL_Absolute);*/
 }

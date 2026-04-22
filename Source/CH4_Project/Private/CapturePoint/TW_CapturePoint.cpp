@@ -11,6 +11,7 @@
 #include "Core/TWPlayerState.h"
 #include "FOW/TWVisionComponent.h"
 #include "GameFramework/GameStateBase.h"
+#include "Log/TWLogCategory.h"
 #include "Net/UnrealNetwork.h"
 #include "UI/Widgets/TWCaptureGaugeWidget.h"
 
@@ -205,13 +206,13 @@ void ATW_CapturePoint::CheckCaptureStatus()
                         }
                     }
                 }
-                UE_LOG(LogTemp, Warning, TEXT("=== [SERVER] Capture Complete! Team %d ==="), CurrentUnitTeam);
+                UE_LOG(LogTWCapture, Warning, TEXT("=== [SERVER] Capture Complete! Team %d ==="), CurrentUnitTeam);
             }
         }
     }
     else if (TeamCount >= 2)
     {
-        UE_LOG(LogTemp, Error, TEXT("=== [SERVER] Clashing!!! ==="));
+        UE_LOG(LogTWCapture, Error, TEXT("=== [SERVER] Clashing!!! ==="));
     }
     else
     {
@@ -238,7 +239,6 @@ void ATW_CapturePoint::CheckCaptureStatus()
         }
     }
     UpdateWidgetUI();
-    UE_LOG(LogTemp, Log, TEXT("=== [SERVER] Progress: %.1f%% (Present Teams: %d) ==="), CurrentGauge, TeamCount);
 }
 
 void ATW_CapturePoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

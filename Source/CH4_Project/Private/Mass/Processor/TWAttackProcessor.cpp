@@ -22,6 +22,7 @@
 #include "EngineUtils.h"
 #include "MassNavigationUtils.h"
 #include "MassReplicationFragments.h"
+#include "Log/TWLogCategory.h"
 #include "Runtime/Engine/Internal/Kismet/BlueprintTypeConversions.h"
 
 namespace
@@ -257,13 +258,13 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					continue;
 				}
 
-				UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
+				UE_LOG(LogTWEntity, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
 
 				const int32 HealthIndex = static_cast<int32>(ETWStatusType::Health);
 				const float OldHealth = EnemyStatus.Status[HealthIndex];
 				const float DamageAmount = StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Damage);
 
-				UE_LOG(LogTemp, Warning, TEXT("Before Target Health : %f"), OldHealth);
+				UE_LOG(LogTWEntity, Warning, TEXT("Before Target Health : %f"), OldHealth);
 
 				const float NewHealth = FMath::Max(0.0f, OldHealth - DamageAmount);
 				EnemyStatus.Status[HealthIndex] = NewHealth;
@@ -300,7 +301,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				}
 
 
-				UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), EnemyStatus.Status[HealthIndex]);
+				UE_LOG(LogTWEntity, Warning, TEXT("After Target Health : %f"), EnemyStatus.Status[HealthIndex]);
 			}
 			else if (bIsBuildingValid)
 			{
@@ -343,11 +344,11 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					continue;
 				}
 
-				UE_LOG(LogTemp, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
+				UE_LOG(LogTWEntity, Warning, TEXT("Entity %d Is Attack!"), EntityIdx);
 
 				const float DamageAmount = StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Damage);
 
-				UE_LOG(LogTemp, Warning, TEXT("Before Target Health : %f"), TargetBuilding->GetCurrentHP());
+				UE_LOG(LogTWEntity, Warning, TEXT("Before Target Health : %f"), TargetBuilding->GetCurrentHP());
 				
 				TargetBuilding->ApplyDamageToBuilding(DamageAmount);
 
@@ -356,7 +357,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					UKismetMathLibrary::FindLookAtRotation(EntityLocation, EnemyLocation).Quaternion());
 				
 
-				UE_LOG(LogTemp, Warning, TEXT("After Target Health : %f"), TargetBuilding->GetCurrentHP());
+				UE_LOG(LogTWEntity, Warning, TEXT("After Target Health : %f"), TargetBuilding->GetCurrentHP());
 			}
 		}
 

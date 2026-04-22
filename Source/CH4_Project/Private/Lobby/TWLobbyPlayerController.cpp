@@ -6,6 +6,7 @@
 #include "Lobby/TWLobbyGameMode.h"
 #include "Lobby/TWLobby_Layout.h"
 #include "Blueprint/UserWidget.h"
+#include "Log/TWLogCategory.h"
 
 
 void ATWLobbyPlayerController::BeginPlay()
@@ -62,7 +63,7 @@ void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Can Not Start!!!"));
+			UE_LOG(LogTWLobby, Warning, TEXT("Can Not Start!!!"));
 		}
 	}
 }

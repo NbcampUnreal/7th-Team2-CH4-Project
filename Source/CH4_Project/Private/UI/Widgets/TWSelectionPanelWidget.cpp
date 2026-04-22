@@ -8,6 +8,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/ProgressBar.h"
 #include "Engine/Texture2D.h"
+#include "Log/TWLogCategory.h"
 #include "UI/Data/TWSelectionQueueItemObject.h"
 #include "UI/Data/TWSelectionSummaryItemObject.h"
 
@@ -58,23 +59,9 @@ FText UTWSelectionPanelWidget::FormatStatFloat(const TCHAR* Label, float Value) 
 
 void UTWSelectionPanelWidget::SetSelectionData(const FSelectionViewModel& InData)
 {
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[SelectionPanel] SetSelectionData - Name: %s / Type: %s / HP: %s / ViewMode: %d / SummaryCount: %d / ProductionVisible: %d / QueueCount: %d / DetailStats: %d"),
-		*InData.DisplayName,
-		*InData.TypeLabel,
-		*InData.HPText,
-		static_cast<int32>(InData.ViewMode),
-		InData.SummaryItems.Num(),
-		InData.bShowProductionPanel ? 1 : 0,
-		InData.Production.QueueItems.Num(),
-		InData.bShowDetailStats ? 1 : 0
-	);
-
 	if (!StateSwitcher)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SelectionPanel] StateSwitcher is null"));
+		UE_LOG(LogTWUI, Warning, TEXT("[SelectionPanel] StateSwitcher is null"));
 		return;
 	}
 
