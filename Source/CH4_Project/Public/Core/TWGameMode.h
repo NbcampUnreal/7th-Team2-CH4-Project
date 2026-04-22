@@ -41,7 +41,9 @@ protected:
 	ATWNexusBuilding* AssignRandomStartNexus(ATWPlayerState* PS);
 	void AssignNexusOwnership(ATWNexusBuilding* Nexus, ATWPlayerState* PS);
 
-	// 기존 영웅 시작 위치 계산용 로직 유지
+	void EnsurePlayerSeedState(ATWPlayerState* PS);
+	ATWPlayerController* FindOwningPlayerController(const ATWPlayerState* PS) const;
+
 	FVector CalculateAllStartNexusCenter() const;
 	FVector CalculateMapInwardDirectionFromNexus(const ATWNexusBuilding* Nexus) const;
 	FVector CalculateHeroSpawnLocationFromNexus(const ATWNexusBuilding* Nexus);
@@ -52,7 +54,6 @@ protected:
 	ATWPlayerState* FindPlayerStateBySlot(int32 InPlayerSlot) const;
 	void BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState);
 
-	// 시작 셋업 후처리
 	int32 GetAssignedStartPlayerCount() const;
 	bool AreAllRequiredPlayersAssignedStartNexus() const;
 	void CleanupUnusedStartNexusBuildings();
@@ -95,4 +96,5 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GameMode|Start")
 	bool bHasCleanedUpUnusedStartNexus = false;
+
 };

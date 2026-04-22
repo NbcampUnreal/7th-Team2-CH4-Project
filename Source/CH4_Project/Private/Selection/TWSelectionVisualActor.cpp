@@ -18,6 +18,30 @@ namespace
 	constexpr int32 HPBAR_CUSTOMDATA_COLOR_B        = 3;
 	constexpr int32 HPBAR_CUSTOMDATA_IS_BUILDING    = 4;
 	constexpr int32 HPBAR_NUM_CUSTOMDATA_FLOATS     = 5;
+
+	static APlayerController* ResolveOwnerLocalController(const AActor* OwnerActor, const UWorld* World)
+	{
+		if (const ATWPlayerController* OwnerTWPC = Cast<ATWPlayerController>(OwnerActor))
+		{
+			return const_cast<ATWPlayerController*>(OwnerTWPC);
+		}
+
+		if (!World)
+		{
+			return nullptr;
+		}
+
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PC = It->Get();
+			if (PC && PC->IsLocalController())
+			{
+				return PC;
+			}
+		}
+
+		return nullptr;
+	}
 }
 
 ATWSelectionVisualActor::ATWSelectionVisualActor()
@@ -248,7 +272,7 @@ int32 ATWSelectionVisualActor::ResolveLocalPlayerSlot() const
 
 	if (const UWorld* World = GetWorld())
 	{
-		if (const APlayerController* PC = World->GetFirstPlayerController())
+		if (const APlayerController* PC = ResolveOwnerLocalController(GetOwner(), World))
 		{
 			if (const ATWPlayerState* TWPS = PC->GetPlayerState<ATWPlayerState>())
 			{
@@ -273,7 +297,7 @@ int32 ATWSelectionVisualActor::ResolveLocalTeamID() const
 
 	if (const UWorld* World = GetWorld())
 	{
-		if (const APlayerController* PC = World->GetFirstPlayerController())
+		if (const APlayerController* PC = ResolveOwnerLocalController(GetOwner(), World))
 		{
 			if (const ATWPlayerState* TWPS = PC->GetPlayerState<ATWPlayerState>())
 			{
@@ -499,7 +523,7 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 
 	if (UWorld* World = GetWorld())
 	{
-		if (APlayerController* PC = World->GetFirstPlayerController())
+		if (APlayerController* PC = ResolveOwnerLocalController(GetOwner(), World))
 		{
 			if (PC->PlayerCameraManager)
 			{

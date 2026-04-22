@@ -15,6 +15,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Log/TWLogCategory.h"
+#include "UObject/ObjectKey.h"
 
 void ATWGameMode::PostLogin(APlayerController* NewPlayer)
 {
@@ -933,12 +934,22 @@ void ATWGameMode::MovePlayerCameraToAssignedStart(ATWPlayerController* PC, ATWNe
 		return;
 	}
 
+	static TSet<TObjectKey<ATWPlayerController>> FocusInitializedControllers;
+	const TObjectKey<ATWPlayerController> ControllerKey(PC);
+	if (FocusInitializedControllers.Contains(ControllerKey))
+	{
+		return;
+	}
+
 	const FVector NexusLocation = Nexus->GetActorLocation();
 	const FVector HeroSpawnLocation = CalculateHeroSpawnLocationFromNexus(Nexus);
 
 	FVector FocusLocation = (NexusLocation + HeroSpawnLocation) * 0.5f;
-	FocusLocation.Z = HeroSpawnLocation.Z;
+	if (APawn* Pawn = PC->GetPawn())
+	{
+		FocusLocation.Z = Pawn->GetActorLocation().Z;
+	}
 
-	// 현재 PlayerController에 public으로 열려 있는 함수 사용
 	PC->ClientFocusStartLocation(FocusLocation);
+	FocusInitializedControllers.Add(ControllerKey);
 }

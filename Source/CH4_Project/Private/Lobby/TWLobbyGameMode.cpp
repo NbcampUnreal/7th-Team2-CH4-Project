@@ -3,9 +3,9 @@
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Lobby/TWLobbyGameState.h"
 #include "Lobby/TWLobbyPlayerController.h"
-#include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerState.h"
-#include "Lobby/TWLobby_Layout.h"
+#include "HAL/IConsoleManager.h"
+#include "Engine/World.h"
 #include "Log/TWLogCategory.h"
 
 ATWLobbyGameMode::ATWLobbyGameMode()
@@ -13,6 +13,9 @@ ATWLobbyGameMode::ATWLobbyGameMode()
 	PlayerControllerClass = ATWLobbyPlayerController::StaticClass();
 	PlayerStateClass = ATWLobbyPlayerState::StaticClass();
 	GameStateClass = ATWLobbyGameState::StaticClass();
+
+	// 기본값은 true로 두되, PIE에서 필요 시 StartGame에서 fallback 처리
+	bUseSeamlessTravel = true;
 }
 
 void ATWLobbyGameMode::PreLogin(
@@ -53,7 +56,7 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	const int32 JoinedPlayerIndex = LGS->GetCurrentPlayerCount();
 
 	// 첫 입장 플레이어만 호스트
-	bool bShouldBeHost = (JoinedPlayerIndex == 1);
+	const bool bShouldBeHost = (JoinedPlayerIndex == 1);
 	LPS->SetIsHost(bShouldBeHost);
 
 	if (LPS->GetLobbyNickname().IsEmpty())
@@ -75,17 +78,13 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 			DefaultHeroId = TEXT("Astrologian");
 			break;
 		case 3:
-			DefaultHeroId = TEXT("DragonKnight");
-			break;
 		case 4:
-			DefaultHeroId = TEXT("DragonKnight");
-			break;
 		default:
+			DefaultHeroId = TEXT("DragonKnight");
 			break;
 		}
 
 		LPS->SetSelectedHeroUnitId(DefaultHeroId);
-		
 	}
 
 	CheckStartCondition();
@@ -122,7 +121,7 @@ bool ATWLobbyGameMode::CheckStartCondition()
 
 	for (APlayerState* PS : LGS->PlayerArray)
 	{
-		ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
+		const ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
 		if (!LPS)
 		{
 			continue;
@@ -134,29 +133,98 @@ bool ATWLobbyGameMode::CheckStartCondition()
 			return false;
 		}
 	}
-	
+
 	return bAllReady;
+}
+
+bool ATWLobbyGameMode::CanUseSeamlessTravelInCurrentWorld() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	if (World->WorldType != EWorldType::PIE)
+	{
+		return true;
+	}
+
+	IConsoleVariable* AllowPIECVar =
+		IConsoleManager::Get().FindConsoleVariable(TEXT("net.AllowPIESeamlessTravel"));
+
+	if (!AllowPIECVar)
+	{
+		return false;
+	}
+
+	return AllowPIECVar->GetInt() != 0;
 }
 
 void ATWLobbyGameMode::StartGame()
 {
-	if (GameLevelName.IsNone())
+	// 중복 시작 방지
+	if (bStartGameRequested)
 	{
+		UE_LOG(LogTWLobby, Warning, TEXT("StartGame skipped: already requested"));
 		return;
 	}
 
-	bUseSeamlessTravel = bUseSeamlessTravelForGame;
-
-	FString TravelURL = GameLevelName.ToString();
-	if (bTravelAsListenServer)
+	if (GameLevelPath.IsEmpty())
 	{
-		TravelURL += TEXT("?listen");
+		UE_LOG(LogTWLobby, Error, TEXT("StartGame failed: GameLevelPath is empty"));
+		return;
 	}
-	
 
-	if (UWorld* World = GetWorld())
+	UWorld* World = GetWorld();
+	if (!World)
 	{
-		World->ServerTravel(TravelURL);
+		UE_LOG(LogTWLobby, Error, TEXT("StartGame failed: World is null"));
+		return;
+	}
+
+	// 서버에서만 실행
+	if (GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogTWLobby, Warning, TEXT("StartGame skipped: called on client"));
+		return;
+	}
+
+	// 시작 조건 재검증
+	if (!CheckStartCondition())
+	{
+		UE_LOG(LogTWLobby, Warning, TEXT("StartGame failed: CheckStartCondition() == false"));
+		return;
+	}
+
+	bool bShouldUseSeamless = CanUseSeamlessTravelInCurrentWorld();
+	if (!bShouldUseSeamless && bFallbackToNonSeamlessInPIE)
+	{
+		UE_LOG(
+			LogTWLobby,
+			Warning,
+			TEXT("PIE seamless travel is not enabled. Falling back to non-seamless ServerTravel. Set net.AllowPIESeamlessTravel=1 to test seamless in PIE.")
+		);
+	}
+
+	bUseSeamlessTravel = bShouldUseSeamless;
+	bStartGameRequested = true;
+
+	UE_LOG(
+		LogTWLobby,
+		Warning,
+		TEXT("StartGame ServerTravel: Path=%s, Seamless=%s, WorldType=%d"),
+		*GameLevelPath,
+		bUseSeamlessTravel ? TEXT("true") : TEXT("false"),
+		static_cast<int32>(World->WorldType)
+	);
+
+	const bool bTravelStarted = World->ServerTravel(GameLevelPath);
+
+	if (!bTravelStarted)
+	{
+		UE_LOG(LogTWLobby, Error, TEXT("StartGame failed: ServerTravel returned false"));
+		bStartGameRequested = false;
 	}
 }
 

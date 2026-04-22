@@ -79,7 +79,17 @@ void ATWPlayerState::SetSelectedHeroUnitId(FName InHeroUnitId)
 		return;
 	}
 
+	if (SelectedHeroUnitId == InHeroUnitId)
+	{
+		return;
+	}
+
 	SelectedHeroUnitId = InHeroUnitId;
+
+	if (ATWPlayerController* TWPC = Cast<ATWPlayerController>(GetOwningController()))
+	{
+		TWPC->OnPlayerStateHeroChanged(SelectedHeroUnitId);
+	}
 }
 
 void ATWPlayerState::SetAssignedStartNexus(ATWNexusBuilding* InNexus)
@@ -510,6 +520,22 @@ void ATWPlayerState::NotifyUIResourceStateChanged()
 	if (ATWPlayerController* TWPC = Cast<ATWPlayerController>(OwningController))
 	{
 		TWPC->NotifyResourceStateChanged();
+	}
+}
+
+void ATWPlayerState::OnRep_SelectedHeroUnitId()
+{
+	UE_LOG(
+		LogTWCommand,
+		Log,
+		TEXT("[PlayerState] OnRep_SelectedHeroUnitId | Player=%s | HeroId=%s"),
+		*GetNameSafe(this),
+		*SelectedHeroUnitId.ToString()
+	);
+
+	if (ATWPlayerController* TWPC = Cast<ATWPlayerController>(GetOwningController()))
+	{
+		TWPC->OnPlayerStateHeroChanged(SelectedHeroUnitId);
 	}
 }
 

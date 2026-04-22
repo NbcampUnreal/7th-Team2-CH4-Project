@@ -2,11 +2,53 @@
 
 #include "Core/TWPlayerController.h"
 #include "Building/TWBaseBuilding.h"
+#include "Mass/TWUnit.h"
+#include "MassActorSubsystem.h"
+#include "MassCommonFragments.h"
+#include "MassEntityManager.h"
+#include "MassEntitySubsystem.h"
 #include "Selection/TWSelectionVisualActor.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "UObject/UObjectGlobals.h"
+
+namespace
+{
+	static bool TryGetUnitVisualActorFromEntityHandle(
+		UWorld* World,
+		const FMassEntityHandle& EntityHandle,
+		const ATWUnit*& OutUnitActor)
+	{
+		OutUnitActor = nullptr;
+
+		if (!World)
+		{
+			return false;
+		}
+
+		UMassEntitySubsystem* EntitySubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+		if (!EntitySubsystem)
+		{
+			return false;
+		}
+
+		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+		if (!EntityManager.IsEntityValid(EntityHandle) || !EntityManager.IsEntityActive(EntityHandle))
+		{
+			return false;
+		}
+
+		const FMassActorFragment* ActorFragment = EntityManager.GetFragmentDataPtr<FMassActorFragment>(EntityHandle);
+		if (!ActorFragment || !ActorFragment->IsValid())
+		{
+			return false;
+		}
+
+		OutUnitActor = Cast<ATWUnit>(ActorFragment->Get());
+		return IsValid(OutUnitActor);
+	}
+}
 
 UTWPlayerSelectionVisualComponent::UTWPlayerSelectionVisualComponent()
 {
@@ -95,16 +137,43 @@ void UTWPlayerSelectionVisualComponent::UpdateSelectionVisualData(
 	int32 InSelectedOwnerPlayerSlot
 )
 {
-	ClearCachedVisualData();
+	const FTWSelectedVisualData PreviousPrimaryVisualData = PrimarySelectedVisualData;
+	const TArray<FTWUnitRingVisualData> PreviousUnitRingVisuals = SelectedUnitRingVisuals;
+	const TArray<FTWBuildingSelectionVisualData> PreviousBuildingVisuals = SelectedBuildingVisuals;
+	const TArray<FTWHPBarVisualData> PreviousHPBarVisuals = SelectedHPBarVisuals;
 
-	if (InSelectedUnitNetIds.Num() > 0)
+	ClearCachedVisualData();
+	bool bBuiltAnyVisual = false;
+	const bool bHasAuthoritativeSelection =
+		OwnerController &&
+		OwnerController->HasAuthority() &&
+		OwnerController->GetAuthoritativeSelectedEntityHandles().Num() > 0;
+
+	if (bHasAuthoritativeSelection)
 	{
-		BuildSelectedUnitVisualData(InSelectedUnitNetIds, InSelectedOwnerPlayerSlot);
+		bBuiltAnyVisual |= BuildSelectedUnitVisualDataFromEntityHandles(InSelectedOwnerPlayerSlot);
+	}
+	else if (InSelectedUnitNetIds.Num() > 0)
+	{
+		bBuiltAnyVisual |= BuildSelectedUnitVisualData(InSelectedUnitNetIds, InSelectedOwnerPlayerSlot);
 	}
 
 	if (IsValid(InSelectedBuilding))
 	{
-		BuildSelectedBuildingVisualData(InSelectedBuilding);
+		bBuiltAnyVisual |= BuildSelectedBuildingVisualData(InSelectedBuilding);
+	}
+
+	if (!PrimarySelectedVisualData.bValid && PreviousPrimaryVisualData.bValid)
+	{
+		PrimarySelectedVisualData = PreviousPrimaryVisualData;
+	}
+
+	if (!bBuiltAnyVisual && (bHasAuthoritativeSelection || InSelectedUnitNetIds.Num() > 0 || IsValid(InSelectedBuilding)))
+	{
+		PrimarySelectedVisualData = PreviousPrimaryVisualData;
+		SelectedUnitRingVisuals = PreviousUnitRingVisuals;
+		SelectedBuildingVisuals = PreviousBuildingVisuals;
+		SelectedHPBarVisuals = PreviousHPBarVisuals;
 	}
 }
 
@@ -142,17 +211,15 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 	SelectedUnitRingVisuals.Reserve(InSelectedUnitNetIds.Num());
 	SelectedHPBarVisuals.Reserve(InSelectedUnitNetIds.Num());
 
-	TArray<FMassNetworkID> InvalidNetIds;
-
+	const FName PreferredPrimaryUnitId = OwnerController->GetLocalPrimarySelectedUnitId();
+	const FMassNetworkID PreferredPrimaryNetId = OwnerController->GetLocalPrimarySelectedUnitNetId();
 	bool bAnyBuilt = false;
-	bool bPrimaryBuilt = false;
 
 	for (const FMassNetworkID& NetId : InSelectedUnitNetIds)
 	{
 		FVector RingLocation = FVector::ZeroVector;
 		if (!UnitSubsystem->TryGetUnitVisualLocation(NetId, RingLocation))
 		{
-			InvalidNetIds.Add(NetId);
 			continue;
 		}
 
@@ -166,7 +233,6 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 		{
 			RingData.RingRadius = Style.SelectionCircleRadius;
 		}
-
 		SelectedUnitRingVisuals.Add(RingData);
 
 		FVector HPBarLocation = FVector::ZeroVector;
@@ -176,20 +242,22 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 		}
 
 		int32 ResolvedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
-		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, ResolvedOwnerPlayerSlot))
-		{
-			ResolvedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
-		}
+		UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, ResolvedOwnerPlayerSlot);
 
 		float CurrentHP = 0.f;
 		float MaxHP = 0.f;
-
-		const bool bHasCurrentHP = UnitSubsystem->TryGetUnitCurrentHP(NetId, ResolvedOwnerPlayerSlot, CurrentHP);
+		const bool bIsPrimaryUnit =
+			(PreferredPrimaryNetId.IsValid() && NetId == PreferredPrimaryNetId);
+		bool bHasCurrentHP = UnitSubsystem->TryGetUnitCurrentHP(NetId, ResolvedOwnerPlayerSlot, CurrentHP);
 		const bool bHasMaxHP = UnitSubsystem->TryGetUnitMaxHP(NetId, ResolvedOwnerPlayerSlot, MaxHP);
+		if (bIsPrimaryUnit && OwnerController->HasLocalPrimarySelectedUnitStatus())
+		{
+			CurrentHP = OwnerController->GetLocalPrimarySelectedUnitStatus().GetStatus(ETWStatusType::Health);
+			bHasCurrentHP = true;
+		}
 
 		if (!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
 		{
-			InvalidNetIds.Add(NetId);
 			continue;
 		}
 
@@ -202,10 +270,19 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 		HPBarData.MaxHP = MaxHP;
 		HPBarData.HealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
 		HPBarData.WorldScale = HPBarWorldScale;
-
 		SelectedHPBarVisuals.Add(HPBarData);
 
-		if (!bPrimaryBuilt)
+		FName CurrentUnitId = NAME_None;
+		UnitSubsystem->TryGetUnitID(NetId, CurrentUnitId);
+		const bool bShouldBecomePrimary =
+			!PrimarySelectedVisualData.bValid &&
+			(
+				bIsPrimaryUnit ||
+				(!PreferredPrimaryNetId.IsValid() && InSelectedUnitNetIds.Num() == 1) ||
+				(!PreferredPrimaryUnitId.IsNone() && CurrentUnitId == PreferredPrimaryUnitId)
+			);
+
+		if (bShouldBecomePrimary)
 		{
 			PrimarySelectedVisualData.bValid = true;
 			PrimarySelectedVisualData.bIsBuilding = false;
@@ -218,24 +295,153 @@ bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualData(
 			PrimarySelectedVisualData.SelectionRadius = RingData.RingRadius;
 			PrimarySelectedVisualData.BuildingHalfExtentXY = FVector2D::ZeroVector;
 			PrimarySelectedVisualData.BuildingZOffset = 0.f;
-			bPrimaryBuilt = true;
 		}
 
 		bAnyBuilt = true;
 	}
 
-	if (InvalidNetIds.Num() > 0)
+	return bAnyBuilt;
+}
+
+bool UTWPlayerSelectionVisualComponent::BuildSelectedUnitVisualDataFromEntityHandles(int32 InSelectedOwnerPlayerSlot)
+{
+	if (!OwnerController)
 	{
-		LastSelectedUnitNetIds.RemoveAll(
-			[&InvalidNetIds](const FMassNetworkID& Id)
+		return false;
+	}
+
+	UWorld* World = OwnerController->GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+
+	const TArray<FMassEntityHandle>& SelectedEntities = OwnerController->GetAuthoritativeSelectedEntityHandles();
+	if (SelectedEntities.Num() <= 0)
+	{
+		return false;
+	}
+
+	SelectedUnitRingVisuals.Reserve(SelectedEntities.Num());
+	SelectedHPBarVisuals.Reserve(SelectedEntities.Num());
+
+	const FName PreferredPrimaryUnitId = OwnerController->GetLocalPrimarySelectedUnitId();
+	const FMassNetworkID PreferredPrimaryNetId = OwnerController->GetLocalPrimarySelectedUnitNetId();
+	bool bAnyBuilt = false;
+
+	for (const FMassEntityHandle& EntityHandle : SelectedEntities)
+	{
+		FName UnitId = NAME_None;
+		FMassNetworkID NetId;
+		int32 ResolvedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
+		FTWUnitStatus RuntimeStatus;
+		if (!OwnerController->TryGetAuthoritativeSelectionData(
+			EntityHandle,
+			UnitId,
+			NetId,
+			ResolvedOwnerPlayerSlot,
+			RuntimeStatus))
+		{
+			continue;
+		}
+
+		FVector RingLocation = FVector::ZeroVector;
+		if ((!NetId.IsValid() || !UnitSubsystem->TryGetUnitVisualLocation(NetId, RingLocation)) &&
+			!UnitSubsystem->TryGetUnitWorldLocation(EntityHandle, RingLocation))
+		{
+			continue;
+		}
+
+		FTWUnitRingVisualData RingData;
+		RingData.UnitNetId = NetId;
+		RingData.RingWorldLocation = RingLocation;
+		RingData.RingRadius = DefaultUnitSelectionCircleRadius;
+
+		if (NetId.IsValid())
+		{
+			FTWUnitSelectionVisualStyle Style;
+			if (UnitSubsystem->TryGetUnitSelectionVisualStyle(NetId, Style))
 			{
-				return InvalidNetIds.Contains(Id);
+				RingData.RingRadius = Style.SelectionCircleRadius;
 			}
-		);
+		}
+
+		SelectedUnitRingVisuals.Add(RingData);
+
+		FVector HPBarLocation = FVector::ZeroVector;
+		const ATWUnit* UnitActor = nullptr;
+		if (TryGetUnitVisualActorFromEntityHandle(World, EntityHandle, UnitActor) && IsValid(UnitActor))
+		{
+			HPBarLocation = UnitActor->GetHPBarAnchorWorldLocation();
+		}
+		else if (!NetId.IsValid() || !UnitSubsystem->TryGetUnitHPBarWorldLocation(NetId, HPBarLocation))
+		{
+			HPBarLocation = RingLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+		}
+
+		float CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
+		bool bHasCurrentHP = true;
+		if (PreferredPrimaryNetId.IsValid() &&
+			NetId == PreferredPrimaryNetId &&
+			OwnerController->HasLocalPrimarySelectedUnitStatus())
+		{
+			CurrentHP = OwnerController->GetLocalPrimarySelectedUnitStatus().GetStatus(ETWStatusType::Health);
+			bHasCurrentHP = true;
+		}
+
+		FTWUnitStatus DefaultStatus = UnitSubsystem->GetUnitDefaultStatus(UnitId, ResolvedOwnerPlayerSlot);
+		const float MaxHP = DefaultStatus.GetStatus(ETWStatusType::Health);
+		if (!bHasCurrentHP || MaxHP <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		FTWHPBarVisualData HPBarData;
+		HPBarData.bValid = true;
+		HPBarData.bIsBuilding = false;
+		HPBarData.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+		HPBarData.WorldLocation = HPBarLocation;
+		HPBarData.CurrentHP = CurrentHP;
+		HPBarData.MaxHP = MaxHP;
+		HPBarData.HealthPercent = FMath::Clamp(CurrentHP / MaxHP, 0.f, 1.f);
+		HPBarData.WorldScale = HPBarWorldScale;
+		SelectedHPBarVisuals.Add(HPBarData);
+
+		const bool bShouldBecomePrimary =
+			!PrimarySelectedVisualData.bValid &&
+			(
+				(PreferredPrimaryNetId.IsValid() && NetId.IsValid() && NetId == PreferredPrimaryNetId) ||
+				(!PreferredPrimaryNetId.IsValid() && SelectedEntities.Num() == 1) ||
+				(!PreferredPrimaryUnitId.IsNone() && UnitId == PreferredPrimaryUnitId)
+			);
+
+		if (bShouldBecomePrimary)
+		{
+			PrimarySelectedVisualData.bValid = true;
+			PrimarySelectedVisualData.bIsBuilding = false;
+			PrimarySelectedVisualData.OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+			PrimarySelectedVisualData.SelectionWorldLocation = RingLocation;
+			PrimarySelectedVisualData.HPBarWorldLocation = HPBarLocation;
+			PrimarySelectedVisualData.CurrentHP = CurrentHP;
+			PrimarySelectedVisualData.MaxHP = MaxHP;
+			PrimarySelectedVisualData.HealthPercent = HPBarData.HealthPercent;
+			PrimarySelectedVisualData.SelectionRadius = RingData.RingRadius;
+			PrimarySelectedVisualData.BuildingHalfExtentXY = FVector2D::ZeroVector;
+			PrimarySelectedVisualData.BuildingZOffset = 0.f;
+		}
+
+		bAnyBuilt = true;
 	}
 
 	return bAnyBuilt;
 }
+
 
 bool UTWPlayerSelectionVisualComponent::BuildSelectedBuildingVisualData(ATWBaseBuilding* InSelectedBuilding)
 {

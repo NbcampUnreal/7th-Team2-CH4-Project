@@ -241,6 +241,9 @@ private:
 		const TArray<FMassNetworkID>& InSelectedUnitNetIds,
 		int32 InSelectedOwnerPlayerSlot
 	);
+	bool BuildSelectedUnitVisualDataFromEntityHandles(
+		int32 InSelectedOwnerPlayerSlot
+	);
 
 	bool BuildSelectedBuildingVisualData(ATWBaseBuilding* InSelectedBuilding);
 	void TickRecentCombatHPBars(float DeltaSeconds);
