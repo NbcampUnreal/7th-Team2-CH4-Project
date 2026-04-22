@@ -1,6 +1,5 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿#include "Lobby/TWLobbyGameMode.h"
 
-#include "Lobby/TWLobbyGameMode.h"
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Lobby/TWLobbyGameState.h"
 #include "Lobby/TWLobbyPlayerController.h"
@@ -26,11 +25,9 @@ void ATWLobbyGameMode::PreLogin(
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
 
 	const int32 CurrentPlayerCount = GetNumPlayers();
-
 	if (CurrentPlayerCount >= 4)
 	{
 		ErrorMessage = TEXT("Server is Full");
-		UE_LOG(LogTWLobby, Warning, TEXT("Login Failed : Server is Full(%d/4)"), CurrentPlayerCount);
 	}
 }
 
@@ -45,7 +42,6 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 
 	LGS->SetCurrentPlayerCount(GetNumPlayers());
-	UE_LOG(LogTWLobby, Warning, TEXT("PostLogin : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 
 	ATWLobbyPlayerState* LPS = NewPlayer->GetPlayerState<ATWLobbyPlayerState>();
 	if (!LPS)
@@ -55,68 +51,41 @@ void ATWLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 
 	const int32 JoinedPlayerIndex = LGS->GetCurrentPlayerCount();
-	LPS->SetIsHost(JoinedPlayerIndex == 1);
+
+	// 첫 입장 플레이어만 호스트
+	bool bShouldBeHost = (JoinedPlayerIndex == 1);
+	LPS->SetIsHost(bShouldBeHost);
 
 	if (LPS->GetLobbyNickname().IsEmpty())
 	{
-		const FString DebugNickname = FString::Printf(TEXT("Tester%d"), JoinedPlayerIndex);
-		LPS->SetLobbyNickname(DebugNickname);
+		const FString DefaultNickname = FString::Printf(TEXT("Tester%d"), JoinedPlayerIndex);
+		LPS->SetLobbyNickname(DefaultNickname);
 	}
 
 	if (LPS->GetSelectedHeroUnitId().IsNone())
 	{
-		FName DebugHeroId = NAME_None;
+		FName DefaultHeroId = TEXT("DragonKnight");
 
 		switch (JoinedPlayerIndex)
 		{
 		case 1:
-			DebugHeroId = TEXT("Markman");
+			DefaultHeroId = TEXT("Markman");
 			break;
 		case 2:
-			DebugHeroId = TEXT("Astrologian");
+			DefaultHeroId = TEXT("Astrologian");
 			break;
 		case 3:
-			DebugHeroId = TEXT("DragonKnight");
+			DefaultHeroId = TEXT("DragonKnight");
 			break;
 		case 4:
-			DebugHeroId = TEXT("DragonKnight");
-			break;
-		default:
-			DebugHeroId = TEXT("DragonKnight");
-			break;
-		}
-
-		LPS->SetSelectedHeroUnitId(DebugHeroId);
-
-		UE_LOG(
-			LogTWLobby,
-			Log,
-			TEXT("[LobbyDebug] Auto profile assigned | PlayerIndex=%d | Nickname=%s | HeroId=%s"),
-			JoinedPlayerIndex,
-			*LPS->GetLobbyNickname(),
-			*DebugHeroId.ToString()
-		);
-	}
-
-	if (GetWorld())
-	{
-		switch (GetWorld()->GetNetMode())
-		{
-		case NM_Standalone:
-			UE_LOG(LogTWLobby, Warning, TEXT("NM_Standalone"));
-			break;
-		case NM_Client:
-			UE_LOG(LogTWLobby, Warning, TEXT("NM_Client!!"));
-			break;
-		case NM_ListenServer:
-			UE_LOG(LogTWLobby, Warning, TEXT("NM_ListenServer!!"));
-			break;
-		case NM_DedicatedServer:
-			UE_LOG(LogTWLobby, Warning, TEXT("NM_DedicatedServer!!"));
+			DefaultHeroId = TEXT("DragonKnight");
 			break;
 		default:
 			break;
 		}
+
+		LPS->SetSelectedHeroUnitId(DefaultHeroId);
+		
 	}
 
 	CheckStartCondition();
@@ -130,7 +99,6 @@ void ATWLobbyGameMode::Logout(AController* Exiting)
 	if (LGS)
 	{
 		LGS->SetCurrentPlayerCount(GetNumPlayers());
-		UE_LOG(LogTWLobby, Warning, TEXT("Logout : PlayerCount Updated to %d"), LGS->GetCurrentPlayerCount());
 	}
 
 	AssignNewHost();
@@ -141,7 +109,7 @@ bool ATWLobbyGameMode::CheckStartCondition()
 {
 	bAllReady = true;
 
-	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
+	ATWLobbyGameState* LGS = GetGameState<ATWLobbyGameState>();
 	if (!LGS)
 	{
 		return false;
@@ -149,24 +117,24 @@ bool ATWLobbyGameMode::CheckStartCondition()
 
 	if (LGS->PlayerArray.Num() < MinPlayersToStart)
 	{
-		UE_LOG(LogTWLobby, Warning, TEXT("To Start Play need at least 2 player"));
 		return false;
 	}
 
 	for (APlayerState* PS : LGS->PlayerArray)
 	{
 		ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(PS);
-		if (LPS)
+		if (!LPS)
 		{
-			if (!LPS->IsHost() && !LPS->IsReady())
-			{
-				bAllReady = false;
-				return false;
-			}
+			continue;
+		}
+
+		if (!LPS->IsHost() && !LPS->IsReady())
+		{
+			bAllReady = false;
+			return false;
 		}
 	}
-
-	UE_LOG(LogTWLobby, Log, TEXT("CheckStartCondition: %s"), bAllReady ? TEXT("true") : TEXT("false"));
+	
 	return bAllReady;
 }
 
@@ -174,7 +142,6 @@ void ATWLobbyGameMode::StartGame()
 {
 	if (GameLevelName.IsNone())
 	{
-		UE_LOG(LogTWLobby, Warning, TEXT("[Lobby] StartGame failed: GameLevelName is None"));
 		return;
 	}
 
@@ -185,14 +152,7 @@ void ATWLobbyGameMode::StartGame()
 	{
 		TravelURL += TEXT("?listen");
 	}
-
-	UE_LOG(
-		LogTWLobby,
-		Warning,
-		TEXT("[Lobby] StartGame - TravelURL: %s / Seamless: %s"),
-		*TravelURL,
-		bUseSeamlessTravel ? TEXT("true") : TEXT("false")
-	);
+	
 
 	if (UWorld* World = GetWorld())
 	{
@@ -203,12 +163,7 @@ void ATWLobbyGameMode::StartGame()
 void ATWLobbyGameMode::AssignNewHost()
 {
 	ATWLobbyGameState* GS = GetGameState<ATWLobbyGameState>();
-	if (!GS)
-	{
-		return;
-	}
-
-	if (GS->PlayerArray.Num() <= 0)
+	if (!GS || GS->PlayerArray.Num() <= 0)
 	{
 		return;
 	}
@@ -227,8 +182,7 @@ void ATWLobbyGameMode::AssignNewHost()
 
 	if (!bHasHost)
 	{
-		ATWLobbyPlayerState* NewHost = Cast<ATWLobbyPlayerState>(GS->PlayerArray[0]);
-		if (NewHost)
+		if (ATWLobbyPlayerState* NewHost = Cast<ATWLobbyPlayerState>(GS->PlayerArray[0]))
 		{
 			NewHost->SetIsHost(true);
 		}

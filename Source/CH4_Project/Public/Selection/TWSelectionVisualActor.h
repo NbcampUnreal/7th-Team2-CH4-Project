@@ -46,6 +46,9 @@ public:
 	void ClearVisuals();
 	void SyncVisuals();
 
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -53,6 +56,7 @@ private:
 	void SyncUnitRingISM();
 	void SyncBuildingSelectionBoxISM();
 	void SyncHPBarISM();
+	void UpdateHPBarTickState();
 
 	int32 ResolveLocalPlayerSlot() const;
 	int32 ResolveLocalTeamID() const;
@@ -152,4 +156,8 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="SelectionVisual|Color")
 	float NeutralDesaturationAlpha = 0.65f;
+
+	// 체력바 메시 축이 안 맞을 때 에디터에서 미세 조정 가능
+	UPROPERTY(EditAnywhere, Category="SelectionVisual|HPBar")
+	float HPBarYawOffset = 90.f;
 };
