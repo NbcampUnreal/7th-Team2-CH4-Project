@@ -41,7 +41,7 @@ protected:
 	// 블루프린트에서 지정할 게임 시작 레벨명
 	// 예: L_TestUI
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Travel")
-	FName GameLevelName = TEXT("L_TestUI");
+	FName GameLevelName = TEXT("L_Main");
 
 	// listen 옵션 포함 여부
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Travel")
