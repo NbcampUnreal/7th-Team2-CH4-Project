@@ -533,19 +533,15 @@ void UTWPlayerUIBridge::AppendHeroSkillCommandIfNeeded(
 		return;
 	}
 
-	// 가장 우선: 실제 현재 로컬 선택 기준으로 영웅인지 판별
-	if (OwnerController->IsOwnedHeroCurrentlySelected())
+	// HeroSkill은 "내가 소유한 영웅을 현재 선택한 경우"에만 노출
+	if (!OwnerController->IsOwnedHeroCurrentlySelected())
 	{
-		InOutCommandIds.AddUnique(TWCommandIds::HeroSkill);
 		return;
 	}
 
-	// 보조 fallback: SelectionId 문자열 기준
-	if (IsHeroSelectionId(InSelectionId))
-	{
-		InOutCommandIds.AddUnique(TWCommandIds::HeroSkill);
-	}
+	InOutCommandIds.AddUnique(TWCommandIds::HeroSkill);
 }
+
 void UTWPlayerUIBridge::Initialize(
 	ATWPlayerController* InOwnerController,
 	TSubclassOf<UTWHUDRootWidget> InHUDRootWidgetClass,
@@ -1359,6 +1355,7 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	}
 
 	OutCommandIds.Reset();
+
 	if (bLocalUnitSelectionOwnedByMe)
 	{
 		OutCommandIds = {
@@ -1367,12 +1364,15 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 			TWCommandIds::Hold
 		};
 
-		if (OwnerController && OwnerController->IsOwnedHeroCurrentlySelected())
+		const bool bIsHeroUnit =
+			!OutVM.SelectionId.IsNone() &&
+			IsHeroSelectionId(OutVM.SelectionId);
+
+		if (bIsHeroUnit)
 		{
 			OutCommandIds.AddUnique(TWCommandIds::HeroSkill);
 		}
 	}
-	AppendHeroSkillCommandIfNeeded(OutVM.SelectionId, OutCommandIds);
 
 	return true;
 }
