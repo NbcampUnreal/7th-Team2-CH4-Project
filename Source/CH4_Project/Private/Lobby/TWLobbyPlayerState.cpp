@@ -1,28 +1,38 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Lobby/TWLobbyPlayerState.h"
 
 #include "Lobby/TWLobbyPlayerController.h"
 #include "Lobby/TWLobby_Layout.h"
 #include "Core/TWPlayerState.h"
+#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
 ATWLobbyPlayerState::ATWLobbyPlayerState()
 {
 	bIsReady = false;
 	bIsHost = false;
-	
 	bReplicates = true;
 }
 
 void ATWLobbyPlayerState::SetIsReady(bool bInReady)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	bIsReady = bInReady;
+	OnRep_IsReady();
 }
 
 void ATWLobbyPlayerState::SetIsHost(bool bInHost)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	bIsHost = bInHost;
 	OnRep_IsHost();
 }
@@ -42,6 +52,7 @@ void ATWLobbyPlayerState::SetLobbyNickname(const FString& InNickname)
 	}
 
 	SetPlayerName(LobbyNickname);
+	OnRep_LobbyNickname();
 }
 
 void ATWLobbyPlayerState::SetSelectedHeroUnitId(FName InHeroUnitId)
@@ -52,23 +63,13 @@ void ATWLobbyPlayerState::SetSelectedHeroUnitId(FName InHeroUnitId)
 	}
 
 	SelectedHeroUnitId = InHeroUnitId;
+	OnRep_SelectedHeroUnitId();
 }
 
 void ATWLobbyPlayerState::PostNetInit()
 {
 	Super::PostNetInit();
-	
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
-	if (LPC && LPC->LobbyWidgetInstance)
-	{
-		LPC->LobbyWidgetInstance->UpdateUserList();
-		LPC->LobbyWidgetInstance->UpdateUserImage();
-		
-		if (GetPlayerController() == LPC)
-		{
-			LPC->LobbyWidgetInstance->ShowPlayButton(IsHost());
-		}
-	}
+	RefreshLobbyWidget();
 }
 
 void ATWLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
@@ -97,49 +98,42 @@ void ATWLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void ATWLobbyPlayerState::OnRep_IsReady()
 {
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
-	
-	if (LPC && LPC->LobbyWidgetInstance)
-	{
-		LPC->LobbyWidgetInstance->UpdateUserImage();
-	}
+	RefreshLobbyWidget();
 }
 
 void ATWLobbyPlayerState::OnRep_IsHost()
 {
-	APlayerController* PC = GetPlayerController();
-	if (!PC) return;
-	
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
-	bool Host = IsHost();
-	if (LPC && LPC->LobbyWidgetInstance)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Current Host : %s"), IsHost() ? TEXT("True") : TEXT("False"));
-		LPC->LobbyWidgetInstance->ShowPlayButton(Host);
-		LPC->LobbyWidgetInstance->UpdateUserImage();
-	}
+	RefreshLobbyWidget();
 }
 
 void ATWLobbyPlayerState::OnRep_LobbyNickname()
 {
-	if (ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController()))
-	{
-		if (PC->LobbyWidgetInstance)
-		{
-			PC->LobbyWidgetInstance->UpdateUserList();
-		}
-	}
+	RefreshLobbyWidget();
 }
 
 void ATWLobbyPlayerState::OnRep_SelectedHeroUnitId()
 {
-	if (ATWLobbyPlayerController* PC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController()))
-	{
-		if (PC->LobbyWidgetInstance)
-		{
-			PC->LobbyWidgetInstance->UpdateUserList();
-		}
-	}
+	RefreshLobbyWidget();
 }
 
+void ATWLobbyPlayerState::RefreshLobbyWidget() const
+{
+	if (!GetWorld())
+	{
+		return;
+	}
 
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (!LPC || !LPC->LobbyWidgetInstance)
+	{
+		return;
+	}
+
+	LPC->LobbyWidgetInstance->UpdateUserList();
+	LPC->LobbyWidgetInstance->UpdateUserImage();
+
+	if (const ATWLobbyPlayerState* LocalPS = LPC->GetPlayerState<ATWLobbyPlayerState>())
+	{
+		LPC->LobbyWidgetInstance->ShowPlayButton(LocalPS->IsHost());
+	}
+}

@@ -1,21 +1,22 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Lobby/TWLobby_Layout.h"
-#include "Lobby//TWLobbyPlayerController.h"
+
+#include "Lobby/TWLobbyPlayerController.h"
 #include "Lobby/TWLobbyGameState.h"
 #include "Lobby/TWLobbyPlayerState.h"
 #include "Components/Button.h"
 #include "Components/EditableText.h"
 #include "Components/HorizontalBox.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "Title/TWTitlePlayerController.h"
-#include "GameFramework/GameStateBase.h"
-#include "Lobby/TWLobbyGameMode.h"
 #include "Components/Image.h"
+#include "Components/ComboBoxString.h"
+#include "CommonTextBlock.h"
+#include "GameFramework/GameStateBase.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 UTWLobby_Layout::UTWLobby_Layout(const FObjectInitializer& ObjectInitializer)
-	:Super(ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 }
 
@@ -23,16 +24,61 @@ void UTWLobby_Layout::NativeConstruct()
 {
 	Super::NativeConstruct();
 	
-	PlayButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnPlayButtonClicked);
-	ReadyButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnReadyButtonClicked);
-	CancelButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnCancelButtonClicked);
-	LobbyExitButton.Get()->OnClicked.AddDynamic(this, &ThisClass::OnLobbyExitButtonClicked);
+	if (PlayButton)
+	{
+		PlayButton->OnClicked.AddDynamic(this, &ThisClass::OnPlayButtonClicked);
+	}
+
+	if (ReadyButton)
+	{
+		ReadyButton->OnClicked.AddDynamic(this, &ThisClass::OnReadyButtonClicked);
+	}
+
+	if (CancelButton)
+	{
+		CancelButton->OnClicked.AddDynamic(this, &ThisClass::OnCancelButtonClicked);
+	}
+
+	if (LobbyExitButton)
+	{
+		LobbyExitButton->OnClicked.AddDynamic(this, &ThisClass::OnLobbyExitButtonClicked);
+	}
+
+	if (ApplySettingsButton)
+	{
+		ApplySettingsButton->OnClicked.AddDynamic(this, &ThisClass::OnApplySettingsButtonClicked);
+	}
+
+	if (HeroSelectComboBox)
+	{
+		HeroSelectComboBox->ClearOptions();
+		HeroSelectComboBox->AddOption(TEXT("DragonKnight"));
+		HeroSelectComboBox->AddOption(TEXT("Markman"));
+		HeroSelectComboBox->AddOption(TEXT("Astrologian"));
+
+		if (HeroSelectComboBox->GetSelectedOption().IsEmpty())
+		{
+			HeroSelectComboBox->SetSelectedOption(TEXT("DragonKnight"));
+		}
+	}
 	
 	NickNameSlots.Empty();
 	NickNameSlots.Add(NickName_1);
 	NickNameSlots.Add(NickName_2);
 	NickNameSlots.Add(NickName_3);
 	NickNameSlots.Add(NickName_4);
+
+	PlayerNameTexts.Empty();
+	PlayerNameTexts.Add(PlayerName1);
+	PlayerNameTexts.Add(PlayerName2);
+	PlayerNameTexts.Add(PlayerName3);
+	PlayerNameTexts.Add(PlayerName4);
+
+	HeroTexts.Empty();
+	HeroTexts.Add(HeroText1);
+	HeroTexts.Add(HeroText2);
+	HeroTexts.Add(HeroText3);
+	HeroTexts.Add(HeroText4);
 	
 	HostImages.Empty();
 	HostImages.Add(HostImage1);
@@ -46,26 +92,29 @@ void UTWLobby_Layout::NativeConstruct()
 	ReadyImages.Add(ReadyImage3);
 	ReadyImages.Add(ReadyImage4);
 	
-	if (PlayButton->IsVisible())
+	if (PlayButton && PlayButton->IsVisible())
 	{
 		PlayButton->SetVisibility(ESlateVisibility::Hidden);
 	}
+
+	UpdateUserList();
 }
 
 void UTWLobby_Layout::OnPlayButtonClicked()
 {
 	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
+	if (!LPC)
+	{
+		return;
+	}
+
 	ATWLobbyPlayerState* LPS = LPC->GetPlayerState<ATWLobbyPlayerState>();
-	if (!LPC || !LPS->IsHost()) return;
+	if (!LPS || !LPS->IsHost())
+	{
+		return;
+	}
 	
-	if(LPC)
-	{
-		LPC->Server_RequestStartGame();
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Can Not Start!!!"));
-	}
+	LPC->Server_RequestStartGame();
 }
 
 void UTWLobby_Layout::OnReadyButtonClicked()
@@ -75,7 +124,20 @@ void UTWLobby_Layout::OnReadyButtonClicked()
 	{
 		LPC->Server_SetReady(true);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Ready!"));
+
+	UpdateUserList();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DeferredRefreshTimerHandle);
+		World->GetTimerManager().SetTimer(
+			DeferredRefreshTimerHandle,
+			this,
+			&ThisClass::DeferredRefreshUserList,
+			0.15f,
+			false
+		);
+	}
 }
 
 void UTWLobby_Layout::OnCancelButtonClicked()
@@ -85,7 +147,20 @@ void UTWLobby_Layout::OnCancelButtonClicked()
 	{
 		LPC->Server_SetReady(false);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Not Ready!"));
+
+	UpdateUserList();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DeferredRefreshTimerHandle);
+		World->GetTimerManager().SetTimer(
+			DeferredRefreshTimerHandle,
+			this,
+			&ThisClass::DeferredRefreshUserList,
+			0.15f,
+			false
+		);
+	}
 }
 
 void UTWLobby_Layout::OnLobbyExitButtonClicked()
@@ -95,7 +170,46 @@ void UTWLobby_Layout::OnLobbyExitButtonClicked()
 	{
 		LPC->ExitLobby();
 	}
-	UE_LOG(LogTemp, Warning, TEXT("I'm Exit!"));
+}
+
+void UTWLobby_Layout::OnApplySettingsButtonClicked()
+{
+	if (NickNameInput)
+	{
+		const FString InputNickname = NickNameInput->GetText().ToString().TrimStartAndEnd();
+		if (!InputNickname.IsEmpty())
+		{
+			SubmitNickname(InputNickname);
+		}
+	}
+
+	if (HeroSelectComboBox)
+	{
+		const FString SelectedHero = HeroSelectComboBox->GetSelectedOption();
+		if (!SelectedHero.IsEmpty())
+		{
+			SelectHero(FName(*SelectedHero));
+		}
+	}
+
+	UpdateUserList();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DeferredRefreshTimerHandle);
+		World->GetTimerManager().SetTimer(
+			DeferredRefreshTimerHandle,
+			this,
+			&ThisClass::DeferredRefreshUserList,
+			0.15f,
+			false
+		);
+	}
+}
+
+void UTWLobby_Layout::DeferredRefreshUserList()
+{
+	UpdateUserList();
 }
 
 void UTWLobby_Layout::SubmitNickname(const FString& InNickname)
@@ -114,79 +228,147 @@ void UTWLobby_Layout::SelectHero(FName InHeroUnitId)
 	}
 }
 
-void UTWLobby_Layout::UpdateUserList()
+FString UTWLobby_Layout::GetDisplayHeroName(const FName& InHeroUnitId) const
 {
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetOwningPlayer());
-	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld()->GetGameState());
-	if (!LGS) return;
-	
-	int32 PlayerCount = LGS->GetCurrentPlayerCount();
-	UE_LOG(LogTemp, Warning, TEXT("UpdateUserList >>> CurrentPlayerCount : %d"), PlayerCount);
-	
-	for (int32 i = 0; i < NickNameSlots.Num(); i++)
+	if (InHeroUnitId.IsNone())
 	{
-		if (i < PlayerCount)
+		return TEXT("-");
+	}
+
+	if (InHeroUnitId == TEXT("DragonKnight"))
+	{
+		return TEXT("DragonKnight");
+	}
+
+	if (InHeroUnitId == TEXT("Markman"))
+	{
+		return TEXT("Markman");
+	}
+
+	if (InHeroUnitId == TEXT("Astrologian"))
+	{
+		return TEXT("Astrologian");
+	}
+
+	return InHeroUnitId.ToString();
+}
+
+void UTWLobby_Layout::RefreshUserSlot(int32 SlotIndex)
+{
+	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld() ? GetWorld()->GetGameState() : nullptr);
+	if (!LGS)
+	{
+		return;
+	}
+
+	if (!NickNameSlots.IsValidIndex(SlotIndex) || !NickNameSlots[SlotIndex])
+	{
+		return;
+	}
+
+	const int32 PlayerCount = LGS->GetCurrentPlayerCount();
+	const bool bVisible = SlotIndex < PlayerCount;
+
+	NickNameSlots[SlotIndex]->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+
+	if (!bVisible)
+	{
+		if (PlayerNameTexts.IsValidIndex(SlotIndex) && PlayerNameTexts[SlotIndex])
 		{
-			UE_LOG(LogTemp, Warning, TEXT("지금 보이게 하는 중"));
-			NickNameSlots[i]->SetVisibility(ESlateVisibility::Visible);
+			PlayerNameTexts[SlotIndex]->SetText(FText::GetEmpty());
+		}
+
+		if (HeroTexts.IsValidIndex(SlotIndex) && HeroTexts[SlotIndex])
+		{
+			HeroTexts[SlotIndex]->SetText(FText::GetEmpty());
+		}
+
+		if (HostImages.IsValidIndex(SlotIndex) && HostImages[SlotIndex])
+		{
+			HostImages[SlotIndex]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		if (ReadyImages.IsValidIndex(SlotIndex) && ReadyImages[SlotIndex])
+		{
+			ReadyImages[SlotIndex]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		return;
+	}
+
+	if (!LGS->PlayerArray.IsValidIndex(SlotIndex))
+	{
+		return;
+	}
+
+	ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(LGS->PlayerArray[SlotIndex]);
+	if (!LPS)
+	{
+		return;
+	}
+
+	const FString LobbyNickname = LPS->GetLobbyNickname();
+	const FName SelectedHeroUnitId = LPS->GetSelectedHeroUnitId();
+
+	if (PlayerNameTexts.IsValidIndex(SlotIndex) && PlayerNameTexts[SlotIndex])
+	{
+		const FString DisplayName = LobbyNickname.IsEmpty()
+			? FString::Printf(TEXT("Player%d"), SlotIndex + 1)
+			: LobbyNickname;
+
+		PlayerNameTexts[SlotIndex]->SetText(FText::FromString(DisplayName));
+	}
+
+	if (HeroTexts.IsValidIndex(SlotIndex) && HeroTexts[SlotIndex])
+	{
+		HeroTexts[SlotIndex]->SetText(FText::FromString(GetDisplayHeroName(SelectedHeroUnitId)));
+	}
+
+	if (HostImages.IsValidIndex(SlotIndex) && HostImages[SlotIndex])
+	{
+		HostImages[SlotIndex]->SetVisibility(
+			LPS->IsHost() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
+		);
+	}
+
+	if (ReadyImages.IsValidIndex(SlotIndex) && ReadyImages[SlotIndex])
+	{
+		if (!LPS->IsHost() && LPS->IsReady())
+		{
+			ReadyImages[SlotIndex]->SetVisibility(ESlateVisibility::Visible);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[ 지금 안 보이게 하는 중 ]"));
-			NickNameSlots[i]->SetVisibility(ESlateVisibility::Collapsed);
+			ReadyImages[SlotIndex]->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
+}
+
+void UTWLobby_Layout::UpdateUserList()
+{
+	ATWLobbyGameState* LGS = Cast<ATWLobbyGameState>(GetWorld() ? GetWorld()->GetGameState() : nullptr);
+	if (!LGS)
+	{
+		return;
+	}
 	
-	UE_LOG(LogTemp, Log, TEXT("UI Updated: Current Players = %d"), PlayerCount);
+	for (int32 i = 0; i < NickNameSlots.Num(); i++)
+	{
+		RefreshUserSlot(i);
+	}
 }
 
 void UTWLobby_Layout::UpdateUserImage()
 {
-	AGameStateBase* GS = GetWorld()->GetGameState();
-	if (!GS) return;
-	
-	for (int32 i = 0; i < NickNameSlots.Num(); i++)
-	{
-		if (NickNameSlots[i]->GetVisibility() == ESlateVisibility::Visible)
-		{
-			if (GS->PlayerArray.IsValidIndex(i))
-			{
-				ATWLobbyPlayerState* LPS = Cast<ATWLobbyPlayerState>(GS->PlayerArray[i]);
-				if (!LPS) continue;
-				
-				if (HostImages.IsValidIndex(i) && HostImages[i])
-				{
-					if (LPS->IsHost())
-					{
-						HostImages[i]->SetVisibility(ESlateVisibility::Visible);
-					}
-				}
-				if (ReadyImages.IsValidIndex(i) && ReadyImages[i])
-				{
-					if (!LPS->IsHost() && LPS->IsReady())
-					{
-						ReadyImages[i]->SetVisibility(ESlateVisibility::Visible);
-					}
-					else
-					{
-						ReadyImages[i]->SetVisibility(ESlateVisibility::Collapsed);
-					}
-				}
-			}
-		}
-	}
+	UpdateUserList();
 }
 
 void UTWLobby_Layout::ShowPlayButton(bool bIsShow)
 {
-	if (bIsShow)
+	if (!PlayButton)
 	{
-		UE_LOG(LogTemp, Warning, TEXT(" Play Button : 지금 보이게 하는 중"));
-		PlayButton->SetVisibility(ESlateVisibility::Visible);
+		return;
 	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[ Play Button : 지금 안 보이게 하는 중 ]"));
-		PlayButton->SetVisibility(ESlateVisibility::Hidden);
-	}
+
+	PlayButton->SetVisibility(bIsShow ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 }

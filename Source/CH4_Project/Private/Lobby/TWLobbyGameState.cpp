@@ -1,46 +1,41 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Lobby/TWLobbyGameState.h"
 
 #include "Lobby/TWLobbyPlayerController.h"
 #include "Lobby/TWLobby_Layout.h"
-#include "Net/UnrealNetwork.h"  // DOREPLIFETIME 매크로용
+#include "Net/UnrealNetwork.h"
 
 ATWLobbyGameState::ATWLobbyGameState()
 {
-	CurrentPlayerCount = -1;
+	CurrentPlayerCount = 0;
 	bReplicates = true;
 }
 
 void ATWLobbyGameState::SetCurrentPlayerCount(int32 InCurrentPlayerCount)
 {
 	CurrentPlayerCount = InCurrentPlayerCount;
-	
+
 	if (HasAuthority())
 	{
 		OnRep_CurrentPlayerCount();
 	}
 }
 
-
 void ATWLobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
 	DOREPLIFETIME(ATWLobbyGameState, CurrentPlayerCount);
 }
 
 void ATWLobbyGameState::OnRep_CurrentPlayerCount()
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (!PC) return;
-	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(PC);
-	if (LPC)
+	ATWLobbyPlayerController* LPC = Cast<ATWLobbyPlayerController>(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr);
+	if (!LPC)
 	{
-		if (LPC->LobbyWidgetInstance)
-		{
-			LPC->LobbyWidgetInstance->UpdateUserList();
-		}
+		return;
 	}
+
+	LPC->RefreshLobbyWidget();
 }

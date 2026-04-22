@@ -7,6 +7,7 @@
 #include "TWLobbyPlayerController.generated.h"
 
 class UTWLobby_Layout;
+class UUserWidget;
 
 UCLASS()
 class CH4_PROJECT_API ATWLobbyPlayerController : public APlayerController
@@ -15,30 +16,31 @@ class CH4_PROJECT_API ATWLobbyPlayerController : public APlayerController
 	
 public:
 	virtual void BeginPlay() override;
-	
+
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SetReady(bool bNewReady);
-	
+
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_RequestStartGame();
-	
+
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SetLobbyNickname(const FString& InNickname);
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SetSelectedHeroUnitId(FName InHeroUnitId);
-	
+
 	void ExitLobby();
-	
+
 	UPROPERTY()
-	class UTWLobby_Layout* LobbyWidgetInstance;
-	
+	TObjectPtr<UTWLobby_Layout> LobbyWidgetInstance;
+
 	void CreateLobbyWidget();
-	
+	void RefreshLobbyWidget();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = ATWUIPLayerController)
 	TSubclassOf<UUserWidget> UIWidgetClass;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Lobby")
-	TSubclassOf<class UTWLobby_Layout> LobbyWidgetClass;
+	TSubclassOf<UTWLobby_Layout> LobbyWidgetClass;
 };

@@ -7,9 +7,11 @@
 #include "TWLobby_Layout.generated.h"
 
 class UButton;
-class UVerticalBox;
 class UHorizontalBox;
 class UImage;
+class UEditableText;
+class UComboBoxString;
+class UCommonTextBlock;
 
 UCLASS()
 class CH4_PROJECT_API UTWLobby_Layout : public UUserWidget
@@ -33,6 +35,15 @@ protected:
 	
 	UFUNCTION()
 	void OnLobbyExitButtonClicked();
+
+	UFUNCTION()
+	void OnApplySettingsButtonClicked();
+
+	UFUNCTION()
+	void DeferredRefreshUserList();
+
+	FString GetDisplayHeroName(const FName& InHeroUnitId) const;
+	void RefreshUserSlot(int32 SlotIndex);
 	
 public:
 	UFUNCTION(BlueprintCallable)
@@ -62,11 +73,28 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = USLobyWidget, meta = (BindWidget))
 	TObjectPtr<UButton> LobbyExitButton;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> ApplySettingsButton;
+#pragma endregion
+
+#pragma region 설정 패널 연결
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UEditableText> NickNameInput;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UComboBoxString> HeroSelectComboBox;
 #pragma endregion
 	
 #pragma region 이름 및 상태 표시 연결
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_1;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> PlayerName1;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> HeroText1;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> HostImage1;
@@ -76,6 +104,12 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_2;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> PlayerName2;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> HeroText2;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> HostImage2;
@@ -85,6 +119,12 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_3;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> PlayerName3;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> HeroText3;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> HostImage3;
@@ -94,6 +134,12 @@ protected:
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UHorizontalBox> NickName_4;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> PlayerName4;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlock> HeroText4;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> HostImage4;
@@ -103,12 +149,20 @@ protected:
 #pragma endregion
 	
 	UPROPERTY()
-	TArray<UHorizontalBox*> NickNameSlots;
-	
-	UPROPERTY()
-	TArray<UImage*> HostImages;
-	
-	UPROPERTY()
-	TArray<UImage*> ReadyImages;
-};
+	TArray<TObjectPtr<UHorizontalBox>> NickNameSlots;
 
+	UPROPERTY()
+	TArray<TObjectPtr<UCommonTextBlock>> PlayerNameTexts;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UCommonTextBlock>> HeroTexts;
+	
+	UPROPERTY()
+	TArray<TObjectPtr<UImage>> HostImages;
+	
+	UPROPERTY()
+	TArray<TObjectPtr<UImage>> ReadyImages;
+
+	UPROPERTY()
+	FTimerHandle DeferredRefreshTimerHandle;
+};

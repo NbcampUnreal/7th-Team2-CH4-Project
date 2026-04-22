@@ -5,7 +5,6 @@
 #include "Components/SceneComponent.h"
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
-#include "Kismet/KismetMathLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
@@ -23,7 +22,8 @@ namespace
 
 ATWSelectionVisualActor::ATWSelectionVisualActor()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = false;
 	SetReplicateMovement(false);
 
@@ -60,6 +60,25 @@ ATWSelectionVisualActor::ATWSelectionVisualActor()
 	HPBarISM->SetVisibility(true);
 	HPBarISM->SetHiddenInGame(false);
 	HPBarISM->NumCustomDataFloats = HPBAR_NUM_CUSTOMDATA_FLOATS;
+}
+
+void ATWSelectionVisualActor::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!HPBarISM || !HPBarMesh)
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	if (SelectedHPBarVisuals.Num() <= 0 && RecentCombatHPBarVisuals.Num() <= 0)
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	SyncHPBarISM();
 }
 
 void ATWSelectionVisualActor::BeginPlay()
@@ -149,6 +168,8 @@ void ATWSelectionVisualActor::ConfigureRenderAssets(
 			HPBarISM->SetMaterial(0, HPBarMaterial);
 		}
 	}
+
+	UpdateHPBarTickState();
 }
 
 void ATWSelectionVisualActor::SetVisualData(
@@ -164,6 +185,8 @@ void ATWSelectionVisualActor::SetVisualData(
 	SelectedBuildingVisuals = InSelectedBuildingVisuals;
 	SelectedHPBarVisuals = InSelectedHPBarVisuals;
 	RecentCombatHPBarVisuals = InRecentCombatHPBarVisuals;
+
+	UpdateHPBarTickState();
 }
 
 void ATWSelectionVisualActor::ClearVisuals()
@@ -191,6 +214,8 @@ void ATWSelectionVisualActor::ClearVisuals()
 		HPBarISM->ClearInstances();
 		HPBarISM->MarkRenderStateDirty();
 	}
+
+	UpdateHPBarTickState();
 }
 
 void ATWSelectionVisualActor::SyncVisuals()
@@ -198,6 +223,16 @@ void ATWSelectionVisualActor::SyncVisuals()
 	SyncUnitRingISM();
 	SyncBuildingSelectionBoxISM();
 	SyncHPBarISM();
+	UpdateHPBarTickState();
+}
+
+void ATWSelectionVisualActor::UpdateHPBarTickState()
+{
+	const bool bShouldTick =
+		HPBarMesh != nullptr &&
+		(SelectedHPBarVisuals.Num() > 0 || RecentCombatHPBarVisuals.Num() > 0);
+
+	SetActorTickEnabled(bShouldTick);
 }
 
 int32 ATWSelectionVisualActor::ResolveLocalPlayerSlot() const
@@ -457,11 +492,10 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 
 	if (CombinedHPBars.Num() <= 0)
 	{
+		HPBarISM->ClearInstances();
 		HPBarISM->MarkRenderStateDirty();
 		return;
 	}
-
-	FRotator FacingRotation = FRotator::ZeroRotator;
 
 	if (UWorld* World = GetWorld())
 	{
@@ -469,7 +503,8 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 		{
 			if (PC->PlayerCameraManager)
 			{
-				const FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+				const FRotator CameraRotation = PC->PlayerCameraManager->GetCameraRotation();
+				const FRotator FacingRotation(0.f, CameraRotation.Yaw + HPBarYawOffset, 0.f);
 
 				for (const FTWHPBarVisualData& HPBarData : CombinedHPBars)
 				{
@@ -477,13 +512,6 @@ void ATWSelectionVisualActor::SyncHPBarISM()
 					{
 						continue;
 					}
-
-					FacingRotation = UKismetMathLibrary::FindLookAtRotation(
-						HPBarData.WorldLocation,
-						CameraLocation
-					);
-					FacingRotation.Pitch = 0.f;
-					FacingRotation.Roll = 0.f;
 
 					const FTransform HPBarTransform(
 						FacingRotation,

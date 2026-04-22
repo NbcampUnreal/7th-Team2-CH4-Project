@@ -6,9 +6,6 @@
 #include "GameFramework/GameState.h"
 #include "TWLobbyGameState.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class CH4_PROJECT_API ATWLobbyGameState : public AGameState
 {
@@ -16,17 +13,18 @@ class CH4_PROJECT_API ATWLobbyGameState : public AGameState
 	
 public:
 	ATWLobbyGameState();
-	
+
 	void SetCurrentPlayerCount(int32 InCurrentPlayerCount);
-	
+
 	FORCEINLINE int32 GetCurrentPlayerCount() const { return CurrentPlayerCount; }
-	
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-		
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerCount)
-	int32 CurrentPlayerCount;
-		
+
 	UFUNCTION()
 	void OnRep_CurrentPlayerCount();
+
+protected:
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentPlayerCount)
+	int32 CurrentPlayerCount;
 };
