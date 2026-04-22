@@ -123,10 +123,7 @@ void UTWBuildComponent::SelectBuildingToConstruct(EBuildingCategory Category)
 	
 	if (CurrentGhost)
 	{
-		UStaticMesh* RealMesh = DefaultBuilding->MeshComponent->GetStaticMesh();
-		FIntPoint RealSize = DefaultBuilding->BuildingData->GridSize.BuildingSize;
-		
-		CurrentGhost->SetBuildingMesh(RealMesh, RealSize);
+		CurrentGhost->InitGhsotBuilding(SelectedBuildingClass);
 	}
 }
 
