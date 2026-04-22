@@ -38,6 +38,13 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnPossess(APawn* InPawn) override;
+private:
+	UPROPERTY(Transient)
+	bool bHasPendingStartFocusLocation = false;
+
+	UPROPERTY(Transient)
+	FVector PendingStartFocusLocation = FVector::ZeroVector;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
@@ -52,6 +59,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	TObjectPtr<UInputMappingContext> IMC_BuildingCommand = nullptr;
 
+	UFUNCTION(Client, Reliable)
+void ClientMoveCameraToStartLocation(const FVector& InTargetLocation, const FRotator& InTargetRotation);
 	bool bUnitCommandContextActive = false;
 	bool bBuildContextActive = false;
 	bool bBuildShortcutModeActive = false;

@@ -9,6 +9,7 @@ class AController;
 class ATWPlayerState;
 class ATWBaseBuilding;
 class ATWNexusBuilding;
+class ATWPlayerController;
 
 UCLASS()
 class CH4_PROJECT_API ATWGameMode : public AGameMode
@@ -40,58 +41,58 @@ protected:
 	ATWNexusBuilding* AssignRandomStartNexus(ATWPlayerState* PS);
 	void AssignNexusOwnership(ATWNexusBuilding* Nexus, ATWPlayerState* PS);
 
-	bool SpawnSelectedHeroUnitForPlayer(ATWPlayerState* PS, ATWNexusBuilding* Nexus);
-
-	void BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState);
-	ATWPlayerState* FindPlayerStateBySlot(int32 InPlayerSlot) const;
-
+	// 기존 영웅 시작 위치 계산용 로직 유지
+	FVector CalculateAllStartNexusCenter() const;
+	FVector CalculateMapInwardDirectionFromNexus(const ATWNexusBuilding* Nexus) const;
 	FVector CalculateHeroSpawnLocationFromNexus(const ATWNexusBuilding* Nexus);
 	FRotator CalculateHeroSpawnRotationFromNexus(const ATWNexusBuilding* Nexus);
 
-private:
-	// 맵의 시작 넥서스 전체 중심점을 계산
-	FVector CalculateAllStartNexusCenter() const;
+	bool SpawnSelectedHeroUnitForPlayer(ATWPlayerState* PS, ATWNexusBuilding* Nexus);
 
-	// 현재 넥서스 기준으로 "맵 안쪽 방향" 벡터 계산
-	FVector CalculateMapInwardDirectionFromNexus(const ATWNexusBuilding* Nexus) const;
+	ATWPlayerState* FindPlayerStateBySlot(int32 InPlayerSlot) const;
+	void BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState);
+
+	// 시작 셋업 후처리
+	int32 GetAssignedStartPlayerCount() const;
+	bool AreAllRequiredPlayersAssignedStartNexus() const;
+	void CleanupUnusedStartNexusBuildings();
+	void TryFinalizeStartSetup();
+	void MovePlayerCameraToAssignedStart(ATWPlayerController* PC, ATWNexusBuilding* Nexus);
 
 protected:
-	// 넥서스 경계 바깥으로 추가로 얼마나 떨어뜨릴지
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroSpawnDistance = 650.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Init")
+	float PostLoginInitializeDelay = 0.2f;
 
-	// 넥서스 크기 + SpawnDistance 외에 추가 여유 거리
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroSpawnExtraPadding = 180.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	int32 InitialHeroSpawnMaxRetryCount = 10;
 
-	// 좌우로 너무 일직선만 되지 않게 살짝 퍼뜨리는 오프셋
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroLateralRandomOffset = 120.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float InitialHeroSpawnRetryDelay = 0.5f;
 
-	// 최종 회전 보정
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroSpawnDistance = 250.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroSpawnExtraPadding = 80.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroLateralRandomOffset = 100.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroNavProjectExtentXY = 300.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroNavProjectExtentZ = 500.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
+	float StartHeroGroundTraceHalfHeight = 1000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Hero")
 	float StartHeroYawOffset = 0.0f;
 
-	// 혹시 바닥 보정용 trace를 별도로 쓰는 경우 대비 유지
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroGroundTraceHalfHeight = 500.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameMode|Start")
+	int32 RequiredStartPlayerCount = 2;
 
-	// NavMesh 투영 범위
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroNavProjectExtentXY = 500.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float StartHeroNavProjectExtentZ = 300.0f;
-
-	// PostLogin 이후 약간 늦춰 초기화
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Init", meta = (ClampMin = "0.0"))
-	float PostLoginInitializeDelay = 0.15f;
-
-	// 영웅 스폰 실패 시 재시도 딜레이
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0.0"))
-	float InitialHeroSpawnRetryDelay = 0.3f;
-
-	// 영웅 스폰 최대 재시도 횟수
-	UPROPERTY(EditDefaultsOnly, Category = "Start|Hero", meta = (ClampMin = "0"))
-	int32 InitialHeroSpawnMaxRetryCount = 5;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GameMode|Start")
+	bool bHasCleanedUpUnusedStartNexus = false;
 };

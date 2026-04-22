@@ -95,6 +95,9 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 		{
 			PS->SetAssignedStartNexus(AssignedNexus);
 			AssignNexusOwnership(AssignedNexus, PS);
+
+			// 시작 넥서스 배정만 완료되어도 남는 넥서스 정리 조건은 볼 수 있음
+			TryFinalizeStartSetup();
 		}
 	}
 
@@ -127,6 +130,13 @@ void ATWGameMode::InitializeJoinedPlayer(AController* NewController)
 		ScheduleInitialHeroSpawnRetry(PS, InitialHeroSpawnMaxRetryCount);
 		return;
 	}
+
+	if (ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC))
+	{
+		MovePlayerCameraToAssignedStart(TWPC, AssignedNexus);
+	}
+
+	TryFinalizeStartSetup();
 
 	UE_LOG(
 		LogTemp,
@@ -255,6 +265,26 @@ void ATWGameMode::RetryInitialHeroSpawn(ATWPlayerState* PS, int32 RemainingRetry
 	if (bSpawned)
 	{
 		BindPlacedBuildingsForPlayer(PS);
+
+		ATWPlayerController* OwnerPC = nullptr;
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (ATWPlayerController* TempPC = Cast<ATWPlayerController>(It->Get()))
+			{
+				if (TempPC->GetPlayerState<ATWPlayerState>() == PS)
+				{
+					OwnerPC = TempPC;
+					break;
+				}
+			}
+		}
+
+		if (OwnerPC)
+		{
+			MovePlayerCameraToAssignedStart(OwnerPC, Nexus);
+		}
+
+		TryFinalizeStartSetup();
 
 		UE_LOG(
 			LogTemp,
@@ -400,13 +430,11 @@ FVector ATWGameMode::CalculateMapInwardDirectionFromNexus(const ATWNexusBuilding
 	const FVector NexusLocation = Nexus->GetActorLocation();
 	FVector NexusCenter = CalculateAllStartNexusCenter();
 
-	// Z는 무시하고 XY 평면 기준으로 계산
 	NexusCenter.Z = NexusLocation.Z;
 
 	FVector InwardDirection = NexusCenter - NexusLocation;
 	InwardDirection.Z = 0.0f;
 
-	// 혹시 모든 넥서스 중심 계산이 애매하거나 거의 같은 위치면 fallback
 	if (InwardDirection.IsNearlyZero())
 	{
 		InwardDirection = -Nexus->GetActorForwardVector();
@@ -467,7 +495,6 @@ FVector ATWGameMode::CalculateHeroSpawnLocationFromNexus(const ATWNexusBuilding*
 		SpawnLocation += RightDirection * LateralOffset;
 	}
 
-	// 1차: NavMesh 투영
 	if (const UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
 	{
 		FNavLocation ProjectedLocation;
@@ -485,7 +512,7 @@ FVector ATWGameMode::CalculateHeroSpawnLocationFromNexus(const ATWNexusBuilding*
 
 	{
 		const FVector TraceStart = SpawnLocation + FVector(0.0f, 0.0f, StartHeroGroundTraceHalfHeight);
-		const FVector TraceEnd   = SpawnLocation - FVector(0.0f, 0.0f, StartHeroGroundTraceHalfHeight);
+		const FVector TraceEnd = SpawnLocation - FVector(0.0f, 0.0f, StartHeroGroundTraceHalfHeight);
 
 		FHitResult HitResult;
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(HeroSpawnGroundTrace), false);
@@ -716,6 +743,7 @@ void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
 		);
 	}
 }
+
 ATWPlayerState* ATWGameMode::FindPlayerStateBySlot(int32 InPlayerSlot) const
 {
 	if (!GetWorld())
@@ -842,4 +870,146 @@ void ATWGameMode::BindPlacedBuildingsForPlayer(ATWPlayerState* InPlayerState)
 
 		Building->SetOwnerPlayerState(InPlayerState);
 	}
+}
+
+int32 ATWGameMode::GetAssignedStartPlayerCount() const
+{
+	if (!GetWorld())
+	{
+		return 0;
+	}
+
+	int32 Count = 0;
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		const ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
+		if (!PS)
+		{
+			continue;
+		}
+
+		if (PS->PlayerSlot < 0)
+		{
+			continue;
+		}
+
+		if (!IsValid(PS->GetAssignedStartNexus()))
+		{
+			continue;
+		}
+
+		++Count;
+	}
+
+	return Count;
+}
+
+bool ATWGameMode::AreAllRequiredPlayersAssignedStartNexus() const
+{
+	return GetAssignedStartPlayerCount() >= RequiredStartPlayerCount;
+}
+
+void ATWGameMode::CleanupUnusedStartNexusBuildings()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	TArray<ATWNexusBuilding*> NexusToDestroy;
+
+	for (TActorIterator<ATWNexusBuilding> It(GetWorld()); It; ++It)
+	{
+		ATWNexusBuilding* Nexus = *It;
+		if (!IsValid(Nexus))
+		{
+			continue;
+		}
+
+		if (Nexus->GetOwnerPlayerState() != nullptr)
+		{
+			continue;
+		}
+
+		NexusToDestroy.Add(Nexus);
+	}
+
+	for (ATWNexusBuilding* Nexus : NexusToDestroy)
+	{
+		if (!IsValid(Nexus))
+		{
+			continue;
+		}
+
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("[GameMode] Destroy unused start nexus | Nexus=%s"),
+			*GetNameSafe(Nexus)
+		);
+
+		Nexus->Destroy();
+	}
+}
+
+void ATWGameMode::TryFinalizeStartSetup()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (bHasCleanedUpUnusedStartNexus)
+	{
+		return;
+	}
+
+	if (!AreAllRequiredPlayersAssignedStartNexus())
+	{
+		return;
+	}
+
+	CleanupUnusedStartNexusBuildings();
+	bHasCleanedUpUnusedStartNexus = true;
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[GameMode] Start setup finalized | AssignedPlayers=%d | Required=%d"),
+		GetAssignedStartPlayerCount(),
+		RequiredStartPlayerCount
+	);
+}
+
+void ATWGameMode::MovePlayerCameraToAssignedStart(ATWPlayerController* PC, ATWNexusBuilding* Nexus)
+{
+	if (!IsValid(PC) || !IsValid(Nexus))
+	{
+		return;
+	}
+
+	const FVector NexusLocation = Nexus->GetActorLocation();
+	const FVector HeroSpawnLocation = CalculateHeroSpawnLocationFromNexus(Nexus);
+
+	FVector FocusLocation = (NexusLocation + HeroSpawnLocation) * 0.5f;
+	FocusLocation.Z = HeroSpawnLocation.Z;
+
+	// 현재 PlayerController에 public으로 열려 있는 함수 사용
+	PC->ClientFocusStartLocation(FocusLocation);
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[GameMode] Focus start location sent | PC=%s | Nexus=%s | Focus=%s"),
+		*GetNameSafe(PC),
+		*GetNameSafe(Nexus),
+		*FocusLocation.ToString()
+	);
 }

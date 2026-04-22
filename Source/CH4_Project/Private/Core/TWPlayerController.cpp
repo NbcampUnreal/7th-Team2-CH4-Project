@@ -252,7 +252,6 @@ void ATWPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(IMC_Common, 0);
 		}
-
 	}
 
 	FInputModeGameAndUI InputMode;
@@ -267,6 +266,37 @@ void ATWPlayerController::BeginPlay()
 	InitializeUIBridge();
 	RefreshUIBridge();
 	RefreshDynamicMappingContexts();
+
+	// 추가: BeginPlay 시점에 이미 Pawn이 있으면 pending 포커스 적용
+	if (bHasPendingStartFocusLocation)
+	{
+		ClientFocusStartLocation_Implementation(PendingStartFocusLocation);
+	}
+}
+
+void ATWPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	if (!bHasPendingStartFocusLocation || !IsValid(InPawn))
+	{
+		return;
+	}
+
+	FVector NewLocation = PendingStartFocusLocation;
+	NewLocation.Z = InPawn->GetActorLocation().Z;
+
+	InPawn->SetActorLocation(NewLocation);
+
+	bHasPendingStartFocusLocation = false;
+	PendingStartFocusLocation = FVector::ZeroVector;
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[PlayerController] FocusStart applied on possess | NewLocation=%s"),
+		*NewLocation.ToString()
+	);
 }
 
 void ATWPlayerController::Tick(float DeltaSeconds)
@@ -303,12 +333,37 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 
 	RefreshLocalSelectionRuntimeData();
 }
+void ATWPlayerController::ClientMoveCameraToStartLocation_Implementation(
+	const FVector& InTargetLocation,
+	const FRotator& InTargetRotation
+)
+{
+	APawn* ControlledPawn = GetPawn();
+	if (IsValid(ControlledPawn))
+	{
+		ControlledPawn->SetActorLocation(InTargetLocation);
+		ControlledPawn->SetActorRotation(InTargetRotation);
+	}
+
+	SetControlRotation(InTargetRotation);
+
+	SetInitialLocationAndRotation(InTargetLocation, InTargetRotation);
+}
 
 void ATWPlayerController::ClientFocusStartLocation_Implementation(const FVector& InWorldLocation)
 {
 	APawn* MyPawn = GetPawn();
 	if (!IsValid(MyPawn))
 	{
+		bHasPendingStartFocusLocation = true;
+		PendingStartFocusLocation = InWorldLocation;
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[PlayerController] FocusStart deferred: Pawn not ready | Target=%s"),
+			*InWorldLocation.ToString()
+		);
 		return;
 	}
 
@@ -316,6 +371,16 @@ void ATWPlayerController::ClientFocusStartLocation_Implementation(const FVector&
 	NewLocation.Z = MyPawn->GetActorLocation().Z;
 
 	MyPawn->SetActorLocation(NewLocation);
+
+	bHasPendingStartFocusLocation = false;
+	PendingStartFocusLocation = FVector::ZeroVector;
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[PlayerController] FocusStart applied | NewLocation=%s"),
+		*NewLocation.ToString()
+	);
 }
 
 void ATWPlayerController::SetMappingContextActive(UInputMappingContext* MappingContext, int32 Priority,
