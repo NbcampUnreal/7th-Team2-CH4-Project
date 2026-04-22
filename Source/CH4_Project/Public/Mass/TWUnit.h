@@ -7,6 +7,7 @@
 #include "MassAgentComponent.h"
 #include "TWUnit.generated.h"
 
+class UTWVisionComponent;
 class UTWTeamComponent;
 class UTWTeamColorComponent;
 class UAnimMontage;
@@ -43,6 +44,9 @@ protected:
 	TObjectPtr<UTWTeamComponent> TeamComponent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|TeamColor")
 	TObjectPtr<UTWTeamColorComponent> TeamColorComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|FogVision")
+	TObjectPtr<UTWVisionComponent> FogVisionComponent;
+	
 public:
 	UFUNCTION(BlueprintCallable, Category="Unit")
 	int32 GetOwnerPlayerSlot() const { return OwnerPlayerSlot; }
