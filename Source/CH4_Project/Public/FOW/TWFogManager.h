@@ -69,6 +69,12 @@ public:
     int32 CachedRTSizeX = 0;
     int32 CachedRTSizeY = 0;
     
+    // 유닛, 건물 아이콘 위한 캐싱데이터
+    TArray<FColor> CachedExploredPixels;
+    
+    UFUNCTION(BlueprintPure, Category = "Fog")
+    bool IsLocationExplored(const FVector& WorldLocation);
+    
     // 월드 좌표를 받아 현재 시야 확보 여부를 반환
     UFUNCTION(BlueprintPure, Category = "Fog")
     bool IsLocationVisible(const FVector& WorldLocation);

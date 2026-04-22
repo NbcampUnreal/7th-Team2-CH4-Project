@@ -1,9 +1,16 @@
 #include "Minimap/TWMiniMap.h"
 
+#include "Component/TWTeamComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Core/TWPlayerState.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/Canvas.h"
+#include "FOW/TWFogManager.h"
+#include "Kismet/GameplayStatics.h"
+#include "Subsystems/TWBuildingManagerSubsystem.h"
 #include "Subsystems/TWGridSubSystem.h"
+#include "Building/TWBaseBuilding.h"
+#include "CapturePoint/TW_CapturePoint.h"
 
 ATWMiniMap::ATWMiniMap()
 {
@@ -67,13 +74,28 @@ void ATWMiniMap::UpdateCapture()
 		return;
 	}
 	
+	if (CachedLocalTeamSlot == -1)
+	{
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>())
+			{
+				CachedLocalTeamSlot = PS->PlayerSlot;
+			}
+		}
+	}
+	
 	CaptureComp->CaptureScene();
 	DrawCameraFrustum();
+	DrawIconsOnMinimap();
 }
 
 void ATWMiniMap::DrawCameraFrustum()
 {
-	if (!FrustumRT) return;
+	if (!FrustumRT)
+	{
+		return;
+	}
 	
 	UKismetRenderingLibrary::ClearRenderTarget2D(this, FrustumRT, FLinearColor::Transparent);
 	
@@ -112,8 +134,8 @@ void ATWMiniMap::DrawCameraFrustum()
                 float T = -WorldLoc.Z / WorldDir.Z;
                 FVector GroundPos = WorldLoc + (WorldDir * T);
             	
-                float U = (GroundPos.X - MapLocation.X) / CaptureWidth + 0.5f;
-                float V = (GroundPos.Y - MapLocation.Y) / CaptureWidth + 0.5f;
+            	float U = (GroundPos.X - GridOrigin.X) / GridFullSize.X;
+            	float V = (GroundPos.Y - GridOrigin.Y) / GridFullSize.Y;
 
                 MinimapPoints.Add(FVector2D(U * Size.X, V * Size.Y));
             }
@@ -129,17 +151,169 @@ void ATWMiniMap::DrawCameraFrustum()
     UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
 }
 
+void ATWMiniMap::DrawIconsOnMinimap()
+{
+	if (!IconRT)
+	{
+		return;
+	}
+	
+    UKismetRenderingLibrary::ClearRenderTarget2D(this, IconRT, FLinearColor::Transparent);
+
+    UCanvas* Canvas;
+    FVector2D Size;
+    FDrawToRenderTargetContext Context;
+    UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, IconRT, Canvas, Size, Context);
+
+    if (!Canvas)
+    {
+        UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
+        return;
+    }
+	
+    ATWFogManager* FogManager = nullptr;
+    {
+        TArray<AActor*> Found;
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATWFogManager::StaticClass(), Found);
+        if (Found.Num() > 0)
+            FogManager = Cast<ATWFogManager>(Found[0]);
+    }
+
+    int32 LocalTeamSlot = CachedLocalTeamSlot;
+    if (LocalTeamSlot == -1)
+    {
+        UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
+        return;
+    }
+
+    // Unit 아이콘
+    TArray<AActor*> AllUnits;
+    UGameplayStatics::GetAllActorsWithTag(GetWorld(), TEXT("Unit"), AllUnits);
+
+    for (AActor* Actor : AllUnits)
+    {
+        if (!IsValid(Actor))
+        {
+	        continue;
+        }
+    	
+        UTWTeamComponent* TeamComp = Actor->FindComponentByClass<UTWTeamComponent>();
+        if (!TeamComp)
+        {
+	        continue;
+        }
+    	
+        int32 TeamID = TeamComp->GetTeamID();
+    	
+        if (!ShouldShow(TeamID, Actor->GetActorLocation(), LocalTeamSlot, FogManager))
+        {
+            continue;
+        }
+    	
+        FVector2D MinimapPos = WorldToMinimap(Actor->GetActorLocation(), Size);
+        float Half = UnitIconSize * 0.5f;
+        FLinearColor Color = (TeamID == LocalTeamSlot) ? MyTeamColor : EnemyTeamColor;
+
+        Canvas->K2_DrawBox(MinimapPos - FVector2D(Half, Half),
+                           FVector2D(UnitIconSize, UnitIconSize),
+                           IconThickness, Color);
+    }
+	
+	// 건물 아이콘
+    if (UTWBuildingManagerSubsystem* BuildingSub = GetWorld()->GetSubsystem<UTWBuildingManagerSubsystem>())
+    {
+        for (ATWBaseBuilding* Building : BuildingSub->GetAllBuildings())
+        {
+            if (!IsValid(Building))
+            {
+	            continue;
+            }
+        	
+            UTWTeamComponent* TeamComp = Building->FindComponentByClass<UTWTeamComponent>();
+            if (!TeamComp)
+            {
+	            continue;
+            }
+        	
+            int32 TeamID = TeamComp->GetTeamID();
+        	
+            if (!ShouldShow(TeamID, Building->GetActorLocation(), LocalTeamSlot, FogManager)) continue;
+        	
+            FVector2D MinimapPos = WorldToMinimap(Building->GetActorLocation(), Size);
+            float Half = BuildingIconSize * 0.5f;
+            FLinearColor Color = (TeamID == LocalTeamSlot) ? MyTeamColor : EnemyTeamColor;
+
+            Canvas->K2_DrawBox(MinimapPos - FVector2D(Half, Half),
+                               FVector2D(BuildingIconSize, BuildingIconSize),
+                               IconThickness, Color);
+        }
+    }
+	
+	// 점령지 아이콘
+    TArray<AActor*> CapturePoints;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATW_CapturePoint::StaticClass(), CapturePoints);
+
+    for (AActor* Actor : CapturePoints)
+    {
+        if (!IsValid(Actor))
+        {
+	        continue;
+        }
+    	
+        UTWTeamComponent* TeamComp = Actor->FindComponentByClass<UTWTeamComponent>();
+        if (!TeamComp)
+        {
+	        continue;
+        }
+    	
+        int32 TeamID = TeamComp->GetTeamID();
+    	
+        if (!ShouldShow(TeamID, Actor->GetActorLocation(), LocalTeamSlot, FogManager)) continue;
+    	
+        FVector2D MinimapPos = WorldToMinimap(Actor->GetActorLocation(), Size);
+        float Half = CapturePointIconSize * 0.5f;
+
+        FLinearColor Color;
+        if (TeamID == -1) Color = NeutralColor;
+        else if (TeamID == LocalTeamSlot) Color = MyTeamColor;
+        else Color = EnemyTeamColor;
+        
+        Canvas->K2_DrawBox(MinimapPos - FVector2D(Half, Half),
+                           FVector2D(CapturePointIconSize, CapturePointIconSize),
+                           IconThickness, Color);
+    }
+
+    UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
+}
+
+FVector2D ATWMiniMap::WorldToMinimap(FVector WorldPos, FVector2D CanvasSize) const
+{
+	float U = (WorldPos.X - GridOrigin.X) / GridFullSize.X;
+	float V = (WorldPos.Y - GridOrigin.Y) / GridFullSize.Y;
+	return FVector2D(U * CanvasSize.X, V * CanvasSize.Y);
+}
+
+bool ATWMiniMap::ShouldShow(int32 TeamID, FVector WorldPos, int32 LocalTeamSlot, class ATWFogManager* FogManager) const
+{
+	if (TeamID == LocalTeamSlot)
+	{
+		return true;
+	}
+	if (!FogManager)
+	{
+		return true;
+	}
+	
+	return FogManager->IsLocationVisible(WorldPos);
+}
+
 FVector ATWMiniMap::GetWorldLocationFromTouch(FVector2D TouchPos, FVector2D WidgetSize)
 {
 	float U = TouchPos.X / WidgetSize.X;
 	float V = TouchPos.Y / WidgetSize.Y;
-	
-	float RelativeX = (U - 0.5f) * CaptureWidth;
-	float RelativeY = (V - 0.5f) * CaptureWidth;
-	
-	float WorldX = -RelativeY; 
-	float WorldY = RelativeX;
 
-	FVector MapLocation = GetActorLocation();
-	return FVector(MapLocation.X + WorldX, MapLocation.Y + WorldY, 0.0f);
+	float WorldX = GridOrigin.X + (1.0f - V) * GridFullSize.X;
+	float WorldY = GridOrigin.Y + U * GridFullSize.Y;
+
+	return FVector(WorldX, WorldY, 0.0f);
 }
