@@ -6,6 +6,7 @@
 #include "Data/TWUnitStatus.h"
 #include "TWHeroUnitBase.generated.h"
 
+class ATWPlayerState;
 UCLASS(Abstract)
 class CH4_PROJECT_API ATWHeroUnitBase : public ATWUnit
 {
@@ -96,4 +97,22 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Hero|Buff")
 	bool bHeroBuffApplied = false;
+	
+protected:
+	void HandleHeroDeath(AActor* DamageCauser);
+	void TryRequestHeroRespawn();
+	ATWPlayerState* ResolveOwnerPlayerState() const;
+
+public:
+	UFUNCTION(BlueprintCallable, Category="Hero|Life")
+	bool IsHeroDead() const { return bHeroDead; }
+
+protected:
+	UPROPERTY(VisibleInstanceOnly, Category="Hero|Life")
+	uint8 bHeroDead : 1 = false;
+
+	UPROPERTY(VisibleInstanceOnly, Category="Hero|Life")
+	uint8 bRespawnRequested : 1 = false;
+	
+	
 };

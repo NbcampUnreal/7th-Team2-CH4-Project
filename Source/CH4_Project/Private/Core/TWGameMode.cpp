@@ -167,10 +167,17 @@ bool ATWGameMode::HasSpawnedInitialHeroForPlayer(const ATWPlayerState* PS) const
 			continue;
 		}
 
-		if (HeroUnit->GetOwnerPlayerSlot() == PS->PlayerSlot)
+		if (HeroUnit->GetOwnerPlayerSlot() != PS->PlayerSlot)
 		{
-			return true;
+			continue;
 		}
+
+		if (HeroUnit->IsHeroDead())
+		{
+			continue;
+		}
+
+		return true;
 	}
 
 	return false;
@@ -636,11 +643,25 @@ void ATWGameMode::RequestRespawnHero(ATWPlayerState* PS, FName HeroUnitId, float
 		return;
 	}
 
+	if (PS->IsHeroRespawnPending() == false)
+	{
+		PS->SetHeroRespawnPending(true);
+	}
+
 	FTimerDelegate RespawnDelegate;
 	RespawnDelegate.BindUObject(this, &ATWGameMode::RespawnHero, PS, HeroUnitId);
 
 	FTimerHandle RespawnTimerHandle;
 	GetWorldTimerManager().SetTimer(RespawnTimerHandle, RespawnDelegate, DelaySeconds, false);
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[GameMode] Hero respawn scheduled | Slot=%d | HeroId=%s | Delay=%.2f"),
+		PS->PlayerSlot,
+		*HeroUnitId.ToString(),
+		DelaySeconds
+	);
 }
 
 void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
@@ -650,15 +671,51 @@ void ATWGameMode::RespawnHero(ATWPlayerState* PS, FName HeroUnitId)
 		return;
 	}
 
-	ATWNexusBuilding* Nexus = PS->GetAssignedStartNexus();
-	if (!IsValid(Nexus))
+	if (HasSpawnedInitialHeroForPlayer(PS))
 	{
+		PS->SetHeroRespawnPending(false);
 		return;
 	}
 
-	SpawnSelectedHeroUnitForPlayer(PS, Nexus);
-}
+	ATWNexusBuilding* Nexus = PS->GetAssignedStartNexus();
+	if (!IsValid(Nexus))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[GameMode] RespawnHero failed: invalid nexus | Slot=%d | HeroId=%s"),
+			PS->PlayerSlot,
+			*HeroUnitId.ToString()
+		);
 
+		PS->SetHeroRespawnPending(false);
+		return;
+	}
+
+	const bool bSpawned = SpawnSelectedHeroUnitForPlayer(PS, Nexus);
+	if (bSpawned)
+	{
+		PS->SetHeroRespawnPending(false);
+
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("[GameMode] RespawnHero success | Slot=%d | HeroId=%s"),
+			PS->PlayerSlot,
+			*HeroUnitId.ToString()
+		);
+	}
+	else
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[GameMode] RespawnHero failed | Slot=%d | HeroId=%s"),
+			PS->PlayerSlot,
+			*HeroUnitId.ToString()
+		);
+	}
+}
 ATWPlayerState* ATWGameMode::FindPlayerStateBySlot(int32 InPlayerSlot) const
 {
 	if (!GetWorld())

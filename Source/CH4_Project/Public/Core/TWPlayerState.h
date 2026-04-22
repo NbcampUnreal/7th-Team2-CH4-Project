@@ -187,8 +187,27 @@ protected:
 	int32 GameResult;
 	
 public:
-	void SetGameResult(int32 InResult) {GameResult = InResult;}
-	FORCEINLINE int32 GetGameResult() const {return GameResult;}
+	void SetGameResult(int32 InResult) { GameResult = InResult; }
+	FORCEINLINE int32 GetGameResult() const { return GameResult; }
+#pragma endregion
+
+#pragma region 영웅 리스폰
+protected:
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Hero|Respawn")
+	bool bHeroRespawnPending = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hero|Respawn", meta=(ClampMin="0.1"))
+	float HeroRespawnDelay = 10.0f;
+
+public:
+	UFUNCTION(BlueprintCallable, Category="Hero|Respawn")
+	bool IsHeroRespawnPending() const { return bHeroRespawnPending; }
+
+	UFUNCTION(BlueprintCallable, Category="Hero|Respawn")
+	void SetHeroRespawnPending(bool bInPending);
+
+	UFUNCTION(BlueprintCallable, Category="Hero|Respawn")
+	float GetHeroRespawnDelay() const { return HeroRespawnDelay; }
 #pragma endregion
 	
 private:
@@ -211,4 +230,4 @@ protected:
 	UPROPERTY(Replicated)
 	TObjectPtr<ATWNexusBuilding> AssignedStartNexus = nullptr;
 #pragma endregion
-};	
+};

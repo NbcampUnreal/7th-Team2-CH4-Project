@@ -4,6 +4,9 @@
 #include "Data/TWUnitTableRowBase.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "Building/TWBaseBuilding.h"
+#include "Core/TWGameMode.h"
+#include "Core/TWPlayerState.h"
+#include "GameFramework/PlayerController.h"
 #include "Math/UnrealMathUtility.h"
 
 ATWHeroUnitBase::ATWHeroUnitBase()
@@ -12,6 +15,8 @@ ATWHeroUnitBase::ATWHeroUnitBase()
 	CurrentHeroHP = 0.f;
 	bHeroBuffApplied = false;
 	CurrentTargetLocation = FVector::ZeroVector;
+	bHeroDead = false;
+	bRespawnRequested = false;
 }
 
 void ATWHeroUnitBase::BeginPlay()
@@ -27,6 +32,7 @@ void ATWHeroUnitBase::BeginPlay()
 		HasAuthority() ? TEXT("true") : TEXT("false"),
 		*GetWorld()->GetName()
 	);
+
 	const UTWUnitSubsystem* UnitSubsystem =
 		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 
@@ -133,9 +139,129 @@ float ATWHeroUnitBase::GetHeroDamageStat() const
 	return RuntimeHeroStatus.GetStatus(ETWStatusType::Damage);
 }
 
+ATWPlayerState* ATWHeroUnitBase::ResolveOwnerPlayerState() const
+{
+	if (!GetWorld())
+	{
+		return nullptr;
+	}
+
+	if (const AController* OwnerController = GetOwner<AController>())
+	{
+		if (ATWPlayerState* OwnerPS = OwnerController->GetPlayerState<ATWPlayerState>())
+		{
+			if (OwnerPS->PlayerSlot == GetOwnerPlayerSlot())
+			{
+				return OwnerPS;
+			}
+		}
+	}
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC)
+		{
+			continue;
+		}
+
+		ATWPlayerState* PS = PC->GetPlayerState<ATWPlayerState>();
+		if (!PS)
+		{
+			continue;
+		}
+
+		if (PS->PlayerSlot == GetOwnerPlayerSlot())
+		{
+			return PS;
+		}
+	}
+
+	return nullptr;
+}
+
+void ATWHeroUnitBase::TryRequestHeroRespawn()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (bRespawnRequested)
+	{
+		return;
+	}
+
+	ATWPlayerState* OwnerPS = ResolveOwnerPlayerState();
+	if (!OwnerPS)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[%s] TryRequestHeroRespawn failed: OwnerPS not found | OwnerSlot=%d"),
+			*GetName(),
+			GetOwnerPlayerSlot()
+		);
+		return;
+	}
+
+	if (OwnerPS->IsHeroRespawnPending())
+	{
+		return;
+	}
+
+	ATWGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ATWGameMode>() : nullptr;
+	if (!GM)
+	{
+		return;
+	}
+
+	bRespawnRequested = true;
+	OwnerPS->SetHeroRespawnPending(true);
+
+	GM->RequestRespawnHero(
+		OwnerPS,
+		SkillOwnHero,
+		OwnerPS->GetHeroRespawnDelay()
+	);
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[%s] Hero respawn requested | OwnerSlot=%d | HeroId=%s"),
+		*GetName(),
+		GetOwnerPlayerSlot(),
+		*SkillOwnHero.ToString()
+	);
+}
+
+void ATWHeroUnitBase::HandleHeroDeath(AActor* DamageCauser)
+{
+	if (bHeroDead)
+	{
+		return;
+	}
+
+	bHeroDead = true;
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[%s] Hero died | OwnerSlot=%d | HeroId=%s | Causer=%s"),
+		*GetName(),
+		GetOwnerPlayerSlot(),
+		*SkillOwnHero.ToString(),
+		DamageCauser ? *DamageCauser->GetName() : TEXT("None")
+	);
+
+	TryRequestHeroRespawn();
+
+	Destroy();
+}
+
 void ATWHeroUnitBase::ReceiveHeroDamage(float InDamageAmount, AActor* DamageCauser)
 {
-	if (InDamageAmount <= 0.f || CurrentHeroHP <= 0.f)
+	if (InDamageAmount <= 0.f || CurrentHeroHP <= 0.f || bHeroDead)
 	{
 		return;
 	}
@@ -151,6 +277,11 @@ void ATWHeroUnitBase::ReceiveHeroDamage(float InDamageAmount, AActor* DamageCaus
 		CurrentHeroHP,
 		DamageCauser ? *DamageCauser->GetName() : TEXT("None")
 	);
+
+	if (CurrentHeroHP <= 0.f)
+	{
+		HandleHeroDeath(DamageCauser);
+	}
 }
 
 bool ATWHeroUnitBase::IsSameTeamActor(const AActor* OtherActor) const
@@ -196,7 +327,6 @@ bool ATWHeroUnitBase::TryApplyDamageToActor(AActor* TargetActor, float DamageAmo
 		return true;
 	}
 
-	// 건물은 현재 스킬 대상에서 제외하는 방향이라 실제 적용은 하지 않음.
 	if (ATWBaseBuilding* TargetBuilding = Cast<ATWBaseBuilding>(TargetActor))
 	{
 		UE_LOG(

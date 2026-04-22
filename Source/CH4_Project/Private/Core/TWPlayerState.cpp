@@ -16,7 +16,6 @@ ATWPlayerState::ATWPlayerState()
 	bReplicates = true;
 
 	PlayerSlot = -1;
-	
 	GameResult = -1;
 	
 	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
@@ -31,6 +30,9 @@ ATWPlayerState::ATWPlayerState()
 	MaxPopulation = 200;
 	PopulationLimit = 10;
 	CurrentPopulation = 0;
+
+	bHeroRespawnPending = false;
+	HeroRespawnDelay = 5.0f;
 }
 
 void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
@@ -79,6 +81,7 @@ void ATWPlayerState::SetPlayerSlot(const int32 InPlayerSlot)
 		);
 	}
 }
+
 void ATWPlayerState::SetLobbyNickname(const FString& InNickname)
 {
 	if (!HasAuthority())
@@ -111,6 +114,24 @@ void ATWPlayerState::SetAssignedStartNexus(ATWNexusBuilding* InNexus)
 	}
 
 	AssignedStartNexus = InNexus;
+}
+
+void ATWPlayerState::SetHeroRespawnPending(bool bInPending)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bHeroRespawnPending = bInPending;
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[PlayerState] HeroRespawnPending changed | Slot=%d | Pending=%d"),
+		PlayerSlot,
+		bHeroRespawnPending ? 1 : 0
+	);
 }
 
 void ATWPlayerState::AddResource(const EResourceType ResourceType, const int32 Amount)
@@ -558,6 +579,7 @@ void ATWPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ATWPlayerState, LobbyNickname);
 	DOREPLIFETIME(ATWPlayerState, SelectedHeroUnitId);
 	DOREPLIFETIME(ATWPlayerState, AssignedStartNexus);
+	DOREPLIFETIME(ATWPlayerState, bHeroRespawnPending);
 }
 
 void ATWPlayerState::NotifyUIResourceStateChanged()
