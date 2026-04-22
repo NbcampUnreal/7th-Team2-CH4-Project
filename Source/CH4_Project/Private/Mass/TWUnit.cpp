@@ -6,6 +6,7 @@
 #include "Animation/TWUnitAnimInstance.h"
 #include "Component/TWTeamColorComponent.h"
 #include "Component/TWTeamComponent.h"
+#include "FOW/TWVisionComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -31,6 +32,11 @@ ATWUnit::ATWUnit()
 	TeamComponent = CreateDefaultSubobject<UTWTeamComponent>(TEXT("TeamComponent"));
 	
 	TeamColorComponent = CreateDefaultSubobject<UTWTeamColorComponent>(TEXT("TeamColorComponent"));
+	
+	FogVisionComponent = CreateDefaultSubobject<UTWVisionComponent>(TEXT("FogVisionComponent"));
+	FogVisionComponent->VisionRadius = 800.f;
+	
+	Tags.AddUnique(FName("Unit"));
 	
 	// 기본값
 	SelectionAnchor->SetRelativeLocation(FVector(0.f, 0.f, 4.f));
