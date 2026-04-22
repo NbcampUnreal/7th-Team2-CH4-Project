@@ -436,7 +436,7 @@ void ATWPlayerController::SetupInputComponent()
 	check(IsValid(MoveCommandAction));
 	check(IsValid(AttackCommandAction));
 	check(IsValid(HoldCommandAction));
-
+	check(IsValid(HeroSkillCommandAction));
 	check(IsValid(ToggleBuildModeAction));
 	check(IsValid(SelectWoodCommandAction));
 	check(IsValid(SelectPopulationCommandAction));
@@ -470,7 +470,7 @@ void ATWPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(MoveCommandAction, ETriggerEvent::Started, this, &ThisClass::OnMoveCommandAction);
 	EnhancedInputComponent->BindAction(AttackCommandAction, ETriggerEvent::Started, this, &ThisClass::OnAttackCommandAction);
 	EnhancedInputComponent->BindAction(HoldCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHoldCommandAction);
-	
+	EnhancedInputComponent->BindAction(HeroSkillCommandAction, ETriggerEvent::Started, this, &ThisClass::OnHeroSkillCommandAction);
 	EnhancedInputComponent->BindAction(SelectWoodCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectWoodBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectPopulationCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectPopulationBuildingCommandAction);
 	EnhancedInputComponent->BindAction(SelectStoneCommandAction, ETriggerEvent::Started, this, &ThisClass::OnSelectStoneBuildingCommandAction);
@@ -699,6 +699,26 @@ void ATWPlayerController::OnAttackCommandAction(const FInputActionValue& InputAc
 void ATWPlayerController::OnHoldCommandAction(const FInputActionValue& InputActionValue)
 {
 	HandleCommandById(TEXT("Hold"));
+}
+
+void ATWPlayerController::OnHeroSkillCommandAction(const FInputActionValue& InputActionValue)
+{
+	if (!ShouldUseUnitCommandContext())
+	{
+		return;
+	}
+
+	if (bBuildShortcutModeActive)
+	{
+		return;
+	}
+
+	if (BuildComponent && BuildComponent->GetBuildMode())
+	{
+		return;
+	}
+
+	HandleCommandById(TEXT("HeroSkill"));
 }
 
 void ATWPlayerController::ServerHandleMoveCommand_Implementation(const FVector& CommandLocation)
