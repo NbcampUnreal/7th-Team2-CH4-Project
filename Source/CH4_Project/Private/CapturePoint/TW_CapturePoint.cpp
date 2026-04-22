@@ -39,7 +39,7 @@ ATW_CapturePoint::ATW_CapturePoint()
     
     GaugeWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("GaugeWidget"));
     GaugeWidgetComp->SetupAttachment(RootComponent);
-    GaugeWidgetComp->SetWidgetSpace(EWidgetSpace::World);
+    GaugeWidgetComp->SetWidgetSpace(EWidgetSpace::Screen);
     GaugeWidgetComp->SetDrawSize(FVector2D(150.0f, 30.0f));
     GaugeWidgetComp->SetRelativeLocation(FVector(0.0f, 0.0f, 200.0f));
 }
