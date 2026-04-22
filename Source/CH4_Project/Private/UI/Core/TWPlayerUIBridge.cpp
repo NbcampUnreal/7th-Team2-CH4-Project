@@ -1209,22 +1209,11 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	{
 		return false;
 	}
-	const bool bHasHeroSelected =
-	OwnerController &&
-	OwnerController->IsOwnedHeroCurrentlySelected();
-
-	if (bHasHeroSelected)
-	{
-		StartSelectionRefreshTimer(0.0f);
-	}
-	else
-	{
-		StopSelectionRefreshTimer();
-	}
 
 	const int32 LocalSelectedUnitCount = OwnerController->GetLocalSelectedUnitCount();
 	if (LocalSelectedUnitCount <= 0)
 	{
+		StopSelectionRefreshTimer();
 		return false;
 	}
 
@@ -1259,6 +1248,10 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	OutVM.AttackSpeed = 0.f;
 	OutVM.MoveSpeed = 0.f;
 	OutVM.Range = 0.f;
+	OutVM.CurrentHP = 0.f;
+	OutVM.MaxHP = 0.f;
+	OutVM.HPText = TEXT("");
+	OutVM.SummaryItems.Empty();
 
 	if (bIsMultiSelection)
 	{
@@ -1276,24 +1269,27 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 		OutVM.DisplayName = OutVM.SelectionId.ToString();
 		OutVM.TypeLabel = TWUIBridgeText::UnitTypeLabel;
 
-		if (UTWUnitSubsystem* UnitSubsystem = OwnerController->GetWorld()->GetSubsystem<UTWUnitSubsystem>())
+		if (UWorld* World = OwnerController->GetWorld())
 		{
-			if (const FTWUnitTableRowBase*  UnitRow = UnitSubsystem->GetUnitTableRowBase(OutVM.SelectionId))
+			if (UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>())
 			{
-				if (!UnitRow->UnitID.IsNone())
+				if (const FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(OutVM.SelectionId))
 				{
-					OutVM.DisplayName = UnitRow->UnitID.ToString();
+					if (!UnitRow->UnitID.IsNone())
+					{
+						OutVM.DisplayName = UnitRow->UnitID.ToString();
+					}
 				}
-			}
 
-			const int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
-			BaseStatus = UnitSubsystem->GetUnitDefaultStatus(OutVM.SelectionId, OwnerPlayerSlot);
-			bHasBaseStatus = true;
+				const int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
+				BaseStatus = UnitSubsystem->GetUnitDefaultStatus(OutVM.SelectionId, OwnerPlayerSlot);
+				bHasBaseStatus = true;
 
-			MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-			if (MaxHP > 0.f)
-			{
-				bHasAnyHP = true;
+				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
+				if (MaxHP > 0.f)
+				{
+					bHasAnyHP = true;
+				}
 			}
 		}
 
@@ -1301,26 +1297,6 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 		FTWUnitStatus RuntimeStatus;
 
 		if (OwnerController->HasLocalPrimarySelectedUnitStatus())
-		{
-			RuntimeStatus = OwnerController->GetLocalPrimarySelectedUnitStatus();
-			RuntimeStatusPtr = &RuntimeStatus;
-
-			CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
-			if (CurrentHP > 0.f)
-			{
-				bHasAnyHP = true;
-			}
-
-			if (MaxHP <= 0.f && bHasBaseStatus)
-			{
-				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-			}
-			else if (MaxHP <= 0.f)
-			{
-				MaxHP = CurrentHP;
-			}
-		}
-		else if (OwnerController->HasLocalPrimarySelectedUnitStatus())
 		{
 			RuntimeStatus = OwnerController->GetLocalPrimarySelectedUnitStatus();
 			RuntimeStatusPtr = &RuntimeStatus;
@@ -1354,6 +1330,20 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 		);
 	}
 
+	const bool bIsHeroUnit =
+		!bIsMultiSelection &&
+		!OutVM.SelectionId.IsNone() &&
+		IsHeroSelectionId(OutVM.SelectionId);
+
+	if (bIsHeroUnit && bLocalUnitSelectionOwnedByMe)
+	{
+		StartSelectionRefreshTimer(0.0f);
+	}
+	else
+	{
+		StopSelectionRefreshTimer();
+	}
+
 	OutCommandIds.Reset();
 
 	if (bLocalUnitSelectionOwnedByMe)
@@ -1363,10 +1353,6 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 			TWCommandIds::Attack,
 			TWCommandIds::Hold
 		};
-
-		const bool bIsHeroUnit =
-			!OutVM.SelectionId.IsNone() &&
-			IsHeroSelectionId(OutVM.SelectionId);
 
 		if (bIsHeroUnit)
 		{
@@ -1391,7 +1377,10 @@ void UTWPlayerUIBridge::ApplyCommandQueueCounts(const TArray<FName>& CommandIds)
 		const int32 QueueCount = ResolveBuildingQueueCount(CommandId);
 		SelectionProvider->SetRuntimeCommandQueueCount(CommandId, QueueCount);
 	}
-	if (OwnerController && OwnerController->IsOwnedHeroCurrentlySelected())
+
+	const bool bHasVisibleHeroSkillCommand = CommandIds.Contains(TWCommandIds::HeroSkill);
+
+	if (OwnerController && bHasVisibleHeroSkillCommand)
 	{
 		const float Remaining = OwnerController->GetHeroSkillRemainingCooldownTime();
 		const bool bReady = (Remaining <= KINDA_SMALL_NUMBER);
@@ -1404,6 +1393,18 @@ void UTWPlayerUIBridge::ApplyCommandQueueCounts(const TArray<FName>& CommandIds)
 		SelectionProvider->SetRuntimeCommandDescription(
 			TWCommandIds::HeroSkill,
 			bReady ? TEXT("") : FString::Printf(TEXT("%.1fs"), Remaining)
+		);
+	}
+	else
+	{
+		SelectionProvider->SetRuntimeCommandEnabled(
+			TWCommandIds::HeroSkill,
+			true
+		);
+
+		SelectionProvider->SetRuntimeCommandDescription(
+			TWCommandIds::HeroSkill,
+			TEXT("")
 		);
 	}
 }
