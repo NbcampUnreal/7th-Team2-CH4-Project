@@ -213,6 +213,9 @@ public:
 private:
 	void NotifyUIResourceStateChanged();
 
+	UFUNCTION()
+	void OnRep_SelectedHeroUnitId();
+
 private:
 	FORCEINLINE UTWUnitSubsystem* GetUnitSubsystem() const
 	{
@@ -224,7 +227,7 @@ protected:
 	UPROPERTY(Replicated)
 	FString LobbyNickname;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_SelectedHeroUnitId, VisibleAnywhere, BlueprintReadOnly, Category="Hero")
 	FName SelectedHeroUnitId = NAME_None;
 
 	UPROPERTY(Replicated)

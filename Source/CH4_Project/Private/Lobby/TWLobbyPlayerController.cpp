@@ -38,6 +38,13 @@ bool ATWLobbyPlayerController::Server_RequestStartGame_Validate()
 
 void ATWLobbyPlayerController::Server_RequestStartGame_Implementation()
 {
+	ATWLobbyPlayerState* LPS = GetPlayerState<ATWLobbyPlayerState>();
+	if (!LPS || !LPS->IsHost())
+	{
+		UE_LOG(LogTWLobby, Warning, TEXT("Server_RequestStartGame rejected: not host"));
+		return;
+	}
+
 	ATWLobbyGameMode* LGM = GetWorld()->GetAuthGameMode<ATWLobbyGameMode>();
 	if (!LGM)
 	{
@@ -82,7 +89,7 @@ void ATWLobbyPlayerController::Server_SetSelectedHeroUnitId_Implementation(FName
 
 void ATWLobbyPlayerController::ExitLobby()
 {
-	ClientTravel(TEXT("L_Title"), ETravelType::TRAVEL_Absolute);
+	ClientTravel(TEXT("/Game/CH4_Project/Maps/Main/L_Title"), TRAVEL_Absolute);
 }
 
 void ATWLobbyPlayerController::CreateLobbyWidget()
@@ -107,7 +114,6 @@ void ATWLobbyPlayerController::CreateLobbyWidget()
 	bShowMouseCursor = true;
 
 	FInputModeUIOnly InputMode;
-	InputMode.SetWidgetToFocus(LobbyWidgetInstance->GetCachedWidget());
 	SetInputMode(InputMode);
 }
 

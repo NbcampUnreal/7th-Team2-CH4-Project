@@ -9,7 +9,6 @@ UTWTeamComponent::UTWTeamComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 	SetIsReplicatedByDefault(true);
-	
 	bIsTeamInitialized = false;
 }
 
@@ -17,23 +16,34 @@ void UTWTeamComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		SetComponentTickEnabled(false);
+	}
 }
 
-void UTWTeamComponent::TickComponent(float DeltaTime, enum ELevelTick TickType,
+void UTWTeamComponent::TickComponent(
+	float DeltaTime,
+	enum ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	
+
 	if (bIsTeamInitialized || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	UMassAgentComponent* MassAgent = GetOwner()->FindComponentByClass<UMassAgentComponent>();
+	if (!MassAgent || !MassAgent->GetEntityHandle().IsValid())
 	{
 		return;
 	}
-	
-	UMassAgentComponent* MassAgent = GetOwner()->FindComponentByClass<UMassAgentComponent>();
-	if (MassAgent && MassAgent->GetEntityHandle().IsValid())
+
+	GetTeamID();
+	if (TeamID >= 0)
 	{
-		GetTeamID();
-		
 		bIsTeamInitialized = true;
 		SetComponentTickEnabled(false);
 	}
@@ -59,37 +69,46 @@ int32 UTWTeamComponent::GetTeamID()
 	{
 		return TeamID;
 	}
-	
-	if (false == GetOwner()->HasAuthority())
+
+	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{
 		return TeamID;
 	}
+
 	UMassAgentComponent* MassAgentComponent = GetOwner()->FindComponentByClass<UMassAgentComponent>();
-	if (false == IsValid(MassAgentComponent))
+	if (!IsValid(MassAgentComponent) || !MassAgentComponent->GetEntityHandle().IsValid())
 	{
 		return TeamID;
 	}
+
 	FMassEntityManager* MassEntityManager = UE::Mass::Utils::GetEntityManager(this);
 	if (!MassEntityManager)
 	{
 		return TeamID;
 	}
-	int32 NewTeamID = MassEntityManager->GetFragmentDataPtr<FTWUnitFragment>(MassAgentComponent->GetEntityHandle())->GetOwner();
-	SetTeamID(NewTeamID);
-	
-	return NewTeamID;
-}
 
+	const FTWUnitFragment* UnitFragment = MassEntityManager->GetFragmentDataPtr<FTWUnitFragment>(MassAgentComponent->GetEntityHandle());
+	if (!UnitFragment)
+	{
+		return TeamID;
+	}
+
+	SetTeamID(UnitFragment->GetOwner());
+	return TeamID;
+}
 
 void UTWTeamComponent::SetTeamID(int32 NewTeamID)
 {
-	// 서버에서만 실행되도록 보장
-	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
-
-	if (TeamID != NewTeamID)
+	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{
-		TeamID = NewTeamID;
-		// 서버에서는 OnRep이 자동으로 호출되지 않으므로 수동 호출
-		OnRep_TeamID(); 
+		return;
 	}
+
+	if (TeamID == NewTeamID)
+	{
+		return;
+	}
+
+	TeamID = NewTeamID;
+	OnRep_TeamID();
 }

@@ -252,4 +252,13 @@ private:
 
 	// USTRUCT 포인터 캐시 대신 값 복사 캐시
 	TMap<FName, FTWUnitTableRowBase> CachedUnitTableRows;
+
+#ifdef WITH_CLIENT_CODE
+	mutable TMap<FMassNetworkID, FName> CachedClientUnitIds;
+	mutable TMap<FMassNetworkID, int32> CachedClientOwnerSlots;
+	mutable TMap<FMassNetworkID, FVector> CachedClientVisualLocations;
+	mutable TMap<FMassNetworkID, FVector> CachedClientHPBarLocations;
+	mutable TMap<FMassNetworkID, float> CachedClientCurrentHP;
+	mutable TMap<FMassNetworkID, float> CachedClientMaxHP;
+#endif
 };

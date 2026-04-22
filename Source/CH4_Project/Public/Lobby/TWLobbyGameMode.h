@@ -31,18 +31,25 @@ public:
 	void AssignNewHost();
 
 protected:
+	// 최소 시작 인원
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
 	int32 MinPlayersToStart = 2;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Lobby")
 	bool bAllReady = false;
 
+	// 반드시 전체 패키지 경로로 넣기
+	// 예: /Game/CH4_Project/Maps/Main/L_Main
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Travel")
-	FName GameLevelName = TEXT("L_Main");
+	FString GameLevelPath = TEXT("/Game/CH4_Project/Maps/Main/L_Main");
 
+	// PIE에서 seamless 허용 안 되어 있으면 자동 fallback
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Travel")
-	bool bTravelAsListenServer = true;
+	bool bFallbackToNonSeamlessInPIE = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Travel")
-	bool bUseSeamlessTravelForGame = false;
+	// 중복 시작 방지
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Lobby|Travel")
+	bool bStartGameRequested = false;
+
+	bool CanUseSeamlessTravelInCurrentWorld() const;
 };

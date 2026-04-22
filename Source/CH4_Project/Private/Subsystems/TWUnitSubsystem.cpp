@@ -76,6 +76,14 @@ namespace
 		FTWUnitStatus AppliedDelta;
 	};
 
+#ifdef WITH_CLIENT_CODE
+	static TMap<FMassNetworkID, FName> GClientUnitIdCache;
+	static TMap<FMassNetworkID, int32> GClientOwnerSlotCache;
+	static TMap<FMassNetworkID, float> GClientCurrentHPCache;
+	static TMap<FMassNetworkID, float> GClientMaxHPCache;
+	static TMap<FMassNetworkID, FTWUnitStatus> GClientStatusCache;
+#endif
+
 	static void AddStatusDelta(FTWUnitStatus& InOutStatus, const FTWUnitStatus& Delta)
 	{
 		for (int32 i = 0; i < static_cast<int32>(ETWStatusType::Count); ++i)
@@ -158,6 +166,13 @@ void UTWUnitSubsystem::Deinitialize()
 {
 	UnitContainers.Empty();
 	CachedUnitTableRows.Empty();
+#ifdef WITH_CLIENT_CODE
+	GClientUnitIdCache.Empty();
+	GClientOwnerSlotCache.Empty();
+	GClientCurrentHPCache.Empty();
+	GClientMaxHPCache.Empty();
+	GClientStatusCache.Empty();
+#endif
 	Super::Deinitialize();
 }
 
@@ -1187,21 +1202,35 @@ FTWUnitStatus UTWUnitSubsystem::GetUnitCurrentStatus(const FMassNetworkID& UnitN
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
 	{
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			return *CachedStatus;
+		}
 		return FTWUnitStatus();
 	}
 
 	FMassEntityManager* EntityManager = nullptr;
 	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
 	{
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			return *CachedStatus;
+		}
 		return FTWUnitStatus();
 	}
 
 	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
 	{
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			return *CachedStatus;
+		}
 		return FTWUnitStatus();
 	}
 
-	return GetUnitCurrentStatus(EntityInfo->Entity, PlayerSlot);
+	const FTWUnitStatus Status = GetUnitCurrentStatus(EntityInfo->Entity, PlayerSlot);
+	GClientStatusCache.Add(UnitNetID, Status);
+	return Status;
 }
 
 bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutUnitID) const
@@ -1211,28 +1240,42 @@ bool UTWUnitSubsystem::TryGetUnitID(const FMassNetworkID& UnitNetID, FName& OutU
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
 	{
+		if (const FName* CachedUnitId = GClientUnitIdCache.Find(UnitNetID))
+		{
+			OutUnitID = *CachedUnitId;
+			return !OutUnitID.IsNone();
+		}
 		return false;
 	}
 
 	FMassEntityManager* EntityManager = nullptr;
-	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager) || !IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
 	{
-		return false;
-	}
-
-	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
-	{
+		if (const FName* CachedUnitId = GClientUnitIdCache.Find(UnitNetID))
+		{
+			OutUnitID = *CachedUnitId;
+			return !OutUnitID.IsNone();
+		}
 		return false;
 	}
 
 	const FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
 	if (!UnitFragment)
 	{
+		if (const FName* CachedUnitId = GClientUnitIdCache.Find(UnitNetID))
+		{
+			OutUnitID = *CachedUnitId;
+			return !OutUnitID.IsNone();
+		}
 		return false;
 	}
 
 	OutUnitID = UnitFragment->GetUnitID();
-	return OutUnitID != NAME_None;
+	if (!OutUnitID.IsNone())
+	{
+		GClientUnitIdCache.Add(UnitNetID, OutUnitID);
+	}
+	return !OutUnitID.IsNone();
 }
 
 bool UTWUnitSubsystem::TryGetUnitOwnerPlayerSlot(
@@ -1244,29 +1287,38 @@ bool UTWUnitSubsystem::TryGetUnitOwnerPlayerSlot(
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
 	{
+		if (const int32* CachedOwner = GClientOwnerSlotCache.Find(UnitNetID))
+		{
+			OutOwnerPlayerSlot = *CachedOwner;
+			return true;
+		}
 		return false;
 	}
 
 	FMassEntityManager* EntityManager = nullptr;
-	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager) || !IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
 	{
+		if (const int32* CachedOwner = GClientOwnerSlotCache.Find(UnitNetID))
+		{
+			OutOwnerPlayerSlot = *CachedOwner;
+			return true;
+		}
 		return false;
 	}
 
-	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
-	{
-		return false;
-	}
-
-	const FTWUnitFragment* UnitFragment =
-		EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
-
+	const FTWUnitFragment* UnitFragment = EntityManager->GetFragmentDataPtr<FTWUnitFragment>(EntityInfo->Entity);
 	if (!UnitFragment)
 	{
+		if (const int32* CachedOwner = GClientOwnerSlotCache.Find(UnitNetID))
+		{
+			OutOwnerPlayerSlot = *CachedOwner;
+			return true;
+		}
 		return false;
 	}
 
 	OutOwnerPlayerSlot = UnitFragment->GetOwner();
+	GClientOwnerSlotCache.Add(UnitNetID, OutOwnerPlayerSlot);
 	return OutOwnerPlayerSlot != INDEX_NONE;
 }
 
@@ -1399,16 +1451,23 @@ bool UTWUnitSubsystem::TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID,
 		if (TryProjectWorldPointToGround(AnchorWorldLocation, GroundLocation, TWUnit))
 		{
 			OutLocation = GroundLocation;
+			CachedClientVisualLocations.Add(UnitNetID, OutLocation);
 			return true;
 		}
 
 		OutLocation = AnchorWorldLocation;
+		CachedClientVisualLocations.Add(UnitNetID, OutLocation);
 		return true;
 	}
 
 	FVector BaseLocation = FVector::ZeroVector;
 	if (!TryGetUnitLocationInternal(UnitNetID, BaseLocation))
 	{
+		if (const FVector* CachedLocation = CachedClientVisualLocations.Find(UnitNetID))
+		{
+			OutLocation = *CachedLocation;
+			return true;
+		}
 		return false;
 	}
 
@@ -1416,10 +1475,12 @@ bool UTWUnitSubsystem::TryGetUnitVisualLocation(const FMassNetworkID& UnitNetID,
 	if (TryProjectWorldPointToGround(BaseLocation, GroundLocation, nullptr))
 	{
 		OutLocation = GroundLocation;
+		CachedClientVisualLocations.Add(UnitNetID, OutLocation);
 		return true;
 	}
 
 	OutLocation = BaseLocation;
+	CachedClientVisualLocations.Add(UnitNetID, OutLocation);
 	return true;
 }
 
@@ -1431,16 +1492,23 @@ bool UTWUnitSubsystem::TryGetUnitHPBarWorldLocation(const FMassNetworkID& UnitNe
 	if (TryGetUnitVisualActor(UnitNetID, TWUnit) && IsValid(TWUnit))
 	{
 		OutLocation = TWUnit->GetHPBarAnchorWorldLocation();
+		CachedClientHPBarLocations.Add(UnitNetID, OutLocation);
 		return true;
 	}
 
 	FVector BaseLocation = FVector::ZeroVector;
 	if (!TryGetUnitLocationInternal(UnitNetID, BaseLocation))
 	{
+		if (const FVector* CachedLocation = CachedClientHPBarLocations.Find(UnitNetID))
+		{
+			OutLocation = *CachedLocation;
+			return true;
+		}
 		return false;
 	}
 
 	OutLocation = BaseLocation + FVector(0.f, 0.f, 120.f);
+	CachedClientHPBarLocations.Add(UnitNetID, OutLocation);
 	return true;
 }
 
@@ -1451,29 +1519,55 @@ bool UTWUnitSubsystem::TryGetUnitCurrentHP(const FMassNetworkID& UnitNetID, int3
 	const FMassReplicationEntityInfo* EntityInfo = nullptr;
 	if (!TryGetReplicationEntityInfo(UnitNetID, EntityInfo) || !EntityInfo)
 	{
+		if (const float* CachedHP = GClientCurrentHPCache.Find(UnitNetID))
+		{
+			OutCurrentHP = *CachedHP;
+			return true;
+		}
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			OutCurrentHP = CachedStatus->GetStatus(ETWStatusType::Health);
+			return OutCurrentHP > 0.f;
+		}
 		return false;
 	}
 
 	FMassEntityManager* EntityManager = nullptr;
-	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager))
+	if (!TryResolveActiveEntityManager(GetWorld(), EntityManager) || !IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
 	{
+		if (const float* CachedHP = GClientCurrentHPCache.Find(UnitNetID))
+		{
+			OutCurrentHP = *CachedHP;
+			return true;
+		}
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			OutCurrentHP = CachedStatus->GetStatus(ETWStatusType::Health);
+			return OutCurrentHP > 0.f;
+		}
 		return false;
 	}
 
-	if (!IsSafeActiveEntity(EntityManager, EntityInfo->Entity))
-	{
-		return false;
-	}
-
-	const FTWStatusFragment* StatusFragment =
-		EntityManager->GetFragmentDataPtr<FTWStatusFragment>(EntityInfo->Entity);
-
+	const FTWStatusFragment* StatusFragment = EntityManager->GetFragmentDataPtr<FTWStatusFragment>(EntityInfo->Entity);
 	if (!StatusFragment)
 	{
+		if (const float* CachedHP = GClientCurrentHPCache.Find(UnitNetID))
+		{
+			OutCurrentHP = *CachedHP;
+			return true;
+		}
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			OutCurrentHP = CachedStatus->GetStatus(ETWStatusType::Health);
+			return OutCurrentHP > 0.f;
+		}
 		return false;
 	}
 
-	OutCurrentHP = StatusFragment->GetStatus().GetStatus(ETWStatusType::Health);
+	const FTWUnitStatus Status = StatusFragment->GetStatus();
+	GClientStatusCache.Add(UnitNetID, Status);
+	OutCurrentHP = Status.GetStatus(ETWStatusType::Health);
+	GClientCurrentHPCache.Add(UnitNetID, OutCurrentHP);
 	return true;
 }
 
@@ -1484,6 +1578,11 @@ bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 Pl
 	FName UnitID = NAME_None;
 	if (!TryGetUnitID(UnitNetID, UnitID))
 	{
+		if (const float* CachedMax = GClientMaxHPCache.Find(UnitNetID))
+		{
+			OutMaxHP = *CachedMax;
+			return OutMaxHP > 0.f;
+		}
 		return false;
 	}
 
@@ -1509,6 +1608,16 @@ bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 Pl
 	const FTWUnitTableRowBase* UnitRow = GetUnitTableRowBase(UnitID);
 	if (!UnitRow)
 	{
+		if (const float* CachedMax = GClientMaxHPCache.Find(UnitNetID))
+		{
+			OutMaxHP = *CachedMax;
+			return OutMaxHP > 0.f;
+		}
+		if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+		{
+			OutMaxHP = CachedStatus->GetStatus(ETWStatusType::Health);
+			return OutMaxHP > 0.f;
+		}
 		return false;
 	}
 
@@ -1516,7 +1625,29 @@ bool UTWUnitSubsystem::TryGetUnitMaxHP(const FMassNetworkID& UnitNetID, int32 Pl
 		const_cast<UTWUnitSubsystem*>(this)->GetUnitDefaultStatus(UnitID, ResolvedOwnerPlayerSlot);
 
 	OutMaxHP = DefaultStatus.GetStatus(ETWStatusType::Health);
-	return OutMaxHP > 0.f;
+	if (OutMaxHP > 0.f)
+	{
+		GClientMaxHPCache.Add(UnitNetID, OutMaxHP);
+		return true;
+	}
+
+	if (const FTWUnitStatus* CachedStatus = GClientStatusCache.Find(UnitNetID))
+	{
+		OutMaxHP = CachedStatus->GetStatus(ETWStatusType::Health);
+		if (OutMaxHP > 0.f)
+		{
+			GClientMaxHPCache.Add(UnitNetID, OutMaxHP);
+			return true;
+		}
+	}
+
+	if (const float* CachedMax = GClientMaxHPCache.Find(UnitNetID))
+	{
+		OutMaxHP = *CachedMax;
+		return OutMaxHP > 0.f;
+	}
+
+	return false;
 }
 
 bool UTWUnitSubsystem::TryGetUnitSelectionVisualStyle(

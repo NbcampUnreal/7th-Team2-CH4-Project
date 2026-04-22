@@ -508,6 +508,111 @@ namespace TWUIBridgeUnitHelpers
 		InOutVM.Range = PreferredStatus->GetStatus(ETWStatusType::Range);
 	}
 }
+
+namespace TWUIBridgeSelectionHelpers
+{
+	static bool TryGetSelectedNetIds(const ATWPlayerController* OwnerController, TArray<FMassNetworkID>& OutNetIds)
+	{
+		OutNetIds.Empty();
+
+		if (!OwnerController)
+		{
+			return false;
+		}
+
+		for (const FMassNetworkID& NetId : OwnerController->GetLocalSelectedUnitNetIds())
+		{
+			if (NetId.IsValid())
+			{
+				OutNetIds.Add(NetId);
+			}
+		}
+
+		return OutNetIds.Num() > 0;
+	}
+
+	static FString ResolveUnitDisplayName(const UTWUnitSubsystem* UnitSubsystem, FName UnitId)
+	{
+		if (!UnitSubsystem || UnitId.IsNone())
+		{
+			return TEXT("");
+		}
+
+		if (const FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(UnitId))
+		{
+			if (!UnitRow->UnitID.IsNone())
+			{
+				return UnitRow->UnitID.ToString();
+			}
+		}
+
+		return UnitId.ToString();
+	}
+
+	static void BuildSummaryItemsFromNetIds(
+		const TArray<FMassNetworkID>& SelectedNetIds,
+		const UTWUnitSubsystem* UnitSubsystem,
+		UDataTable* SelectionPresentationTable,
+		TArray<FSelectionSummaryItemViewModel>& OutSummaryItems)
+	{
+		OutSummaryItems.Empty();
+
+		if (!UnitSubsystem)
+		{
+			return;
+		}
+
+		TArray<FName> UnitOrder;
+		TMap<FName, int32> UnitCounts;
+
+		for (const FMassNetworkID& NetId : SelectedNetIds)
+		{
+			FName UnitId = NAME_None;
+			if (!UnitSubsystem->TryGetUnitID(NetId, UnitId) || UnitId.IsNone())
+			{
+				continue;
+			}
+
+			if (!UnitCounts.Contains(UnitId))
+			{
+				UnitOrder.Add(UnitId);
+			}
+
+			UnitCounts.FindOrAdd(UnitId)++;
+		}
+
+		for (const FName UnitId : UnitOrder)
+		{
+			const int32 Count = UnitCounts.FindRef(UnitId);
+			if (Count <= 0)
+			{
+				continue;
+			}
+
+			FSelectionSummaryItemViewModel Item;
+			Item.EntityId = UnitId;
+			Item.DisplayName = ResolveUnitDisplayName(UnitSubsystem, UnitId);
+			Item.Count = Count;
+			Item.CountText = FString::Printf(TEXT("x%d"), Count);
+
+			if (const FUISelectionPresentationRow* PresentationRow =
+				TWUIBridgeBuildingHelpers::FindSelectionPresentationRowByEntityId(SelectionPresentationTable, UnitId))
+			{
+				if (!PresentationRow->PortraitIcon.IsNull())
+				{
+					Item.Icon = PresentationRow->PortraitIcon;
+				}
+				else if (!PresentationRow->Portrait.IsNull())
+				{
+					Item.Icon = PresentationRow->Portrait;
+				}
+			}
+
+			OutSummaryItems.Add(Item);
+		}
+	}
+}
+
 bool UTWPlayerUIBridge::IsHeroSelectionId(FName InSelectionId) const
 {
 	if (InSelectionId.IsNone())
@@ -515,13 +620,23 @@ bool UTWPlayerUIBridge::IsHeroSelectionId(FName InSelectionId) const
 		return false;
 	}
 
-	const FString SelectionIdString = InSelectionId.ToString();
+	if (!OwnerController)
+	{
+		return false;
+	}
 
-	return
-		SelectionIdString.Contains(TEXT("Hero")) ||
-		InSelectionId == TEXT("DragonKnight") ||
-		InSelectionId == TEXT("Markman") ||
-		InSelectionId == TEXT("Astrologian");
+	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	if (LocalPS->GetSelectedHeroUnitId() != InSelectionId)
+	{
+		return false;
+	}
+
+	return OwnerController->IsOwnedHeroCurrentlySelected();
 }
 
 void UTWPlayerUIBridge::AppendHeroSkillCommandIfNeeded(
@@ -1220,23 +1335,20 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 
 	const FName LocalPrimarySelectedUnitId = OwnerController->GetLocalPrimarySelectedUnitId();
 	const TArray<FSelectionSummaryItemViewModel>& LocalSummaryItems = OwnerController->GetLocalSelectionSummaryItems();
-
 	const bool bIsMultiSelection = LocalSelectedUnitCount > 1;
+	TArray<FMassNetworkID> SelectedNetIds;
+	TWUIBridgeSelectionHelpers::TryGetSelectedNetIds(OwnerController, SelectedNetIds);
 
 	const ATWPlayerState* LocalPS = OwnerController->GetPlayerState<ATWPlayerState>();
 	const bool bLocalUnitSelectionOwnedByMe =
 		LocalPS &&
 		(OwnerController->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot);
+	UTWUnitSubsystem* UnitSubsystem =
+		OwnerController->GetWorld() ? OwnerController->GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 
 	OutVM = FSelectionViewModel();
 	OutVM.SelectionType = bIsMultiSelection ? ESelectionViewType::Multi : ESelectionViewType::Unit;
 	OutVM.ViewMode = bIsMultiSelection ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
-	OutVM.SelectionId = LocalPrimarySelectedUnitId.IsNone()
-		? (bIsMultiSelection ? DefaultMultiSelectedUnitId : DefaultSelectedUnitId)
-		: LocalPrimarySelectedUnitId;
-
-	OutVM.DisplayName = bIsMultiSelection ? TWUIBridgeText::MultiSelectedUnits : OutVM.SelectionId.ToString();
-	OutVM.TypeLabel = bIsMultiSelection ? TWUIBridgeText::UnitsTypeLabel : TWUIBridgeText::UnitTypeLabel;
 	OutVM.TotalSelectedCount = LocalSelectedUnitCount;
 	OutVM.CountLabel = bIsMultiSelection
 		? FString::Printf(TEXT("%d Selected"), LocalSelectedUnitCount)
@@ -1256,58 +1368,80 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 
 	if (bIsMultiSelection)
 	{
+		OutVM.SelectionId = !LocalPrimarySelectedUnitId.IsNone()
+			? LocalPrimarySelectedUnitId
+			: NAME_None;
+		OutVM.DisplayName = TWUIBridgeText::MultiSelectedUnits;
+		OutVM.TypeLabel = TWUIBridgeText::UnitsTypeLabel;
 		OutVM.SummaryItems = LocalSummaryItems;
+
+		if (OutVM.SummaryItems.IsEmpty())
+		{
+			TWUIBridgeSelectionHelpers::BuildSummaryItemsFromNetIds(
+				SelectedNetIds,
+				UnitSubsystem,
+				SelectionPresentationTable,
+				OutVM.SummaryItems);
+		}
+
+		if (OutVM.SummaryItems.IsEmpty())
+		{
+			StopSelectionRefreshTimer();
+			return false;
+		}
 	}
 	else
 	{
+		FName EffectiveSelectionId = LocalPrimarySelectedUnitId;
+		if (EffectiveSelectionId.IsNone() && SelectedNetIds.Num() == 1 && UnitSubsystem)
+		{
+			UnitSubsystem->TryGetUnitID(SelectedNetIds[0], EffectiveSelectionId);
+		}
+
+		if (EffectiveSelectionId.IsNone())
+		{
+			StopSelectionRefreshTimer();
+			return false;
+		}
+
+		OutVM.SelectionId = EffectiveSelectionId;
+		OutVM.DisplayName = EffectiveSelectionId.ToString();
+		OutVM.TypeLabel = TWUIBridgeText::UnitTypeLabel;
+
 		float CurrentHP = 0.f;
 		float MaxHP = 0.f;
 		bool bHasAnyHP = false;
-
 		FTWUnitStatus BaseStatus;
 		bool bHasBaseStatus = false;
-
-		OutVM.DisplayName = OutVM.SelectionId.ToString();
-		OutVM.TypeLabel = TWUIBridgeText::UnitTypeLabel;
-
-		if (UWorld* World = OwnerController->GetWorld())
+		int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
+		if (SelectedNetIds.Num() == 1 && UnitSubsystem)
 		{
-			if (UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>())
+			UnitSubsystem->TryGetUnitOwnerPlayerSlot(SelectedNetIds[0], OwnerPlayerSlot);
+		}
+
+		if (UnitSubsystem)
+		{
+			OutVM.DisplayName = TWUIBridgeSelectionHelpers::ResolveUnitDisplayName(UnitSubsystem, EffectiveSelectionId);
+			BaseStatus = UnitSubsystem->GetUnitDefaultStatus(EffectiveSelectionId, OwnerPlayerSlot);
+			bHasBaseStatus = true;
+			MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
+			if (MaxHP > 0.f)
 			{
-				if (const FTWUnitTableRowBase* UnitRow = UnitSubsystem->GetUnitTableRowBase(OutVM.SelectionId))
-				{
-					if (!UnitRow->UnitID.IsNone())
-					{
-						OutVM.DisplayName = UnitRow->UnitID.ToString();
-					}
-				}
-
-				const int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
-				BaseStatus = UnitSubsystem->GetUnitDefaultStatus(OutVM.SelectionId, OwnerPlayerSlot);
-				bHasBaseStatus = true;
-
-				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-				if (MaxHP > 0.f)
-				{
-					bHasAnyHP = true;
-				}
+				bHasAnyHP = true;
 			}
 		}
 
 		const FTWUnitStatus* RuntimeStatusPtr = nullptr;
 		FTWUnitStatus RuntimeStatus;
-
 		if (OwnerController->HasLocalPrimarySelectedUnitStatus())
 		{
 			RuntimeStatus = OwnerController->GetLocalPrimarySelectedUnitStatus();
 			RuntimeStatusPtr = &RuntimeStatus;
-
 			CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
 			if (CurrentHP > 0.f)
 			{
 				bHasAnyHP = true;
 			}
-
 			if (MaxHP <= 0.f && bHasBaseStatus)
 			{
 				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
@@ -1346,7 +1480,6 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	}
 
 	OutCommandIds.Reset();
-
 	if (bLocalUnitSelectionOwnedByMe)
 	{
 		OutCommandIds = {
@@ -1493,6 +1626,14 @@ void UTWPlayerUIBridge::RefreshSelection()
 			VM.TotalSelectedCount,
 			VM.SummaryItems
 		);
+		return;
+	}
+
+	const bool bHasSelectionToPreserve =
+		(OwnerController->GetSelectedBuilding() != nullptr) ||
+		(OwnerController->GetLocalSelectedUnitCount() > 0);
+	if (bHasSelectionToPreserve)
+	{
 		return;
 	}
 

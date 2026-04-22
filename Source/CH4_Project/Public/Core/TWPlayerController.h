@@ -60,7 +60,7 @@ protected:
 	TObjectPtr<UInputMappingContext> IMC_BuildingCommand = nullptr;
 
 	UFUNCTION(Client, Reliable)
-void ClientMoveCameraToStartLocation(const FVector& InTargetLocation, const FRotator& InTargetRotation);
+	void ClientMoveCameraToStartLocation(const FVector& InTargetLocation, const FRotator& InTargetRotation);
 	bool bUnitCommandContextActive = false;
 	bool bBuildContextActive = false;
 	bool bBuildShortcutModeActive = false;
@@ -332,6 +332,9 @@ private:
 	bool RefreshLocalPrimarySelectedUnitStatus();
 
 	const FUICommandMetaRow* FindCommandMetaRowFromTable(FName CommandId) const;
+	void ForceRefreshSelectionFromHero();
+	bool TryResolveLocalPrimarySelectedUnitFromClientSelection(FName& OutUnitId, FMassNetworkID& OutPrimaryNetId) const;
+	void ResolveLocalSelectedUnitIds(TArray<FName>& OutUnitIds) const;
 
 	bool CanExecuteCommand(const FUICommandMetaRow* CommandMeta, FName CommandId) const;
 	bool TryHandleImmediateCommand(const FUICommandMetaRow* CommandMeta, FName CommandId);
@@ -411,6 +414,16 @@ public:
 public:
 	int32 GetLocalSelectedUnitCount() const { return LocalSelectedUnitCount; }
 	FName GetLocalPrimarySelectedUnitId() const { return LocalPrimarySelectedUnitId; }
+	const FMassNetworkID& GetLocalPrimarySelectedUnitNetId() const { return LocalPrimarySelectedUnitNetId; }
+	const TArray<FMassNetworkID>& GetLocalSelectedUnitNetIds() const { return ClientSelectedEntities; }
+	void GetResolvedLocalSelectedUnitNetIds(TArray<FMassNetworkID>& OutUnitNetIds) const;
+	const TArray<FMassEntityHandle>& GetAuthoritativeSelectedEntityHandles() const { return ServerSelectedEntities; }
+	bool TryGetAuthoritativeSelectionData(
+		const FMassEntityHandle& EntityHandle,
+		FName& OutUnitId,
+		FMassNetworkID& OutNetId,
+		int32& OutOwnerPlayerSlot,
+		FTWUnitStatus& OutStatus) const;
 	const TArray<FSelectionSummaryItemViewModel>& GetLocalSelectionSummaryItems() const { return LocalSelectionSummaryItems; }
 	bool HasLocalPrimarySelectedUnitStatus() const { return bHasLocalPrimarySelectedUnitStatus; }
 	const FTWUnitStatus& GetLocalPrimarySelectedUnitStatus() const { return LocalPrimarySelectedUnitStatus; }
@@ -419,6 +432,7 @@ public:
 
 	FName ResolveBuildingSelectionId(const ATWBaseBuilding* InBuilding) const;
 	void NotifyResourceStateChanged();
+	void OnPlayerStateHeroChanged(FName InHeroUnitId);
 
 	UFUNCTION(Client, Reliable)
 	void ClientForceRefreshSelectionBridge();
@@ -458,6 +472,9 @@ private:
 
 	UPROPERTY(Transient)
 	FName LocalPrimarySelectedUnitId = NAME_None;
+
+	UPROPERTY(Transient)
+	FMassNetworkID LocalPrimarySelectedUnitNetId;
 
 	UPROPERTY(Transient)
 	FTWUnitStatus LocalPrimarySelectedUnitStatus;

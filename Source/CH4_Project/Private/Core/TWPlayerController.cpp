@@ -59,6 +59,41 @@ namespace
 {
 	constexpr float SingleSelectionHitRadius = 100.f;
 
+	static bool AreSelectionSummaryItemsEqual(
+		const TArray<FSelectionSummaryItemViewModel>& A,
+		const TArray<FSelectionSummaryItemViewModel>& B)
+	{
+		if (A.Num() != B.Num())
+		{
+			return false;
+		}
+
+		for (int32 Index = 0; Index < A.Num(); ++Index)
+		{
+			if (A[Index].EntityId != B[Index].EntityId)
+			{
+				return false;
+			}
+
+			if (A[Index].DisplayName != B[Index].DisplayName)
+			{
+				return false;
+			}
+
+			if (A[Index].Count != B[Index].Count)
+			{
+				return false;
+			}
+
+			if (A[Index].CountText != B[Index].CountText)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	static bool TryGetEntityWorldLocation(
 		UWorld* World,
 		const FMassEntityHandle& EntityHandle,
@@ -90,6 +125,68 @@ namespace
 		}
 
 		return false;
+	}
+
+	static bool TryGetSelectionDataFromEntityHandle(
+		UWorld* World,
+		const FMassEntityHandle& EntityHandle,
+		FName& OutUnitId,
+		FMassNetworkID& OutNetId,
+		int32* OutOwnerPlayerSlot = nullptr,
+		FTWUnitStatus* OutStatus = nullptr)
+	{
+		OutUnitId = NAME_None;
+		OutNetId = FMassNetworkID();
+
+		if (!World)
+		{
+			return false;
+		}
+
+		UMassEntitySubsystem* EntitySubsystem = World->GetSubsystem<UMassEntitySubsystem>();
+		if (!EntitySubsystem)
+		{
+			return false;
+		}
+
+		FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
+		if (!EntityManager.IsEntityValid(EntityHandle) || !EntityManager.IsEntityActive(EntityHandle))
+		{
+			return false;
+		}
+
+		const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
+		if (!UnitFragment)
+		{
+			return false;
+		}
+
+		OutUnitId = UnitFragment->GetUnitID();
+		if (OutUnitId.IsNone())
+		{
+			return false;
+		}
+
+		if (OutOwnerPlayerSlot)
+		{
+			*OutOwnerPlayerSlot = UnitFragment->GetOwner();
+		}
+
+		if (const FMassNetworkIDFragment* NetworkIdFragment =
+			EntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(EntityHandle))
+		{
+			OutNetId = NetworkIdFragment->NetID;
+		}
+
+		if (OutStatus)
+		{
+			if (const FTWStatusFragment* StatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(EntityHandle))
+			{
+				*OutStatus = StatusFragment->GetStatus();
+			}
+		}
+
+		return true;
 	}
 
 	static bool CanControlCurrentUnitSelection(const ATWPlayerController* PC)
@@ -319,12 +416,12 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 		UpdateDragSelectionOverlay();
 	}
 
+	RefreshLocalSelectionRuntimeData();
+
 	if (PlayerSelectionVisualComponent)
 	{
 		PlayerSelectionVisualComponent->TickVisuals(DeltaSeconds);
 	}
-
-	RefreshLocalSelectionRuntimeData();
 }
 void ATWPlayerController::ClientMoveCameraToStartLocation_Implementation(
 	const FVector& InTargetLocation,
@@ -1173,6 +1270,15 @@ void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector&
 			bool bHasPrimaryHealth = false;
 			BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
 			ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth, InSelectedOwnerPlayerSlot);
+
+			if (IsLocalController())
+			{
+				ClientApplyUnitSelection_Implementation(
+					NetworkIds,
+					PrimaryHealth,
+					bHasPrimaryHealth,
+					InSelectedOwnerPlayerSlot);
+			}
 		};
 
 	const FVector AreaMin(
@@ -1243,6 +1349,11 @@ void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector&
 	ServerSelectedEntities.Empty();
 	SelectedBuilding = nullptr;
 	ClientClearSelection();
+
+	if (IsLocalController())
+	{
+		ClientClearSelection_Implementation();
+	}
 }
 
 void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVector& StartLocation,
@@ -1282,6 +1393,15 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 			bool bHasPrimaryHealth = false;
 			BuildSelectionPayloadFromEntities(ServerSelectedEntities, NetworkIds, PrimaryHealth, bHasPrimaryHealth);
 			ClientApplyUnitSelection(NetworkIds, PrimaryHealth, bHasPrimaryHealth, InSelectedOwnerPlayerSlot);
+
+			if (IsLocalController())
+			{
+				ClientApplyUnitSelection_Implementation(
+					NetworkIds,
+					PrimaryHealth,
+					bHasPrimaryHealth,
+					InSelectedOwnerPlayerSlot);
+			}
 		};
 
 	auto FindBestBuildingInRect =
@@ -1464,6 +1584,11 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 	ServerSelectedEntities.Empty();
 	SelectedBuilding = nullptr;
 	ClientClearSelection();
+
+	if (IsLocalController())
+	{
+		ClientClearSelection_Implementation();
+	}
 }
 
 void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuilding* TargetBuilding)
@@ -1476,10 +1601,20 @@ void ATWPlayerController::ServerHandleBuildingSelect_Implementation(ATWBaseBuild
 	if (!IsValid(TargetBuilding))
 	{
 		ClientClearSelection();
+
+		if (IsLocalController())
+		{
+			ClientClearSelection_Implementation();
+		}
 		return;
 	}
 
 	ClientApplyBuildingSelection(TargetBuilding);
+
+	if (IsLocalController())
+	{
+		ClientApplyBuildingSelection_Implementation(TargetBuilding);
+	}
 }
 
 bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
@@ -1655,47 +1790,75 @@ bool ATWPlayerController::TryGetSelectedHeroUnitId(FName& OutHeroUnitId) const
 {
 	OutHeroUnitId = NAME_None;
 
-	const UTWUnitSubsystem* UnitSubsystem =
-		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
-	if (!UnitSubsystem)
+	if (!IsLocalController() || SelectedBuilding != nullptr)
 	{
 		return false;
 	}
 
-	for (const FMassNetworkID& NetId : ClientSelectedEntities)
+	const ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!PS)
 	{
-		FName UnitId = NAME_None;
-		int32 OwnerSlot = INDEX_NONE;
+		return false;
+	}
 
-		if (!UnitSubsystem->TryGetUnitID(NetId, UnitId))
-		{
-			continue;
-		}
+	const FName PlayerStateHeroUnitId = PS->GetSelectedHeroUnitId();
+	if (PlayerStateHeroUnitId.IsNone())
+	{
+		return false;
+	}
 
-		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, OwnerSlot))
-		{
-			continue;
-		}
+	if (LocalSelectedOwnerPlayerSlot != PS->PlayerSlot)
+	{
+		return false;
+	}
 
-		const ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
-		if (!PS || OwnerSlot != PS->PlayerSlot)
-		{
-			continue;
-		}
+	if (ClientSelectedEntities.Num() != 1)
+	{
+		return false;
+	}
 
-		if (
-			UnitId == TEXT("DragonKnight") ||
-			UnitId == TEXT("Markman") ||
-			UnitId == TEXT("Astrologian")
-		)
+	FName SelectedUnitId = LocalPrimarySelectedUnitId;
+	FMassNetworkID PrimaryNetId = LocalPrimarySelectedUnitNetId;
+	if (SelectedUnitId.IsNone() || !PrimaryNetId.IsValid())
+	{
+		if (!TryResolveLocalPrimarySelectedUnitFromClientSelection(SelectedUnitId, PrimaryNetId))
 		{
-			OutHeroUnitId = UnitId;
-			return true;
+			return false;
 		}
+	}
+
+	if (SelectedUnitId == PlayerStateHeroUnitId)
+	{
+		OutHeroUnitId = SelectedUnitId;
+		return true;
+	}
+
+	const UTWUnitSubsystem* UnitSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	ATWHeroUnitBase* OwnedHero = GetOwnedHeroUnit();
+	if (!UnitSubsystem || !OwnedHero || !PrimaryNetId.IsValid())
+	{
+		return false;
+	}
+
+	FVector SelectedLocation = FVector::ZeroVector;
+	if (!UnitSubsystem->TryGetUnitVisualLocation(PrimaryNetId, SelectedLocation))
+	{
+		if (!UnitSubsystem->TryGetUnitHPBarWorldLocation(PrimaryNetId, SelectedLocation))
+		{
+			return false;
+		}
+	}
+
+	const float DistSq = FVector::DistSquared2D(SelectedLocation, OwnedHero->GetActorLocation());
+	if (DistSq <= FMath::Square(200.0f))
+	{
+		OutHeroUnitId = PlayerStateHeroUnitId;
+		return true;
 	}
 
 	return false;
 }
+
 
 bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMassEntityHandle& OutEntityHandle) const
 {
@@ -1722,31 +1885,19 @@ bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMa
 
 	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 
+	// 1) 서버 선택 목록 안에 이미 엔티티가 있으면 그걸 우선 사용
 	for (const FMassEntityHandle& Entity : ServerSelectedEntities)
 	{
-		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+		if (!EntityManager.IsEntityActive(Entity))
 		{
 			continue;
 		}
 
-		const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
-		if (!UnitFrag)
-		{
-			continue;
-		}
-
-		if (UnitFrag->GetOwner() != PS->PlayerSlot)
-		{
-			continue;
-		}
-
-		if (UnitFrag->GetUnitID() == InHeroUnitId)
-		{
-			OutEntityHandle = Entity;
-			return true;
-		}
+		OutEntityHandle = Entity;
+		return true;
 	}
 
+	// 2) 소유 중인 영웅 액터를 기준으로 근처 엔티티를 찾음
 	const ATWHeroUnitBase* OwnedHero = GetOwnedHeroUnit();
 	if (!IsValid(OwnedHero))
 	{
@@ -1766,32 +1917,44 @@ bool ATWPlayerController::TryFindOwnedHeroEntityByUnitId(FName InHeroUnitId, FMa
 		return false;
 	}
 
+	FMassEntityHandle BestEntity;
+	float BestDistanceSq = TNumericLimits<float>::Max();
+
 	for (const FMassEntityHandle& Entity : NearbyEntities)
 	{
-		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+		if (!EntityManager.IsEntityActive(Entity))
 		{
 			continue;
 		}
 
-		const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
-		if (!UnitFrag)
+		FVector EntityLocation = FVector::ZeroVector;
+		if (!TryGetEntityWorldLocation(World, Entity, EntityLocation))
 		{
 			continue;
 		}
 
-		if (UnitFrag->GetOwner() != PS->PlayerSlot)
+		const float DistSq = FVector::DistSquared(EntityLocation, HeroLocation);
+		if (DistSq < BestDistanceSq)
 		{
-			continue;
-		}
-
-		if (UnitFrag->GetUnitID() == InHeroUnitId)
-		{
-			OutEntityHandle = Entity;
-			return true;
+			BestDistanceSq = DistSq;
+			BestEntity = Entity;
 		}
 	}
 
-	return false;
+	if (!BestEntity.IsSet())
+	{
+		UE_LOG(
+			LogTWCommand,
+			Warning,
+			TEXT("[HeroSkill][Server] HeroEntity not found | Slot=%d | HeroId=%s"),
+			PS->PlayerSlot,
+			*InHeroUnitId.ToString()
+		);
+		return false;
+	}
+
+	OutEntityHandle = BestEntity;
+	return true;
 }
 
 bool ATWPlayerController::TryApplyDamageToBuilding(ATWBaseBuilding* InTargetBuilding, float InDamage) const
@@ -2495,23 +2658,25 @@ void ATWPlayerController::UpdateHeroSkillTargeting()
 ATWHeroUnitBase* ATWPlayerController::GetOwnedHeroUnit() const
 {
 	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
-	if (!LocalPS)
+	if (!LocalPS || !GetWorld())
 	{
 		return nullptr;
 	}
 
 	for (TActorIterator<ATWHeroUnitBase> It(GetWorld()); It; ++It)
 	{
-		ATWHeroUnitBase* Hero = *It;
-		if (!IsValid(Hero))
+		ATWHeroUnitBase* HeroUnit = *It;
+		if (!IsValid(HeroUnit))
 		{
 			continue;
 		}
 
-		if (Hero->GetOwnerPlayerSlot() == LocalPS->PlayerSlot)
+		if (HeroUnit->GetOwnerPlayerSlot() != LocalPS->PlayerSlot)
 		{
-			return Hero;
+			continue;
 		}
+
+		return HeroUnit;
 	}
 
 	return nullptr;
@@ -2548,6 +2713,7 @@ void ATWPlayerController::ClientRefreshSelectedUnitStatusAndUI_Implementation()
 {
 	RefreshLocalPrimarySelectedUnitStatus();
 	RefreshUIBridge();
+	RefreshSelectionVisualManager();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -2558,6 +2724,7 @@ void ATWPlayerController::ClientRefreshSelectedUnitStatusAndUI_Implementation()
 			{
 				RefreshLocalPrimarySelectedUnitStatus();
 				RefreshUIBridge();
+				RefreshSelectionVisualManager();
 			},
 			0.1f,
 			false
@@ -2567,50 +2734,57 @@ void ATWPlayerController::ClientRefreshSelectedUnitStatusAndUI_Implementation()
 
 bool ATWPlayerController::IsOwnedHeroCurrentlySelected() const
 {
-	if (!IsLocalController())
+	FName SelectedHeroUnitId = NAME_None;
+	return TryGetSelectedHeroUnitId(SelectedHeroUnitId);
+}
+
+bool ATWPlayerController::TryGetSelectedHeroEntityHandle(FMassEntityHandle& OutEntityHandle, FName& OutHeroUnitId) const
+{
+	OutEntityHandle = FMassEntityHandle();
+	OutHeroUnitId = NAME_None;
+
+	if (!HasAuthority())
 	{
 		return false;
 	}
 
-	if (ClientSelectedEntities.IsEmpty())
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!PS)
 	{
 		return false;
 	}
 
-	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
-	if (!LocalPS)
+	UMassEntitySubsystem* EntitySubsystem = GetWorld() ? GetWorld()->GetSubsystem<UMassEntitySubsystem>() : nullptr;
+	if (!EntitySubsystem)
 	{
 		return false;
 	}
 
-	const UTWUnitSubsystem* UnitSubsystem =
-		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
-	if (!UnitSubsystem)
-	{
-		return false;
-	}
+	FMassEntityManager& EntityManager = EntitySubsystem->GetMutableEntityManager();
 
-	for (const FMassNetworkID& NetId : ClientSelectedEntities)
+	for (const FMassEntityHandle& Entity : ServerSelectedEntities)
 	{
-		int32 OwnerPlayerSlot = INDEX_NONE;
-		if (!UnitSubsystem->TryGetUnitOwnerPlayerSlot(NetId, OwnerPlayerSlot))
+		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
 		{
 			continue;
 		}
-		
-		if (OwnerPlayerSlot != LocalPS->PlayerSlot)
+
+		const FTWUnitFragment* UnitFrag = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+		if (!UnitFrag)
 		{
 			continue;
 		}
 
-		FName UnitId = NAME_None;
-		if (!UnitSubsystem->TryGetUnitID(NetId, UnitId))
+		if (UnitFrag->GetOwner() != PS->PlayerSlot)
 		{
 			continue;
 		}
-		
-		if (IsHeroUnitId(UnitId))
+
+		const FName UnitId = UnitFrag->GetUnitID();
+		if (UnitId == PS->GetSelectedHeroUnitId())
 		{
+			OutEntityHandle = Entity;
+			OutHeroUnitId = UnitId;
 			return true;
 		}
 	}
@@ -2643,11 +2817,59 @@ void ATWPlayerController::RefreshSelectionVisualManager()
 		return;
 	}
 
+	TArray<FMassNetworkID> ResolvedSelectedUnitNetIds;
+	GetResolvedLocalSelectedUnitNetIds(ResolvedSelectedUnitNetIds);
+
 	PlayerSelectionVisualComponent->RefreshSelectionVisuals(
-		ClientSelectedEntities,
+		ResolvedSelectedUnitNetIds,
 		SelectedBuilding,
 		LocalSelectedOwnerPlayerSlot
 	);
+}
+
+void ATWPlayerController::GetResolvedLocalSelectedUnitNetIds(TArray<FMassNetworkID>& OutUnitNetIds) const
+{
+	OutUnitNetIds.Reset();
+
+	if (HasAuthority() && ServerSelectedEntities.Num() > 0)
+	{
+		OutUnitNetIds.Reserve(ServerSelectedEntities.Num());
+
+		for (const FMassEntityHandle& EntityHandle : ServerSelectedEntities)
+		{
+			FName UnitId = NAME_None;
+			FMassNetworkID NetId;
+			if (TryGetSelectionDataFromEntityHandle(GetWorld(), EntityHandle, UnitId, NetId) && NetId.IsValid())
+			{
+				OutUnitNetIds.Add(NetId);
+			}
+		}
+
+		if (OutUnitNetIds.Num() > 0)
+		{
+			return;
+		}
+	}
+
+	OutUnitNetIds = ClientSelectedEntities;
+}
+
+bool ATWPlayerController::TryGetAuthoritativeSelectionData(
+	const FMassEntityHandle& EntityHandle,
+	FName& OutUnitId,
+	FMassNetworkID& OutNetId,
+	int32& OutOwnerPlayerSlot,
+	FTWUnitStatus& OutStatus) const
+{
+	OutOwnerPlayerSlot = INDEX_NONE;
+	OutStatus = FTWUnitStatus();
+	return TryGetSelectionDataFromEntityHandle(
+		GetWorld(),
+		EntityHandle,
+		OutUnitId,
+		OutNetId,
+		&OutOwnerPlayerSlot,
+		&OutStatus);
 }
 
 void ATWPlayerController::NotifyRecentCombatUnitDamaged(
@@ -2723,6 +2945,7 @@ void ATWPlayerController::ClearLocalSelectionCache()
 	SelectedBuilding = nullptr;
 	LocalSelectedUnitCount = 0;
 	LocalPrimarySelectedUnitId = NAME_None;
+	LocalPrimarySelectedUnitNetId = FMassNetworkID();
 	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
 	bHasLocalPrimarySelectedUnitStatus = false;
 	LocalSelectionSummaryItems.Empty();
@@ -2754,6 +2977,142 @@ void ATWPlayerController::RebuildLocalSelectionSummary(const TArray<FName>& InUn
 		Item.CountText = FString::Printf(TEXT("x%d"), Pair.Value);
 		LocalSelectionSummaryItems.Add(Item);
 	}
+}
+
+
+void ATWPlayerController::ResolveLocalSelectedUnitIds(TArray<FName>& OutUnitIds) const
+{
+	OutUnitIds.Empty();
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return;
+	}
+
+	if (HasAuthority() && ServerSelectedEntities.Num() > 0)
+	{
+		for (const FMassEntityHandle& EntityHandle : ServerSelectedEntities)
+		{
+			FName UnitId = NAME_None;
+			FMassNetworkID UnusedNetId;
+			if (TryGetSelectionDataFromEntityHandle(GetWorld(), EntityHandle, UnitId, UnusedNetId) && !UnitId.IsNone())
+			{
+				OutUnitIds.Add(UnitId);
+			}
+		}
+
+		if (OutUnitIds.Num() > 0)
+		{
+			return;
+		}
+	}
+
+	for (const FMassNetworkID& NetId : ClientSelectedEntities)
+	{
+		FName UnitId = NAME_None;
+		if (UnitSubsystem->TryGetUnitID(NetId, UnitId) && !UnitId.IsNone())
+		{
+			OutUnitIds.Add(UnitId);
+		}
+	}
+}
+
+bool ATWPlayerController::TryResolveLocalPrimarySelectedUnitFromClientSelection(FName& OutUnitId, FMassNetworkID& OutPrimaryNetId) const
+{
+	OutUnitId = NAME_None;
+	OutPrimaryNetId = FMassNetworkID();
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	const UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+
+	if (HasAuthority() && ServerSelectedEntities.Num() > 0)
+	{
+		for (const FMassEntityHandle& EntityHandle : ServerSelectedEntities)
+		{
+			FName UnitId = NAME_None;
+			FMassNetworkID NetId;
+			if (!TryGetSelectionDataFromEntityHandle(GetWorld(), EntityHandle, UnitId, NetId) || UnitId.IsNone())
+			{
+				continue;
+			}
+
+			if (LocalPrimarySelectedUnitNetId.IsValid() && NetId.IsValid() && NetId == LocalPrimarySelectedUnitNetId)
+			{
+				OutUnitId = UnitId;
+				OutPrimaryNetId = NetId;
+				return true;
+			}
+
+			if (!LocalPrimarySelectedUnitId.IsNone() && UnitId == LocalPrimarySelectedUnitId)
+			{
+				OutUnitId = UnitId;
+				OutPrimaryNetId = NetId;
+				return true;
+			}
+
+			if (OutUnitId.IsNone())
+			{
+				OutUnitId = UnitId;
+				OutPrimaryNetId = NetId;
+			}
+		}
+
+		if (!OutUnitId.IsNone())
+		{
+			return true;
+		}
+	}
+
+	if (LocalPrimarySelectedUnitNetId.IsValid() && ClientSelectedEntities.Contains(LocalPrimarySelectedUnitNetId))
+	{
+		FName PreservedUnitId = NAME_None;
+		if (UnitSubsystem->TryGetUnitID(LocalPrimarySelectedUnitNetId, PreservedUnitId) && !PreservedUnitId.IsNone())
+		{
+			OutUnitId = PreservedUnitId;
+			OutPrimaryNetId = LocalPrimarySelectedUnitNetId;
+			return true;
+		}
+	}
+
+	for (const FMassNetworkID& NetId : ClientSelectedEntities)
+	{
+		FName UnitId = NAME_None;
+		if (!UnitSubsystem->TryGetUnitID(NetId, UnitId) || UnitId.IsNone())
+		{
+			continue;
+		}
+
+		if (!LocalPrimarySelectedUnitId.IsNone() && UnitId == LocalPrimarySelectedUnitId)
+		{
+			OutUnitId = UnitId;
+			OutPrimaryNetId = NetId;
+			return true;
+		}
+
+		if (OutUnitId.IsNone())
+		{
+			OutUnitId = UnitId;
+			OutPrimaryNetId = NetId;
+		}
+	}
+
+	return !OutUnitId.IsNone() && OutPrimaryNetId.IsValid();
 }
 
 void ATWPlayerController::BuildSelectionPayloadFromEntities(
@@ -2809,6 +3168,11 @@ const FUICommandMetaRow* ATWPlayerController::FindCommandMetaRowFromTable(FName 
 	static const FString ContextString(TEXT("ATWPlayerController::FindCommandMetaRowFromTable"));
 	return CommandMetaTable->FindRow<FUICommandMetaRow>(CommandId, ContextString);
 }
+void ATWPlayerController::ForceRefreshSelectionFromHero()
+{
+	// 기존 hero fallback 강제 보정은 리슨 서버에서 실제 선택 상태를 덮어써서
+	// 잘못된 영웅/체력 UI를 만들 수 있으므로 no-op로 유지한다.
+}
 
 void ATWPlayerController::RefreshLocalSelectionRuntimeData()
 {
@@ -2822,19 +3186,72 @@ void ATWPlayerController::RefreshLocalSelectionRuntimeData()
 		return;
 	}
 
-	if (ClientSelectedEntities.IsEmpty())
+	const FName PreviousPrimaryUnitId = LocalPrimarySelectedUnitId;
+	const FMassNetworkID PreviousPrimaryNetId = LocalPrimarySelectedUnitNetId;
+	const bool bPreviousHadStatus = bHasLocalPrimarySelectedUnitStatus;
+	const int32 PreviousSummaryCount = LocalSelectionSummaryItems.Num();
+	TArray<FSelectionSummaryItemViewModel> PreviousSummaryItems = LocalSelectionSummaryItems;
+
+	const bool bHasAnyUnitSelection =
+		(HasAuthority() && ServerSelectedEntities.Num() > 0) ||
+		(ClientSelectedEntities.Num() > 0);
+
+	if (!bHasAnyUnitSelection)
 	{
 		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
 		bHasLocalPrimarySelectedUnitStatus = false;
+		LocalPrimarySelectedUnitId = NAME_None;
+		LocalPrimarySelectedUnitNetId = FMassNetworkID();
+		LocalSelectionSummaryItems.Empty();
 		return;
 	}
 
-	RefreshLocalPrimarySelectedUnitStatus();
+	TArray<FName> UnitIds;
+	ResolveLocalSelectedUnitIds(UnitIds);
+	if (UnitIds.Num() > 0)
+	{
+		RebuildLocalSelectionSummary(UnitIds);
+	}
+
+	FName ResolvedPrimaryUnitId = NAME_None;
+	FMassNetworkID ResolvedPrimaryNetId;
+	if (TryResolveLocalPrimarySelectedUnitFromClientSelection(ResolvedPrimaryUnitId, ResolvedPrimaryNetId))
+	{
+		LocalPrimarySelectedUnitId = ResolvedPrimaryUnitId;
+		LocalPrimarySelectedUnitNetId = ResolvedPrimaryNetId;
+	}
+
+	if (RefreshLocalPrimarySelectedUnitStatus())
+	{
+		const bool bPrimaryChanged =
+			(PreviousPrimaryUnitId != LocalPrimarySelectedUnitId) ||
+			(PreviousPrimaryNetId != LocalPrimarySelectedUnitNetId);
+		const bool bStatusBecameValid = (!bPreviousHadStatus && bHasLocalPrimarySelectedUnitStatus);
+		const bool bSummaryChanged =
+			(PreviousSummaryCount != LocalSelectionSummaryItems.Num()) ||
+			!AreSelectionSummaryItemsEqual(PreviousSummaryItems, LocalSelectionSummaryItems);
+
+		if (bPrimaryChanged || bStatusBecameValid || bSummaryChanged)
+		{
+			RefreshDynamicMappingContexts();
+			RefreshUIBridge();
+			RefreshSelectionVisualManager();
+		}
+		return;
+	}
+
+	// 선택은 살아 있지만 복제 동기화가 잠깐 늦는 프레임에서는
+	// 직전 유효 UnitId/Status를 유지한다.
 }
+
 
 bool ATWPlayerController::RefreshLocalPrimarySelectedUnitStatus()
 {
-	if (ClientSelectedEntities.IsEmpty())
+	const bool bHasAnyUnitSelection =
+		(HasAuthority() && ServerSelectedEntities.Num() > 0) ||
+		(ClientSelectedEntities.Num() > 0);
+
+	if (!bHasAnyUnitSelection)
 	{
 		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
 		bHasLocalPrimarySelectedUnitStatus = false;
@@ -2847,39 +3264,67 @@ bool ATWPlayerController::RefreshLocalPrimarySelectedUnitStatus()
 		return false;
 	}
 
-	UMassReplicationSubsystem* RepSubsystem = World->GetSubsystem<UMassReplicationSubsystem>();
-	if (!RepSubsystem)
+	UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+	if (!UnitSubsystem)
 	{
 		return false;
 	}
 
-	const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(ClientSelectedEntities[0]);
-	if (!EntityInfo)
+	if (HasAuthority() && ServerSelectedEntities.Num() > 0)
 	{
-		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
-		bHasLocalPrimarySelectedUnitStatus = false;
-		return false;
-	}
+		const FMassEntityHandle PrimaryEntityHandle = ServerSelectedEntities[0];
+		FName PrimaryUnitId = NAME_None;
+		FMassNetworkID PrimaryNetId;
+		int32 OwnerSlot = LocalSelectedOwnerPlayerSlot;
+		FTWUnitStatus Status;
 
-	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
-	if (!EntityManager.IsEntityActive(EntityInfo->Entity))
-	{
-		LocalPrimarySelectedUnitStatus = FTWUnitStatus();
-		bHasLocalPrimarySelectedUnitStatus = false;
-		return false;
-	}
+		if (!TryGetSelectionDataFromEntityHandle(
+			World,
+			PrimaryEntityHandle,
+			PrimaryUnitId,
+			PrimaryNetId,
+			&OwnerSlot,
+			&Status))
+		{
+			return false;
+		}
 
-	if (FTWStatusFragment* StatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(EntityInfo->Entity))
-	{
-		LocalPrimarySelectedUnitStatus = StatusFragment->GetMutableStatus();
+		LocalPrimarySelectedUnitId = PrimaryUnitId;
+		LocalPrimarySelectedUnitNetId = PrimaryNetId;
+		LocalSelectedOwnerPlayerSlot = OwnerSlot;
+		LocalPrimarySelectedUnitStatus = Status;
 		bHasLocalPrimarySelectedUnitStatus = true;
 		return true;
 	}
 
-	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
-	bHasLocalPrimarySelectedUnitStatus = false;
-	return false;
+	FMassNetworkID PrimaryNetId = LocalPrimarySelectedUnitNetId;
+	FName PrimaryUnitId = LocalPrimarySelectedUnitId;
+	if (!PrimaryNetId.IsValid() || PrimaryUnitId.IsNone())
+	{
+		if (!TryResolveLocalPrimarySelectedUnitFromClientSelection(PrimaryUnitId, PrimaryNetId))
+		{
+			return false;
+		}
+		LocalPrimarySelectedUnitId = PrimaryUnitId;
+		LocalPrimarySelectedUnitNetId = PrimaryNetId;
+	}
+
+	int32 OwnerSlot = LocalSelectedOwnerPlayerSlot;
+	UnitSubsystem->TryGetUnitOwnerPlayerSlot(PrimaryNetId, OwnerSlot);
+
+	FTWUnitStatus Status = UnitSubsystem->GetUnitCurrentStatus(PrimaryNetId, OwnerSlot);
+	float CurrentHP = 0.f;
+	if (!UnitSubsystem->TryGetUnitCurrentHP(PrimaryNetId, OwnerSlot, CurrentHP))
+	{
+		return false;
+	}
+
+	Status.SetStatus(ETWStatusType::Health, CurrentHP);
+	LocalPrimarySelectedUnitStatus = Status;
+	bHasLocalPrimarySelectedUnitStatus = true;
+	return true;
 }
+
 
 void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	const TArray<FMassNetworkID>& InNetworkIds,
@@ -2893,35 +3338,19 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	LocalSelectedUnitCount = InNetworkIds.Num();
 	ClientSelectedEntities = InNetworkIds;
 
-	UMassReplicationSubsystem* RepSubsystem = GetWorld()->GetSubsystem<UMassReplicationSubsystem>();
-	if (RepSubsystem)
+	TArray<FName> UnitIds;
+	ResolveLocalSelectedUnitIds(UnitIds);
+	if (UnitIds.Num() > 0)
 	{
-		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*GetWorld());
-		TArray<FName> UnitIds;
+		RebuildLocalSelectionSummary(UnitIds);
+	}
 
-		for (const FMassNetworkID& NetID : InNetworkIds)
-		{
-			const FMassReplicationEntityInfo* EntityInfo = RepSubsystem->GetEntityInfoMap().Find(NetID);
-			if (!EntityInfo)
-			{
-				continue;
-			}
-
-			const FMassEntityHandle EntityHandle = EntityInfo->Entity;
-			const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(EntityHandle);
-			if (!UnitFragment)
-			{
-				continue;
-			}
-
-			UnitIds.Add(UnitFragment->GetUnitID());
-		}
-
-		if (UnitIds.Num() > 0)
-		{
-			LocalPrimarySelectedUnitId = UnitIds[0];
-			RebuildLocalSelectionSummary(UnitIds);
-		}
+	FName ResolvedPrimaryUnitId = NAME_None;
+	FMassNetworkID ResolvedPrimaryNetId;
+	if (TryResolveLocalPrimarySelectedUnitFromClientSelection(ResolvedPrimaryUnitId, ResolvedPrimaryNetId))
+	{
+		LocalPrimarySelectedUnitId = ResolvedPrimaryUnitId;
+		LocalPrimarySelectedUnitNetId = ResolvedPrimaryNetId;
 	}
 
 	LocalPrimarySelectedUnitStatus = FTWUnitStatus();
@@ -2938,6 +3367,7 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	RefreshUIBridge();
 	RefreshSelectionVisualManager();
 }
+
 
 void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBuilding* InBuilding)
 {
@@ -3793,6 +4223,43 @@ void ATWPlayerController::NotifyResourceStateChanged()
 	}
 
 	RefreshUIBridge();
+}
+
+void ATWPlayerController::OnPlayerStateHeroChanged(FName InHeroUnitId)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogTWCommand,
+		Log,
+		TEXT("[Selection] OnPlayerStateHeroChanged | Player=%s | HeroId=%s | SelectedCount=%d | OwnerSlot=%d"),
+		*GetNameSafe(this),
+		*InHeroUnitId.ToString(),
+		LocalSelectedUnitCount,
+		LocalSelectedOwnerPlayerSlot
+	);
+
+	if (SelectedBuilding)
+	{
+		RefreshDynamicMappingContexts();
+		RefreshUIBridge();
+		RefreshSelectionVisualManager();
+		return;
+	}
+
+	const ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (PS && LocalSelectedOwnerPlayerSlot == INDEX_NONE && LocalSelectedUnitCount > 0)
+	{
+		LocalSelectedOwnerPlayerSlot = PS->PlayerSlot;
+	}
+
+	RefreshLocalSelectionRuntimeData();
+	RefreshDynamicMappingContexts();
+	RefreshUIBridge();
+	RefreshSelectionVisualManager();
 }
 #pragma endregion
 

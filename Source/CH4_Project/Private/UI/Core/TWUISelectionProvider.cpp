@@ -330,14 +330,40 @@ void UTWUISelectionProvider::RefreshFromSourceIfNeeded() const
 	if (TWPC->GetLocalSelectedUnitCount() > 0)
 	{
 		UTWUISelectionProvider* MutableThis = const_cast<UTWUISelectionProvider*>(this);
+		const TArray<FMassNetworkID>& SelectedNetIds = TWPC->GetLocalSelectedUnitNetIds();
+		FName ResolvedSelectionId = TWPC->GetLocalPrimarySelectedUnitId();
+		UTWUnitSubsystem* UnitSubsystem = TWPC->GetWorld() ? TWPC->GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+
+		if (ResolvedSelectionId.IsNone() && SelectedNetIds.Num() == 1 && UnitSubsystem)
+		{
+			UnitSubsystem->TryGetUnitID(SelectedNetIds[0], ResolvedSelectionId);
+		}
+
+		if (ResolvedSelectionId.IsNone() && TWPC->GetLocalSelectionSummaryItems().Num() == 1)
+		{
+			ResolvedSelectionId = TWPC->GetLocalSelectionSummaryItems()[0].EntityId;
+		}
+
+		if (ResolvedSelectionId.IsNone())
+		{
+			return;
+		}
 
 		MutableThis->CachedSelectionViewModel = FSelectionViewModel();
 		MutableThis->CachedSelectionViewModel.SelectionType =
 			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewType::Multi : ESelectionViewType::Unit;
 		MutableThis->CachedSelectionViewModel.ViewMode =
 			(TWPC->GetLocalSelectedUnitCount() > 1) ? ESelectionViewMode::Multi : ESelectionViewMode::Single;
-		MutableThis->CachedSelectionViewModel.SelectionId = TWPC->GetLocalPrimarySelectedUnitId();
+		MutableThis->CachedSelectionViewModel.SelectionId = ResolvedSelectionId;
+		MutableThis->CachedSelectionViewModel.DisplayName =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? TEXT("Selected Units") : ResolvedSelectionId.ToString();
+		MutableThis->CachedSelectionViewModel.TypeLabel =
+			(TWPC->GetLocalSelectedUnitCount() > 1) ? TEXT("Units") : TEXT("Unit");
 		MutableThis->CachedSelectionViewModel.TotalSelectedCount = TWPC->GetLocalSelectedUnitCount();
+		MutableThis->CachedSelectionViewModel.CountLabel =
+			(TWPC->GetLocalSelectedUnitCount() > 1)
+			? FString::Printf(TEXT("%d Selected"), TWPC->GetLocalSelectedUnitCount())
+			: TEXT("");
 		MutableThis->CachedSelectionViewModel.SummaryItems = TWPC->GetLocalSelectionSummaryItems();
 		MutableThis->CachedSelectionViewModel.bShowDetailStats =
 			(TWPC->GetLocalSelectedUnitCount() == 1);
