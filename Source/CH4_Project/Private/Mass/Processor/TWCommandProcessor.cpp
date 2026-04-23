@@ -113,13 +113,6 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					EntitiesToSignalPathInit.Add(Entity);
 					break;
 				case ETWMassCommand::AttackToLocation:
-					{
-						UE::Math::TVector<double> MyLocation = TransformFragments[EntityIdx].GetTransform().
-							GetLocation();
-						UE::Math::TVector<double> TargetLocation = CommandFragments[EntityIdx].GetLocation();
-						UE_LOG(LogTWEntity, Warning, TEXT("%lf, %lf, %lf -> %lf, %lf, %lf"), MyLocation.X, MyLocation.Y,
-						       MyLocation.Z, TargetLocation.X, TargetLocation.Y, TargetLocation.Z)
-					}
 
 					Context.Defer().RemoveTag<FTWMassChasingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
@@ -136,8 +129,14 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
 					Context.Defer().AddTag<FTWMassChasingTag>(Entity);
 
-					AttackFragments[EntityIdx].bIsTargetSet = true;
-					AttackFragments[EntityIdx].TargetEntity = CommandFragments[EntityIdx].GetTarget();
+					if (CommandFragments[EntityIdx].GetTarget().IsValid())
+					{
+						AttackFragments[EntityIdx].SetTargetEntity(CommandFragments[EntityIdx].GetTarget());
+					}else if (IsValid(CommandFragments[EntityIdx].GetTargetBuilding()))
+					{
+						AttackFragments[EntityIdx].SetTargetBuilding(CommandFragments[EntityIdx].GetTargetBuilding());
+					}
+					
 					if (CommandFragments[EntityIdx].GetTarget().IsValid())
 					{
 						CommandFragments[EntityIdx].SetMoveDestination( EntityManager.GetFragmentDataPtr<FTransformFragment>(CommandFragments[EntityIdx].GetTarget())->GetTransform().GetLocation());
@@ -155,7 +154,6 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
 					Context.Defer().RemoveTag<FTWMassChasingTag>(Entity);
 #pragma region Stand
-					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
 					CommandFragments[EntityIdx].SetMoveDestination( AgentNavLocation);
 					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
 
@@ -187,7 +185,6 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					break;
 				case ETWMassCommand::MoveToLocation:
 #pragma region Stand
-					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
 					CommandFragments[EntityIdx].SetMoveDestination( AgentNavLocation);
 					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
 
@@ -223,8 +220,8 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 						}
 						if (DistSquared < 10000.0f)
 						{
-#pragma region Stand
 							CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
+#pragma region Stand
 							CommandFragments[EntityIdx].SetMoveDestination( AgentNavLocation);
 
 							MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
@@ -241,9 +238,7 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 							Context.Defer().RemoveTag<FTWMassHoldTag>(Entity);
 							Context.Defer().RemoveTag<FTWMassMovingTag>(Entity);
 							Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
-							continue;
 #pragma endregion
-					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
 						}
 						else
 						{
@@ -254,7 +249,6 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					break;
 				case ETWMassCommand::AttackToLocation:
 #pragma region Stand
-					CommandFragments[EntityIdx].SetType(ETWMassCommand::None);
 					CommandFragments[EntityIdx].SetMoveDestination(AgentNavLocation);
 
 					MoveTarget.CreateNewAction(EMassMovementAction::Stand, *World);
@@ -295,11 +289,12 @@ void UTWCommandProcessor::SignalEntities(FMassEntityManager& EntityManager, FMas
 					break;
 				case ETWMassCommand::AttackToLocation:
 					Context.Defer().RemoveTag<FTWMassAttackingTag>(Entity);
-					Context.Defer().RemoveTag<FTWMassChasingTag>(Entity);
 					Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
 					CommandFragments[EntityIdx].SetMoveDestination(CommandFragments[EntityIdx].GetLocation());
-
+					
+					AttackFragments[EntityIdx].LastSearchTime = 0.f;
+					
 					EntitiesToSignalPathInit.Add(Entity);
 					break;
 				case ETWMassCommand::AttackToTarget:

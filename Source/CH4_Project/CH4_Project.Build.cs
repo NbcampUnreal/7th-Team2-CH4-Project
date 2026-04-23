@@ -33,7 +33,8 @@ public class CH4_Project : ModuleRules
 			"MassEQS",
 			"NetCore", "CommonUI",
 			"NavCorridor",
-			"Landscape"
+			"Landscape",
+			"MassLOD"
 			
 		});
 

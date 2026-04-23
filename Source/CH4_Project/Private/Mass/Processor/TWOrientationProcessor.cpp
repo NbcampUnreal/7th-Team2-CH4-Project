@@ -62,15 +62,15 @@ void UTWOrientationProcessor::Execute(FMassEntityManager& EntityManager,
 				const FMassMoveTargetFragment& MoveTarget = MoveTargetList[EntityIt];
 				
 				const FMassEntityHandle Entity = Context.GetEntity(EntityIt);
-				const FMassEntityHandle TargetEntity = AttackList[EntityIt].TargetEntity;
-				ATWBaseBuilding* TargetBuilding = AttackList[EntityIt].TargetBuilding.Get();
+				const FMassEntityHandle TargetEntity = AttackList[EntityIt].GetTargetEntity();
+				ATWBaseBuilding* TargetBuilding = AttackList[EntityIt].GetTargetBuilding();
 				// Do not touch transform at all when animating
 				if (MoveTarget.GetCurrentAction() == EMassMovementAction::Animate)
 				{
 					continue;
 				}
 				bool bIsEntityValid = Context.GetEntityManagerChecked().IsEntityValid(TargetEntity);
-				bool bIsBuildingValid = AttackList[EntityIt].TargetBuilding.IsValid();
+				bool bIsBuildingValid = IsValid(AttackList[EntityIt].GetTargetBuilding());
 				FVector CurrentLocation = LocationList[EntityIt].GetTransform().GetLocation();
 				FVector TargetLocation = FVector::ZeroVector;
 				if (!bIsEntityValid && !bIsBuildingValid)

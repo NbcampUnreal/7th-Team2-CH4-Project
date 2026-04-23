@@ -188,9 +188,9 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 		for (int32 EntityIdx = 0; EntityIdx < Context.GetNumEntities(); EntityIdx++)
 		{
 			const FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-			const FMassEntityHandle TargetEntity = AttackList[EntityIdx].TargetEntity;
-			ATWBaseBuilding* TargetBuilding = AttackList[EntityIdx].TargetBuilding.Get();
-			if (false == AttackList[EntityIdx].bIsTargetSet)
+			const FMassEntityHandle TargetEntity = AttackList[EntityIdx].GetTargetEntity();
+			ATWBaseBuilding* TargetBuilding = AttackList[EntityIdx].GetTargetBuilding();
+			if (false == AttackList[EntityIdx].GetIsTargetSet())
 			{
 				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
@@ -198,11 +198,11 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 
 
 			bool bIsEntityValid = EntityManager.IsEntityValid(TargetEntity);
-			bool bIsBuildingValid = AttackList[EntityIdx].TargetBuilding.IsValid();
+			bool bIsBuildingValid = IsValid(TargetBuilding);
 			
 			if (!bIsEntityValid && !bIsBuildingValid)
 			{
-				AttackList[EntityIdx].bIsTargetSet = false;
+				AttackList[EntityIdx].ClearTarget();
 				EntitiesToSignalAttackComplete.Add(Entity);
 				continue;
 			}
@@ -212,7 +212,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					TargetEntity);
 				if (!EnemyStatusFragment || EnemyStatusFragment->GetIsDeath())
 				{
-					AttackList[EntityIdx].bIsTargetSet = false;
+					AttackList[EntityIdx].ClearTarget();
 					EntitiesToSignalAttackComplete.Add(Entity);
 					continue;
 				}
@@ -226,7 +226,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					EntityManager.GetFragmentDataPtr<FTransformFragment>(TargetEntity);
 				if (!TargetTransformFragment)
 				{
-					AttackList[EntityIdx].bIsTargetSet = false;
+					AttackList[EntityIdx].ClearTarget();
 					EntitiesToSignalAttackComplete.Add(Entity);
 					continue;
 				}
@@ -241,7 +241,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					
 					if (CommandList[EntityIdx].GetType() == ETWMassCommand::Hold)
 					{
-						AttackList[EntityIdx].bIsTargetSet = false;
+						AttackList[EntityIdx].ClearTarget();
 						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 					}else 
 					{
@@ -307,7 +307,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			{
 				if (TargetBuilding->IsDead())
 				{
-					AttackList[EntityIdx].bIsTargetSet = false;
+					AttackList[EntityIdx].ClearTarget();
 					EntitiesToSignalAttackComplete.Add(Entity);
 					continue;
 				}
@@ -322,7 +322,7 @@ void UTWAttackProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 					
 					if (CommandList[EntityIdx].GetType() == ETWMassCommand::Hold)
 					{
-						AttackList[EntityIdx].bIsTargetSet = false;
+						AttackList[EntityIdx].ClearTarget();
 						Context.Defer().AddTag<FTWMassSearchingTag>(Entity);
 						
 					}else if (CommandList[EntityIdx].GetType() == ETWMassCommand::AttackToLocation)

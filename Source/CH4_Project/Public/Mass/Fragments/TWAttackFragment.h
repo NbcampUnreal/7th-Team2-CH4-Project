@@ -12,12 +12,22 @@ struct FTWAttackFragment : public FMassFragment
 	GENERATED_BODY()
 	
 	FTWAttackFragment() = default;
-	FMassEntityHandle TargetEntity;
-	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
 	float LastSearchTime = 0.0f;
 	float LastAttackTime = 0.0f;
 	float LastChasingTime = 0.0f;
 	float LastAttackAnimationTime = 0.0f;
+public:
+	void SetTargetEntity(const FMassEntityHandle& InTargetEntity){ClearTarget(); TargetEntity = InTargetEntity; bIsTargetSet = true;}
+	void SetTargetBuilding(ATWBaseBuilding* InTargetBuilding){ClearTarget(); TargetBuilding = InTargetBuilding; bIsTargetSet = true;}
+	FMassEntityHandle GetTargetEntity() const {return TargetEntity;}
+	ATWBaseBuilding* GetTargetBuilding() const {return TargetBuilding.Get();}
+	void ClearTarget(){bIsTargetSet = false; TargetEntity = FMassEntityHandle(); TargetBuilding.Reset();}
+	
+	uint8 GetIsTargetSet() const {return bIsTargetSet;}
+private:
+	FMassEntityHandle TargetEntity;
+	TWeakObjectPtr<ATWBaseBuilding> TargetBuilding;
+	
 	uint8 bIsTargetSet = false;
 	
 };
