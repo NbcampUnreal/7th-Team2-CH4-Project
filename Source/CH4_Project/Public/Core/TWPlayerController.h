@@ -79,6 +79,11 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool IsHeroSkillReady() const;
+	
+	void HandleUnitKilledSelectionClear(const FMassEntityHandle& DeadEntity);
+
+	UFUNCTION(Client, Reliable)
+	void ClientClearSelectionByDeath();
 
 protected:
 	virtual void SetupInputComponent() override;

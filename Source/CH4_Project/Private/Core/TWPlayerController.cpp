@@ -1676,6 +1676,45 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 
 	return bIsEdgeScrollingNow;
 }
+
+void ATWPlayerController::HandleUnitKilledSelectionClear(const FMassEntityHandle& DeadEntity)
+{
+	if (!HasAuthority() || !DeadEntity.IsSet())
+	{
+		return;
+	}
+
+	bool bWasSelected = false;
+
+	for (const FMassEntityHandle& SelectedEntity : ServerSelectedEntities)
+	{
+		if (SelectedEntity == DeadEntity)
+		{
+			bWasSelected = true;
+			break;
+		}
+	}
+
+	if (!bWasSelected)
+	{
+		return;
+	}
+
+	ServerSelectedEntities.Empty();
+	SelectedBuilding = nullptr;
+
+	ClientClearSelectionByDeath();
+
+	if (IsLocalController())
+	{
+		ClientClearSelectionByDeath_Implementation();
+	}
+}
+
+void ATWPlayerController::ClientClearSelectionByDeath_Implementation()
+{
+	ClientClearSelection_Implementation();
+}
 #pragma endregion
 
 #pragma region 병력 스폰 대기열 / 인구 수 대기열 / 연구소 대기열
@@ -3239,6 +3278,18 @@ void ATWPlayerController::RefreshLocalSelectionRuntimeData()
 		}
 		return;
 	}
+	
+	TArray<FName> RemainingUnitIds;
+	ResolveLocalSelectedUnitIds(RemainingUnitIds);
+
+	if (RemainingUnitIds.Num() <= 0)
+	{
+		ClearLocalSelectionCache();
+		RefreshDynamicMappingContexts();
+		RefreshUIBridge();
+		RefreshSelectionVisualManager();
+		return;
+	}
 
 	// 선택은 살아 있지만 복제 동기화가 잠깐 늦는 프레임에서는
 	// 직전 유효 UnitId/Status를 유지한다.
@@ -3332,6 +3383,22 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	bool bInHasPrimaryHealth,
 	int32 InSelectedOwnerPlayerSlot)
 {
+	if (bBuildShortcutModeActive)
+	{
+		if (BuildComponent && BuildComponent->GetBuildMode())
+		{
+			BuildComponent->EndBuildMode();
+		}
+
+		bBuildShortcutModeActive = false;
+		ClearArmedCommandId();
+
+		if (PlayerUIControllerComponent)
+		{
+			PlayerUIControllerComponent->RefreshBuildModeNotification();
+		}
+	}
+	
 	ClearLocalSelectionCache();
 
 	LocalSelectedOwnerPlayerSlot = InSelectedOwnerPlayerSlot;
@@ -3371,6 +3438,22 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 
 void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBuilding* InBuilding)
 {
+	if (bBuildShortcutModeActive)
+	{
+		if (BuildComponent && BuildComponent->GetBuildMode())
+		{
+			BuildComponent->EndBuildMode();
+		}
+
+		bBuildShortcutModeActive = false;
+		ClearArmedCommandId();
+
+		if (PlayerUIControllerComponent)
+		{
+			PlayerUIControllerComponent->RefreshBuildModeNotification();
+		}
+	}
+	
 	ClearLocalSelectionCache();
 	SelectedBuilding = InBuilding;
 

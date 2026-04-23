@@ -939,6 +939,17 @@ void UTWUnitSubsystem::OnUnitKilled(FMassEntityHandle& Unit)
 
 	const FName DeadUnitId = UnitFragment->GetUnitID();
 	const int32 OwnerPlayerSlot = UnitFragment->GetOwner();
+	
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TWPC = Cast<ATWPlayerController>(It->Get());
+		if (!TWPC)
+		{
+			continue;
+		}
+
+		TWPC->HandleUnitKilledSelectionClear(Unit);
+	}
 
 	if (IsHeroUnitId(DeadUnitId))
 	{
