@@ -26,13 +26,6 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTWMenuButtonWidget> ButtonSlot0;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTWMenuButtonWidget> ButtonSlot1;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTWMenuButtonWidget> ButtonSlot2;
-
 private:
 	void ApplySlotData(int32 SlotIndex, const FMenuButtonViewModel& InData);
 

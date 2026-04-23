@@ -28,9 +28,6 @@ protected:
 	TObjectPtr<UBorder> MinimapSurface;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> TextTitle;
-
-	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> DisabledOverlay;
 	
 	UPROPERTY(meta = (BindWidgetOptional))
