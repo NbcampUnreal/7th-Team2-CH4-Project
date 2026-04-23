@@ -53,6 +53,7 @@
 #include "Particles/ParticleSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "FOW/TWFogManager.h"
 #include "Log/TWLogCategory.h"
 
 namespace
@@ -417,6 +418,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	}
 
 	RefreshLocalSelectionRuntimeData();
+	HandleHiddenEnemySelectionByFog();
 
 	if (PlayerSelectionVisualComponent)
 	{
@@ -779,6 +781,12 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 	{
 		if (ATWBaseBuilding* ClickedBuilding = Cast<ATWBaseBuilding>(HitResult.GetActor()))
 		{
+			if (IsEnemyBuildingHiddenByFog(ClickedBuilding))
+			{
+				ServerHandleBuildingSelect(nullptr);
+				return;
+			}
+
 			ServerHandleBuildingSelect(ClickedBuilding);
 			return;
 		}
@@ -1330,6 +1338,11 @@ void ATWPlayerController::ServerHandleSingleSelect_Implementation(const FVector&
 			{
 				continue;
 			}
+			
+			if (OtherPS->PlayerSlot != TWPS->PlayerSlot && IsLocationHiddenByFog(EntityLocation))
+			{
+				continue;
+			}
 
 			if (DistanceSq < BestDistanceSq)
 			{
@@ -1405,7 +1418,7 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		};
 
 	auto FindBestBuildingInRect =
-		[World, &RectMin, &RectMax, &RectCenter](const bool bRequireOwnedByMe, const int32 InMyPlayerSlot)
+		[this, World, &RectMin, &RectMax, &RectCenter](const bool bRequireOwnedByMe, const int32 InMyPlayerSlot)
 		{
 			ATWBaseBuilding* BestBuilding = nullptr;
 			float BestDistanceSq = TNumericLimits<float>::Max();
@@ -1425,6 +1438,11 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 				}
 
 				if (!DoesBuildingOverlapSelectionRect2D(Building, RectMin, RectMax))
+				{
+					continue;
+				}
+				
+				if (!bRequireOwnedByMe && IsEnemyBuildingHiddenByFog(Building))
 				{
 					continue;
 				}
@@ -1536,6 +1554,11 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 			}
 
 			if (!IsPointInsideSelectionRect2D(EnemyLocation, RectMin, RectMax))
+			{
+				continue;
+			}
+			
+			if (IsLocationHiddenByFog(EnemyLocation))
 			{
 				continue;
 			}
@@ -1675,6 +1698,231 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	}
 
 	return bIsEdgeScrollingNow;
+}
+
+bool ATWPlayerController::IsLocationHiddenByFog(const FVector& InWorldLocation) const
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	ATWFogManager* FogManager = nullptr;
+	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
+	{
+		FogManager = *It;
+		break;
+	}
+
+	if (!FogManager)
+	{
+		return false;
+	}
+
+	return !FogManager->IsLocationVisible(InWorldLocation);
+}
+
+bool ATWPlayerController::IsEnemyBuildingHiddenByFog(const ATWBaseBuilding* InBuilding) const
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	if (!IsValid(InBuilding))
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	if (InBuilding->OwnerPlayerSlot == LocalPS->PlayerSlot)
+	{
+		return false;
+	}
+
+	return IsLocationHiddenByFog(InBuilding->GetActorLocation());
+}
+
+bool ATWPlayerController::ShouldClearCurrentSelectionByFog() const
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	if (SelectedBuilding)
+	{
+		if (SelectedBuilding->OwnerPlayerSlot == LocalPS->PlayerSlot)
+		{
+			return false;
+		}
+
+		return IsLocationHiddenByFog(SelectedBuilding->GetActorLocation());
+	}
+
+	if (ClientSelectedEntities.Num() != 1)
+	{
+		return false;
+	}
+
+	if (LocalSelectedOwnerPlayerSlot == LocalPS->PlayerSlot)
+	{
+		return false;
+	}
+
+	FVector SelectedUnitLocation = FVector::ZeroVector;
+	bool bResolvedLocation = false;
+
+	if (HasAuthority() && ServerSelectedEntities.Num() == 1 && ServerSelectedEntities[0].IsSet())
+	{
+		bResolvedLocation = TryGetEntityWorldLocation(
+			GetWorld(),
+			ServerSelectedEntities[0],
+			SelectedUnitLocation
+		);
+	}
+	else
+	{
+		const UTWUnitSubsystem* UnitSubsystem =
+			GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+		if (!UnitSubsystem)
+		{
+			return false;
+		}
+
+		const FMassNetworkID SelectedNetId = ClientSelectedEntities[0];
+		if (!SelectedNetId.IsValid())
+		{
+			return false;
+		}
+
+		bResolvedLocation = UnitSubsystem->TryGetUnitVisualLocation(
+			SelectedNetId,
+			SelectedUnitLocation
+		);
+
+		if (!bResolvedLocation)
+		{
+			bResolvedLocation = UnitSubsystem->TryGetUnitHPBarWorldLocation(
+				SelectedNetId,
+				SelectedUnitLocation
+			);
+		}
+	}
+
+	if (!bResolvedLocation)
+	{
+		return false;
+	}
+
+	return IsLocationHiddenByFog(SelectedUnitLocation);
+}
+
+void ATWPlayerController::HandleHiddenEnemySelectionByFog()
+{
+	if (!ShouldClearCurrentSelectionByFog())
+	{
+		return;
+	}
+
+	ServerHandleBuildingSelect(nullptr);
+}
+
+bool ATWPlayerController::ShouldRejectIncomingUnitSelectionByFog(const TArray<FMassNetworkID>& InNetworkIds,
+	int32 InSelectedOwnerPlayerSlot) const
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	if (InSelectedOwnerPlayerSlot == LocalPS->PlayerSlot)
+	{
+		return false;
+	}
+
+	if (InNetworkIds.Num() != 1)
+	{
+		return false;
+	}
+
+	const UTWUnitSubsystem* UnitSubsystem =
+		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	if (!UnitSubsystem)
+	{
+		return false;
+	}
+
+	const FMassNetworkID SelectedNetId = InNetworkIds[0];
+	if (!SelectedNetId.IsValid())
+	{
+		return false;
+	}
+
+	FVector SelectedUnitLocation = FVector::ZeroVector;
+
+	bool bResolvedLocation = UnitSubsystem->TryGetUnitVisualLocation(
+		SelectedNetId,
+		SelectedUnitLocation
+	);
+
+	if (!bResolvedLocation)
+	{
+		bResolvedLocation = UnitSubsystem->TryGetUnitHPBarWorldLocation(
+			SelectedNetId,
+			SelectedUnitLocation
+		);
+	}
+
+	if (!bResolvedLocation)
+	{
+		return false;
+	}
+
+	return IsLocationHiddenByFog(SelectedUnitLocation);
+}
+
+bool ATWPlayerController::ShouldRejectIncomingBuildingSelectionByFog(const ATWBaseBuilding* InBuilding) const
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	if (!IsValid(InBuilding))
+	{
+		return false;
+	}
+
+	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
+	if (!LocalPS)
+	{
+		return false;
+	}
+
+	if (InBuilding->OwnerPlayerSlot == LocalPS->PlayerSlot)
+	{
+		return false;
+	}
+
+	return IsLocationHiddenByFog(InBuilding->GetActorLocation());
 }
 
 void ATWPlayerController::HandleUnitKilledSelectionClear(const FMassEntityHandle& DeadEntity)
@@ -3389,6 +3637,12 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 	bool bInHasPrimaryHealth,
 	int32 InSelectedOwnerPlayerSlot)
 {
+	if (ShouldRejectIncomingUnitSelectionByFog(InNetworkIds, InSelectedOwnerPlayerSlot))
+	{
+		ClientClearSelection_Implementation();
+		return;
+	}
+	
 	if (bBuildShortcutModeActive)
 	{
 		if (BuildComponent && BuildComponent->GetBuildMode())
@@ -3444,6 +3698,12 @@ void ATWPlayerController::ClientApplyUnitSelection_Implementation(
 
 void ATWPlayerController::ClientApplyBuildingSelection_Implementation(ATWBaseBuilding* InBuilding)
 {
+	if (ShouldRejectIncomingBuildingSelectionByFog(InBuilding))
+	{
+		ClientClearSelection_Implementation();
+		return;
+	}
+	
 	if (bBuildShortcutModeActive)
 	{
 		if (BuildComponent && BuildComponent->GetBuildMode())
