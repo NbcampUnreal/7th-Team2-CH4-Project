@@ -336,6 +336,9 @@ void UTWSteerToMoveTargetProcessor::Execute(FMassEntityManager& EntityManager, F
 				Force.Value = FVector::ZeroVector;
 				DesiredMovement.DesiredVelocity = FVector::ZeroVector;
 			}
+			
+
+			
 
 #if WITH_MASSGAMEPLAY_DEBUG
 			FColor EntityColor = FColor::White;
