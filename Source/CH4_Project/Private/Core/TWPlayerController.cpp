@@ -2642,12 +2642,16 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 }
 void ATWPlayerController::BeginHeroSkillTargeting(FName InHeroUnitId)
 {
+	ClearArmedCommandId();
+	
 	bHeroSkillTargetingMode = true;
 	PendingHeroSkillUnitId = InHeroUnitId;
 
 	const float TargetRadius = ResolveHeroSkillTargetRadius(InHeroUnitId);
 	ApplyHeroSkillTargetDecalStyle(InHeroUnitId, TargetRadius);
 	UpdateHeroSkillTargetDecal(GetMouseWorldLocation());
+	
+	UpdateInputOverlayState();
 }
 
 void ATWPlayerController::ConfirmHeroSkillTargeting()
@@ -2662,7 +2666,6 @@ void ATWPlayerController::ConfirmHeroSkillTargeting()
 
 	if (HeroUnitId.IsNone())
 	{
-		UE_LOG(LogTWCommand, Warning, TEXT("[HeroSkill] Confirm failed: PendingHeroSkillUnitId is None"));
 		HideHeroSkillTargetDecal();
 		bHeroSkillTargetingMode = false;
 		PendingHeroSkillUnitId = NAME_None;
@@ -2672,9 +2675,10 @@ void ATWPlayerController::ConfirmHeroSkillTargeting()
 	ServerUseHeroSkill(TargetLocation, HeroUnitId);
 
 	HideHeroSkillTargetDecal();
-
 	bHeroSkillTargetingMode = false;
 	PendingHeroSkillUnitId = NAME_None;
+	
+	UpdateInputOverlayState();
 }
 
 void ATWPlayerController::CancelHeroSkillTargeting()
@@ -2683,6 +2687,8 @@ void ATWPlayerController::CancelHeroSkillTargeting()
 
 	bHeroSkillTargetingMode = false;
 	PendingHeroSkillUnitId = NAME_None;
+	
+	UpdateInputOverlayState();
 }
 void ATWPlayerController::UpdateHeroSkillTargeting()
 {
@@ -3924,6 +3930,11 @@ bool ATWPlayerController::TryResolveBuildingCategoryFromPayload(
 
 void ATWPlayerController::SetArmedCommandId(FName InCommandId)
 {
+	if (bHeroSkillTargetingMode)
+	{
+		CancelHeroSkillTargeting();
+	}
+	
 	ArmedCommandId = InCommandId;
 	UpdateInputOverlayState();
 }
@@ -4354,7 +4365,14 @@ void ATWPlayerController::UpdateInputOverlayState()
 		return;
 	}
 
-	PlayerUIControllerComponent->UpdateInputOverlayState(ArmedCommandId);
+	if (bHeroSkillTargetingMode)
+	{
+		PlayerUIControllerComponent->UpdateInputOverlayState(TEXT("HeroSkill"));
+	}
+	else
+	{
+		PlayerUIControllerComponent->UpdateInputOverlayState(ArmedCommandId);
+	}
 }
 
 void ATWPlayerController::UpdateDragSelectionOverlay()
