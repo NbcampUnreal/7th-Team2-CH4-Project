@@ -53,10 +53,7 @@
 #include "Particles/ParticleSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
-#include "FOW/TWFogManager.h"
 #include "Log/TWLogCategory.h"
-
-class ATWFogManager;
 
 namespace
 {
@@ -420,8 +417,7 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 	}
 
 	RefreshLocalSelectionRuntimeData();
-	HandleHiddenEnemySelectionByFog();
-	
+
 	if (PlayerSelectionVisualComponent)
 	{
 		PlayerSelectionVisualComponent->TickVisuals(DeltaSeconds);
@@ -783,18 +779,7 @@ void ATWPlayerController::OnEndLeftMouseAction(const FInputActionValue& InputAct
 	{
 		if (ATWBaseBuilding* ClickedBuilding = Cast<ATWBaseBuilding>(HitResult.GetActor()))
 		{
-			if (IsEnemyBuildingHiddenByFog(ClickedBuilding))
-			{
-				return;
-			}
-
 			ServerHandleBuildingSelect(ClickedBuilding);
-			return;
-		}
-		
-		if (IsLocationHiddenByFog(ClickLocation))
-		{
-			ServerHandleBuildingSelect(nullptr);
 			return;
 		}
 
@@ -1420,7 +1405,7 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 		};
 
 	auto FindBestBuildingInRect =
-		[this, World, &RectMin, &RectMax, &RectCenter](const bool bRequireOwnedByMe, const int32 InMyPlayerSlot)
+		[World, &RectMin, &RectMax, &RectCenter](const bool bRequireOwnedByMe, const int32 InMyPlayerSlot)
 		{
 			ATWBaseBuilding* BestBuilding = nullptr;
 			float BestDistanceSq = TNumericLimits<float>::Max();
@@ -1440,11 +1425,6 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 				}
 
 				if (!DoesBuildingOverlapSelectionRect2D(Building, RectMin, RectMax))
-				{
-					continue;
-				}
-				
-				if (!bRequireOwnedByMe && IsEnemyBuildingHiddenByFog(Building))
 				{
 					continue;
 				}
@@ -1556,11 +1536,6 @@ void ATWPlayerController::ServerHandleMultipleSelect_Implementation(const FVecto
 			}
 
 			if (!IsPointInsideSelectionRect2D(EnemyLocation, RectMin, RectMax))
-			{
-				continue;
-			}
-			
-			if (IsLocationHiddenByFog(EnemyLocation))
 			{
 				continue;
 			}
@@ -1700,159 +1675,6 @@ bool ATWPlayerController::HandleScreenEdgeScrolling(float DeltaSeconds)
 	}
 
 	return bIsEdgeScrollingNow;
-}
-
-void ATWPlayerController::HandleHiddenEnemySelectionByFog()
-{
-	if (!ShouldClearCurrentSelectionByFog())
-	{
-		return;
-	}
-
-	ServerHandleBuildingSelect(nullptr);
-}
-
-bool ATWPlayerController::ShouldClearCurrentSelectionByFog() const
-{
-	if (!IsLocalController())
-	{
-		return false;
-	}
-
-	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
-	if (!LocalPS)
-	{
-		return false;
-	}
-
-	ATWFogManager* FogManager = nullptr;
-	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
-	{
-		FogManager = *It;
-		break;
-	}
-
-	if (!FogManager)
-	{
-		return false;
-	}
-
-	// 1) 건물 선택 중이면 적 건물 + 안개 여부 검사
-	if (SelectedBuilding)
-	{
-		if (SelectedBuilding->OwnerPlayerSlot == LocalPS->PlayerSlot)
-		{
-			return false;
-		}
-
-		return !FogManager->IsLocationVisible(SelectedBuilding->GetActorLocation());
-	}
-
-	// 2) 유닛 선택 중이면 지금 구조상 enemy 선택은 1개만 오므로 그 케이스만 검사
-	if (ClientSelectedEntities.Num() != 1)
-	{
-		return false;
-	}
-
-	if (LocalSelectedOwnerPlayerSlot == LocalPS->PlayerSlot)
-	{
-		return false;
-	}
-
-	const UTWUnitSubsystem* UnitSubsystem =
-		GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
-	if (!UnitSubsystem)
-	{
-		return false;
-	}
-
-	const FMassNetworkID SelectedNetId = ClientSelectedEntities[0];
-	if (!SelectedNetId.IsValid())
-	{
-		return false;
-	}
-
-	FVector SelectedUnitLocation = FVector::ZeroVector;
-
-	bool bResolvedLocation = UnitSubsystem->TryGetUnitVisualLocation(
-		SelectedNetId,
-		SelectedUnitLocation
-	);
-
-	if (!bResolvedLocation)
-	{
-		bResolvedLocation = UnitSubsystem->TryGetUnitHPBarWorldLocation(
-			SelectedNetId,
-			SelectedUnitLocation
-		);
-	}
-
-	if (!bResolvedLocation)
-	{
-		return false;
-	}
-
-	return !FogManager->IsLocationVisible(SelectedUnitLocation);
-}
-
-bool ATWPlayerController::IsEnemyBuildingHiddenByFog(const ATWBaseBuilding* InBuilding) const
-{
-	if (!IsLocalController())
-	{
-		return false;
-	}
-
-	if (!IsValid(InBuilding))
-	{
-		return false;
-	}
-
-	const ATWPlayerState* LocalPS = GetPlayerState<ATWPlayerState>();
-	if (!LocalPS)
-	{
-		return false;
-	}
-
-	if (InBuilding->OwnerPlayerSlot == LocalPS->PlayerSlot)
-	{
-		return false;
-	}
-
-	ATWFogManager* FogManager = nullptr;
-	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
-	{
-		FogManager = *It;
-		break;
-	}
-
-	if (!FogManager)
-	{
-		return false;
-	}
-
-	return !FogManager->IsLocationVisible(InBuilding->GetActorLocation());
-}
-
-bool ATWPlayerController::IsLocationHiddenByFog(const FVector& InWorldLocation) const
-{
-	if (!IsLocalController())
-	{
-		return false;
-	}
-
-	ATWFogManager* FogManager = nullptr;
-	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
-	{
-		FogManager = *It;
-		break;
-	}
-
-	if (!FogManager)
-	{
-		return false;
-	}
-
-	return !FogManager->IsLocationVisible(InWorldLocation);
 }
 
 void ATWPlayerController::HandleUnitKilledSelectionClear(const FMassEntityHandle& DeadEntity)
