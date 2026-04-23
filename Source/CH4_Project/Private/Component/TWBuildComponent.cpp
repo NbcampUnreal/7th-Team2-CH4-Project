@@ -167,7 +167,7 @@ void UTWBuildComponent::RequestBuild()
 		return;
 	}
 	
-	if (!GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize))
+	if (!GridSub->CanBuildArea(CurrentAnchor, CurrentGhost->BuildingSize, true))
 	{
 		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
 		return;
@@ -238,7 +238,7 @@ void UTWBuildComponent::Server_SpawnBuilding_Implementation(FIntPoint Anchor, FI
 		}
 	}
 	
-	if (!GridSub->CanBuildArea(Anchor, BuildSize))
+	if (!GridSub->CanBuildArea(Anchor, BuildSize, false))
 	{
 		UE_LOG(LogTWBuild, Warning, TEXT("[건설] 설치 실패: 배치 불가 위치"));
 		return;

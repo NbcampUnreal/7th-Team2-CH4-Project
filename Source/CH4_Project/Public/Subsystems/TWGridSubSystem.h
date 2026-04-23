@@ -41,7 +41,7 @@ public:
 	
 	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
-	bool CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize) const;
+	bool CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize, bool bCheckFogVisibility = true) const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Grid|Construction")
 	void OccupyArea(FIntPoint AnchorLocation, FIntPoint BuildingSize, AActor* BuildingAnchor);

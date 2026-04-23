@@ -146,16 +146,20 @@ FVector UTWGridSubSystem::GridToWorldPosition(const FIntPoint& GridLocation) con
 	return FVector(WorldX, WorldY, CachedZ);
 }
 
-bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize) const
+bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint BuildingSize, bool bCheckFogVisibility) const
 {
 	// 안개 매니저를 찾아 시야 확인 준비
 	ATWFogManager* FogManager = nullptr;
-	for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
+	
+	if (bCheckFogVisibility)
 	{
-		if (ATWFogManager* FoundActor = *It)
+		for (TActorIterator<ATWFogManager> It(GetWorld()); It; ++It)
 		{
-			FogManager = FoundActor;
-			break;
+			if (ATWFogManager* FoundActor = *It)
+			{
+				FogManager = FoundActor;
+				break;
+			}
 		}
 	}
 	
@@ -178,7 +182,7 @@ bool UTWGridSubSystem::CanBuildArea(FIntPoint AnchorLocation, FIntPoint Building
 				{
 					return false;
 				}
-			}
+			} 
 		}
 	}
 	
