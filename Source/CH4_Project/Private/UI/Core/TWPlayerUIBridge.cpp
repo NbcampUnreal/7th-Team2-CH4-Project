@@ -874,7 +874,6 @@ void UTWPlayerUIBridge::ForceRefreshSelectionFromGameplayEvent()
 		HUDCoordinator->RefreshSelectionPanel();
 	}
 }
-
 void UTWPlayerUIBridge::StartSelectionRefreshTimer(float InGraceSeconds)
 {
 	if (!OwnerController)
@@ -1343,6 +1342,7 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 	const bool bLocalUnitSelectionOwnedByMe =
 		LocalPS &&
 		(OwnerController->GetLocalSelectedOwnerPlayerSlot() == LocalPS->PlayerSlot);
+
 	UTWUnitSubsystem* UnitSubsystem =
 		OwnerController->GetWorld() ? OwnerController->GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
 
@@ -1381,7 +1381,8 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 				SelectedNetIds,
 				UnitSubsystem,
 				SelectionPresentationTable,
-				OutVM.SummaryItems);
+				OutVM.SummaryItems
+			);
 		}
 
 		if (OutVM.SummaryItems.IsEmpty())
@@ -1411,46 +1412,70 @@ bool UTWPlayerUIBridge::TryUnitSelectionVM(FSelectionViewModel& OutVM, TArray<FN
 		float CurrentHP = 0.f;
 		float MaxHP = 0.f;
 		bool bHasAnyHP = false;
+
 		FTWUnitStatus BaseStatus;
 		bool bHasBaseStatus = false;
+
 		int32 OwnerPlayerSlot = OwnerController->GetLocalSelectedOwnerPlayerSlot();
+
 		if (SelectedNetIds.Num() == 1 && UnitSubsystem)
 		{
-			UnitSubsystem->TryGetUnitOwnerPlayerSlot(SelectedNetIds[0], OwnerPlayerSlot);
+			int32 ResolvedOwnerPlayerSlot = INDEX_NONE;
+			if (UnitSubsystem->TryGetUnitOwnerPlayerSlot(SelectedNetIds[0], ResolvedOwnerPlayerSlot))
+			{
+				OwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+			}
+			else if (LocalPS)
+			{
+				OwnerPlayerSlot = LocalPS->PlayerSlot;
+			}
 		}
 
 		if (UnitSubsystem)
 		{
-			OutVM.DisplayName = TWUIBridgeSelectionHelpers::ResolveUnitDisplayName(UnitSubsystem, EffectiveSelectionId);
+			OutVM.DisplayName =
+				TWUIBridgeSelectionHelpers::ResolveUnitDisplayName(UnitSubsystem, EffectiveSelectionId);
+
 			BaseStatus = UnitSubsystem->GetUnitDefaultStatus(EffectiveSelectionId, OwnerPlayerSlot);
 			bHasBaseStatus = true;
+
+			// MaxHP는 업그레이드 반영 기본 스탯을 진실값으로 우선 사용
 			MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-			if (MaxHP > 0.f)
-			{
-				bHasAnyHP = true;
-			}
 		}
 
 		const FTWUnitStatus* RuntimeStatusPtr = nullptr;
 		FTWUnitStatus RuntimeStatus;
+		bool bResolvedCurrentHPFromSubsystem = false;
+
+		if (SelectedNetIds.Num() == 1 && UnitSubsystem)
+		{
+			bResolvedCurrentHPFromSubsystem =
+				UnitSubsystem->TryGetUnitCurrentHP(SelectedNetIds[0], OwnerPlayerSlot, CurrentHP);
+		}
+
 		if (OwnerController->HasLocalPrimarySelectedUnitStatus())
 		{
 			RuntimeStatus = OwnerController->GetLocalPrimarySelectedUnitStatus();
 			RuntimeStatusPtr = &RuntimeStatus;
-			CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
-			if (CurrentHP > 0.f)
+
+			if (!bResolvedCurrentHPFromSubsystem)
 			{
-				bHasAnyHP = true;
-			}
-			if (MaxHP <= 0.f && bHasBaseStatus)
-			{
-				MaxHP = BaseStatus.GetStatus(ETWStatusType::Health);
-			}
-			else if (MaxHP <= 0.f)
-			{
-				MaxHP = CurrentHP;
+				CurrentHP = RuntimeStatus.GetStatus(ETWStatusType::Health);
 			}
 		}
+
+		// 정말 BaseStatus를 못 구했을 때만 MaxHP fallback
+		if (MaxHP <= 0.f && SelectedNetIds.Num() == 1 && UnitSubsystem)
+		{
+			UnitSubsystem->TryGetUnitMaxHP(SelectedNetIds[0], OwnerPlayerSlot, MaxHP);
+		}
+
+		if (MaxHP <= 0.f && CurrentHP > 0.f)
+		{
+			MaxHP = CurrentHP;
+		}
+
+		bHasAnyHP = (CurrentHP > 0.f) || (MaxHP > 0.f);
 
 		OutVM.CurrentHP = CurrentHP;
 		OutVM.MaxHP = MaxHP;
