@@ -1822,7 +1822,8 @@ void ATWPlayerController::RefreshUIBridge()
 FVector ATWPlayerController::GetMouseWorldLocation() const
 {
 	FHitResult Hit;
-	GetHitResultUnderCursor(ECC_Visibility, false, Hit);
+	
+	GetHitResultUnderCursor(ECC_GameTraceChannel1, false, Hit);
 	return Hit.bBlockingHit ? Hit.ImpactPoint : FVector::ZeroVector;
 }
 bool ATWPlayerController::TryGetSelectedHeroUnitId(FName& OutHeroUnitId) const
@@ -2497,7 +2498,10 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 	const FTWUnitStatus HeroRuntimeStatus = UnitSubsystem->GetUnitCurrentStatus(HeroEntity, PS->PlayerSlot);
 	const float BaseDamage = HeroRuntimeStatus.GetStatus(ETWStatusType::Damage);
 	const float SkillDamage = FMath::Max(1.f, BaseDamage * HeroRow->SkillMultiplier);
-
+	
+	
+	
+	
 	if (HeroUnitId == TEXT("DragonKnight"))
 	{
 		TArray<ETWStatusType> TargetStatuses = {
