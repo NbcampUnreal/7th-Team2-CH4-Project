@@ -81,4 +81,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Minimap|Icons")
 	float IconThickness = 15.f;
 #pragma endregion
+	
+#pragma region 머티리얼
+	UPROPERTY(EditAnywhere, Category="MiniMap|Water")
+	UMaterialInterface* MinimapWaterMaterial = nullptr;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UStaticMeshComponent>> WaterMeshComponents;
+
+	TMap<TWeakObjectPtr<UStaticMeshComponent>, TArray<UMaterialInterface*>> OriginalWaterMaterials;
+	
+	void CacheWaterActors();
+	void ApplyMinimapWaterMaterial();
+	void RestoreWaterMaterials();
+#pragma endregion
 };

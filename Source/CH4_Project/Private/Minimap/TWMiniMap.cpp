@@ -11,6 +11,9 @@
 #include "Subsystems/TWGridSubSystem.h"
 #include "Building/TWBaseBuilding.h"
 #include "CapturePoint/TW_CapturePoint.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInterface.h"
 
 ATWMiniMap::ATWMiniMap()
 {
@@ -57,6 +60,7 @@ void ATWMiniMap::BeginPlay()
 		CaptureComp->bCaptureOnMovement = false;
 	}
 	
+	CacheWaterActors();
 	
 	GetWorldTimerManager().SetTimer(
 		CaptureTimerHandle,
@@ -64,7 +68,7 @@ void ATWMiniMap::BeginPlay()
 		&ATWMiniMap::UpdateCapture,
 		0.1,
 		true
-		);
+	);
 }
 
 void ATWMiniMap::UpdateCapture()
@@ -85,7 +89,10 @@ void ATWMiniMap::UpdateCapture()
 		}
 	}
 	
+	ApplyMinimapWaterMaterial();
 	CaptureComp->CaptureScene();
+	RestoreWaterMaterials();
+
 	DrawCameraFrustum();
 	DrawIconsOnMinimap();
 }
@@ -305,6 +312,95 @@ bool ATWMiniMap::ShouldShow(int32 TeamID, FVector WorldPos, int32 LocalTeamSlot,
 	}
 	
 	return FogManager->IsLocationVisible(WorldPos);
+}
+
+void ATWMiniMap::CacheWaterActors()
+{
+	WaterMeshComponents.Empty();
+	OriginalWaterMaterials.Empty();
+
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AStaticMeshActor::StaticClass(), FoundActors);
+
+	for (AActor* Actor : FoundActors)
+	{
+		if (!IsValid(Actor))
+		{
+			continue;
+		}
+
+		const FString LowerName = Actor->GetName().ToLower();
+
+		if (!LowerName.Contains(TEXT("water")))
+		{
+			continue;
+		}
+
+		AStaticMeshActor* WaterActor = Cast<AStaticMeshActor>(Actor);
+		if (!WaterActor)
+		{
+			continue;
+		}
+
+		UStaticMeshComponent* MeshComp = WaterActor->GetStaticMeshComponent();
+		if (!MeshComp)
+		{
+			continue;
+		}
+
+		WaterMeshComponents.Add(MeshComp);
+
+		TArray<UMaterialInterface*> SavedMaterials;
+		const int32 MaterialCount = MeshComp->GetNumMaterials();
+
+		for (int32 Index = 0; Index < MaterialCount; ++Index)
+		{
+			SavedMaterials.Add(MeshComp->GetMaterial(Index));
+		}
+
+		OriginalWaterMaterials.Add(MeshComp, SavedMaterials);
+	}
+}
+
+void ATWMiniMap::ApplyMinimapWaterMaterial()
+{
+	if (!MinimapWaterMaterial)
+	{
+		return;
+	}
+
+	for (const TWeakObjectPtr<UStaticMeshComponent>& MeshPtr : WaterMeshComponents)
+	{
+		UStaticMeshComponent* MeshComp = MeshPtr.Get();
+		if (!MeshComp)
+		{
+			continue;
+		}
+
+		const int32 MaterialCount = MeshComp->GetNumMaterials();
+		for (int32 Index = 0; Index < MaterialCount; ++Index)
+		{
+			MeshComp->SetMaterial(Index, MinimapWaterMaterial);
+		}
+	}
+}
+
+void ATWMiniMap::RestoreWaterMaterials()
+{
+	for (TPair<TWeakObjectPtr<UStaticMeshComponent>, TArray<UMaterialInterface*>>& Pair : OriginalWaterMaterials)
+	{
+		UStaticMeshComponent* MeshComp = Pair.Key.Get();
+		if (!MeshComp)
+		{
+			continue;
+		}
+
+		const TArray<UMaterialInterface*>& SavedMaterials = Pair.Value;
+		for (int32 Index = 0; Index < SavedMaterials.Num(); ++Index)
+		{
+			MeshComp->SetMaterial(Index, SavedMaterials[Index]);
+		}
+	}
 }
 
 FVector ATWMiniMap::GetWorldLocationFromTouch(FVector2D TouchPos, FVector2D WidgetSize)
