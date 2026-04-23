@@ -62,7 +62,7 @@ public:
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category="Grid|Settings")
-	float CellSize = 100.0f;
+	float CellSize = 200.0f;
 	
 	UPROPERTY(VisibleAnywhere, Category="Grid|Settings")
 	FIntPoint GridDimensions;
