@@ -160,6 +160,11 @@ protected:
 
 private:
 	bool HandleScreenEdgeScrolling(float DeltaSeconds);
+	
+	void HandleHiddenEnemySelectionByFog();
+	bool ShouldClearCurrentSelectionByFog() const;
+	bool IsEnemyBuildingHiddenByFog(const ATWBaseBuilding* InBuilding) const;
+	bool IsLocationHiddenByFog(const FVector& InWorldLocation) const;
 #pragma endregion
 
 #pragma region 병력 스폰 대기열 / 인구 수 대기열 / 연구소 대기열
