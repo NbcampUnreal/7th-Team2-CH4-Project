@@ -34,7 +34,8 @@ public class CH4_Project : ModuleRules
 			"NetCore", "CommonUI",
 			"NavCorridor",
 			"Landscape",
-			"MassLOD"
+			"MassLOD",
+			"GameplayTags",
 			
 		});
 
