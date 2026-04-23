@@ -48,6 +48,70 @@ namespace
 		OutUnitActor = Cast<ATWUnit>(ActorFragment->Get());
 		return IsValid(OutUnitActor);
 	}
+
+	static void PrimeRecentCombatUnitSnapshot(
+		UWorld* World,
+		const FMassNetworkID& UnitNetId,
+		int32& InOutOwnerPlayerSlot,
+		FVector& InOutCachedWorldLocation,
+		float& InOutCachedCurrentHP,
+		float& InOutCachedMaxHP,
+		float& InOutCachedHealthPercent,
+		float DefaultFallbackUnitHPBarHeight)
+	{
+		if (!World || !UnitNetId.IsValid())
+		{
+			return;
+		}
+
+		UTWUnitSubsystem* UnitSubsystem = World->GetSubsystem<UTWUnitSubsystem>();
+		if (!UnitSubsystem)
+		{
+			return;
+		}
+
+		FVector HPBarLocation = FVector::ZeroVector;
+		if (UnitSubsystem->TryGetUnitHPBarWorldLocation(UnitNetId, HPBarLocation))
+		{
+			InOutCachedWorldLocation = HPBarLocation;
+		}
+		else
+		{
+			FVector UnitLocation = FVector::ZeroVector;
+			if (UnitSubsystem->TryGetUnitVisualLocation(UnitNetId, UnitLocation))
+			{
+				InOutCachedWorldLocation = UnitLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+			}
+		}
+
+		int32 ResolvedOwnerPlayerSlot = InOutOwnerPlayerSlot;
+		if (UnitSubsystem->TryGetUnitOwnerPlayerSlot(UnitNetId, ResolvedOwnerPlayerSlot))
+		{
+			InOutOwnerPlayerSlot = ResolvedOwnerPlayerSlot;
+		}
+
+		float CurrentHP = 0.f;
+		if (UnitSubsystem->TryGetUnitCurrentHP(UnitNetId, InOutOwnerPlayerSlot, CurrentHP))
+		{
+			InOutCachedCurrentHP = CurrentHP;
+		}
+
+		float MaxHP = 0.f;
+		if (UnitSubsystem->TryGetUnitMaxHP(UnitNetId, InOutOwnerPlayerSlot, MaxHP))
+		{
+			InOutCachedMaxHP = MaxHP;
+		}
+
+		if (InOutCachedMaxHP > KINDA_SMALL_NUMBER)
+		{
+			if (InOutCachedCurrentHP <= 0.f)
+			{
+				InOutCachedCurrentHP = InOutCachedMaxHP;
+			}
+
+			InOutCachedHealthPercent = FMath::Clamp(InOutCachedCurrentHP / InOutCachedMaxHP, 0.f, 1.f);
+		}
+	}
 }
 
 UTWPlayerSelectionVisualComponent::UTWPlayerSelectionVisualComponent()
@@ -529,6 +593,16 @@ void UTWPlayerSelectionVisualComponent::NotifyRecentCombatUnitDamaged(
 			Item.RemainingTime = SafeVisibleTime;
 			Item.bValid = true;
 			Item.bIsBuilding = false;
+			PrimeRecentCombatUnitSnapshot(
+				GetWorld(),
+				Item.UnitNetId,
+				Item.OwnerPlayerSlot,
+				Item.CachedWorldLocation,
+				Item.CachedCurrentHP,
+				Item.CachedMaxHP,
+				Item.CachedHealthPercent,
+				DefaultFallbackUnitHPBarHeight
+			);
 			return;
 		}
 	}
@@ -540,6 +614,16 @@ void UTWPlayerSelectionVisualComponent::NotifyRecentCombatUnitDamaged(
 	NewItem.Building = nullptr;
 	NewItem.OwnerPlayerSlot = InOwnerPlayerSlot;
 	NewItem.RemainingTime = SafeVisibleTime;
+	PrimeRecentCombatUnitSnapshot(
+		GetWorld(),
+		NewItem.UnitNetId,
+		NewItem.OwnerPlayerSlot,
+		NewItem.CachedWorldLocation,
+		NewItem.CachedCurrentHP,
+		NewItem.CachedMaxHP,
+		NewItem.CachedHealthPercent,
+		DefaultFallbackUnitHPBarHeight
+	);
 	RecentCombatHPBars.Add(NewItem);
 }
 
@@ -688,11 +772,20 @@ void UTWPlayerSelectionVisualComponent::BuildRecentCombatHPBarVisualData()
 			FVector UnitLocation = FVector::ZeroVector;
 			if (!UnitSubsystem->TryGetUnitVisualLocation(Item.UnitNetId, UnitLocation))
 			{
-				InvalidUnitNetIds.Add(Item.UnitNetId);
-				continue;
+				if (!Item.CachedWorldLocation.IsNearlyZero())
+				{
+					HPBarLocation = Item.CachedWorldLocation;
+				}
+				else
+				{
+					InvalidUnitNetIds.Add(Item.UnitNetId);
+					continue;
+				}
 			}
-
-			HPBarLocation = UnitLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+			else
+			{
+				HPBarLocation = UnitLocation + FVector(0.f, 0.f, DefaultFallbackUnitHPBarHeight);
+			}
 		}
 
 		int32 ResolvedOwnerPlayerSlot = Item.OwnerPlayerSlot;
@@ -710,7 +803,26 @@ void UTWPlayerSelectionVisualComponent::BuildRecentCombatHPBarVisualData()
 		const bool bHasMaxHP =
 			UnitSubsystem->TryGetUnitMaxHP(Item.UnitNetId, ResolvedOwnerPlayerSlot, MaxHP);
 
-		if (!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
+		if ((!bHasCurrentHP || !bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER) &&
+			Item.CachedMaxHP > KINDA_SMALL_NUMBER)
+		{
+			if (!bHasCurrentHP)
+			{
+				CurrentHP = Item.CachedCurrentHP;
+			}
+
+			if (!bHasMaxHP || MaxHP <= KINDA_SMALL_NUMBER)
+			{
+				MaxHP = Item.CachedMaxHP;
+			}
+		}
+
+		if (MaxHP > KINDA_SMALL_NUMBER && !bHasCurrentHP && CurrentHP <= 0.f)
+		{
+			CurrentHP = MaxHP;
+		}
+
+		if (MaxHP <= KINDA_SMALL_NUMBER)
 		{
 			InvalidUnitNetIds.Add(Item.UnitNetId);
 			continue;
