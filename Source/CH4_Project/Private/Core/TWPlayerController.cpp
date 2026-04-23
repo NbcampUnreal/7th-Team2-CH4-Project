@@ -29,7 +29,7 @@
 #include "Component/TWPlayerSelectionVisualComponent.h"
 #include "Subsystems/TWUnitSubsystem.h"
 #include "UObject/UnrealType.h"
-
+#include "MassReplicationFragments.h"
 #include "MassCommonFragments.h"
 #include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
@@ -55,6 +55,7 @@
 #include "NiagaraSystem.h"
 #include "FOW/TWFogManager.h"
 #include "Log/TWLogCategory.h"
+#include "Selection/TWSelectionVisualActor.h"
 
 namespace
 {
@@ -360,6 +361,7 @@ void ATWPlayerController::BeginPlay()
 
 	InitializeSelectionVisualManager();
 	RefreshSelectionVisualManager();
+	InitializeBuffRingVisualActor();
 
 	InitializeUIBridge();
 	RefreshUIBridge();
@@ -419,12 +421,275 @@ void ATWPlayerController::Tick(float DeltaSeconds)
 
 	RefreshLocalSelectionRuntimeData();
 	HandleHiddenEnemySelectionByFog();
+	TickBuffRingVisuals(DeltaSeconds);
+
 
 	if (PlayerSelectionVisualComponent)
 	{
 		PlayerSelectionVisualComponent->TickVisuals(DeltaSeconds);
 	}
 }
+
+void ATWPlayerController::InitializeBuffRingVisualActor()
+{
+	if (!IsLocalController() || !GetWorld())
+	{
+		return;
+	}
+
+	if (IsValid(BuffRingVisualActor))
+	{
+		return;
+	}
+
+	TSubclassOf<ATWSelectionVisualActor> SpawnClass = BuffRingVisualActorClass;
+	if (!SpawnClass)
+	{
+		SpawnClass = ATWSelectionVisualActor::StaticClass();
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = GetPawn();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	BuffRingVisualActor = GetWorld()->SpawnActor<ATWSelectionVisualActor>(
+		SpawnClass,
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParams
+	);
+
+	if (!IsValid(BuffRingVisualActor))
+	{
+		return;
+	}
+
+	BuffRingVisualActor->SetOwner(this);
+	BuffRingVisualActor->ConfigureRenderAssets(
+		BuffRingMesh,
+		BuffRingMaterial,
+		BuffRingMeshBaseDiameter,
+		0.f,
+		true,
+		FRotator(90.f, 0.f, 0.f),
+		BuffRingVisualScaleMultiplier,
+		nullptr,
+		nullptr,
+		0.f,
+		nullptr,
+		nullptr,
+		FVector::OneVector
+	);
+	BuffRingVisualActor->ClearBuffRingVisuals();
+}
+
+void ATWPlayerController::DestroyBuffRingVisualActor()
+{
+	if (IsValid(BuffRingVisualActor))
+	{
+		BuffRingVisualActor->Destroy();
+		BuffRingVisualActor = nullptr;
+	}
+
+	ActiveBuffRingVisuals.Empty();
+}
+
+bool ATWPlayerController::GatherFriendlyUnitsForBuffVisual(
+	const FVector& InCenter,
+	float InRadius,
+	int32 InOwnerPlayerSlot,
+	TArray<FMassNetworkID>& OutTargetUnitNetIds
+) const
+{
+	OutTargetUnitNetIds.Reset();
+
+	UWorld* World = GetWorld();
+	UTWUnitSubsystem* UnitSubsystem = World ? World->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	if (!World || !UnitSubsystem || InOwnerPlayerSlot == INDEX_NONE || InRadius <= 0.f)
+	{
+		return false;
+	}
+
+	TArray<FMassEntityHandle> CandidateEntities;
+	if (!UnitSubsystem->GetFriendlyEntitiesInRadius(
+		InCenter,
+		InRadius,
+		InOwnerPlayerSlot,
+		CandidateEntities,
+		true
+	))
+	{
+		return false;
+	}
+
+	for (const FMassEntityHandle& EntityHandle : CandidateEntities)
+	{
+		FName UnitId = NAME_None;
+		FMassNetworkID NetId;
+		int32 OwnerSlot = INDEX_NONE;
+
+		if (!TryGetSelectionDataFromEntityHandle(World, EntityHandle, UnitId, NetId, &OwnerSlot))
+		{
+			continue;
+		}
+
+		if (OwnerSlot != InOwnerPlayerSlot)
+		{
+			continue;
+		}
+
+		if (!NetId.IsValid())
+		{
+			continue;
+		}
+
+		OutTargetUnitNetIds.AddUnique(NetId);
+	}
+
+	return OutTargetUnitNetIds.Num() > 0;
+}
+
+void ATWPlayerController::ApplyLocalBuffRingVisuals(
+	const TArray<FMassNetworkID>& InTargetUnitNetIds,
+	float InRingRadius,
+	float InDuration,
+	float InHeightOffset
+)
+{
+	if (!IsLocalController() || !GetWorld())
+	{
+		return;
+	}
+
+	InitializeBuffRingVisualActor();
+
+	const float ExpireTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.f, InDuration);
+
+	for (const FMassNetworkID& NetId : InTargetUnitNetIds)
+	{
+		if (!NetId.IsValid())
+		{
+			continue;
+		}
+
+		bool bUpdated = false;
+		for (FActiveBuffRingVisualEntry& Entry : ActiveBuffRingVisuals)
+		{
+			if (Entry.UnitNetId == NetId)
+			{
+				Entry.ExpireTime = FMath::Max(Entry.ExpireTime, ExpireTime);
+				Entry.RingRadius = InRingRadius;
+				Entry.HeightOffset = InHeightOffset;
+				bUpdated = true;
+				break;
+			}
+		}
+
+		if (!bUpdated)
+		{
+			FActiveBuffRingVisualEntry& NewEntry = ActiveBuffRingVisuals.AddDefaulted_GetRef();
+			NewEntry.UnitNetId = NetId;
+			NewEntry.ExpireTime = ExpireTime;
+			NewEntry.RingRadius = InRingRadius;
+			NewEntry.HeightOffset = InHeightOffset;
+		}
+	}
+
+	RefreshBuffRingVisualActor();
+}
+
+void ATWPlayerController::RefreshBuffRingVisualActor()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!IsValid(BuffRingVisualActor))
+	{
+		if (ActiveBuffRingVisuals.Num() <= 0)
+		{
+			return;
+		}
+
+		InitializeBuffRingVisualActor();
+	}
+
+	if (!IsValid(BuffRingVisualActor))
+	{
+		return;
+	}
+
+	UTWUnitSubsystem* UnitSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UTWUnitSubsystem>() : nullptr;
+	if (!UnitSubsystem)
+	{
+		BuffRingVisualActor->ClearBuffRingVisuals();
+		return;
+	}
+
+	TArray<FTWUnitRingVisualData> RingVisuals;
+	RingVisuals.Reserve(ActiveBuffRingVisuals.Num());
+
+	for (const FActiveBuffRingVisualEntry& Entry : ActiveBuffRingVisuals)
+	{
+		FVector RingLocation = FVector::ZeroVector;
+		bool bResolved = UnitSubsystem->TryGetUnitVisualLocation(Entry.UnitNetId, RingLocation);
+		if (!bResolved)
+		{
+			bResolved = UnitSubsystem->TryGetUnitHPBarWorldLocation(Entry.UnitNetId, RingLocation);
+		}
+
+		if (!bResolved)
+		{
+			continue;
+		}
+
+		FTWUnitRingVisualData& RingData = RingVisuals.AddDefaulted_GetRef();
+		RingData.RingWorldLocation = RingLocation + FVector(0.f, 0.f, Entry.HeightOffset);
+		RingData.RingRadius = Entry.RingRadius;
+	}
+
+	BuffRingVisualActor->SetBuffRingVisuals(RingVisuals);
+	BuffRingVisualActor->SyncVisuals();
+}
+
+void ATWPlayerController::TickBuffRingVisuals(float DeltaSeconds)
+{
+	if (!IsLocalController() || !GetWorld())
+	{
+		return;
+	}
+
+	if (ActiveBuffRingVisuals.Num() <= 0)
+	{
+		if (IsValid(BuffRingVisualActor))
+		{
+			BuffRingVisualActor->ClearBuffRingVisuals();
+		}
+		return;
+	}
+
+	const float Now = GetWorld()->GetTimeSeconds();
+	ActiveBuffRingVisuals.RemoveAll(
+		[Now](const FActiveBuffRingVisualEntry& Entry)
+		{
+			return !Entry.UnitNetId.IsValid() || Entry.ExpireTime <= Now;
+		}
+	);
+
+	if (ActiveBuffRingVisuals.Num() <= 0)
+	{
+		if (IsValid(BuffRingVisualActor))
+		{
+			BuffRingVisualActor->ClearBuffRingVisuals();
+		}
+		return;
+	}
+
+	RefreshBuffRingVisualActor();
+}
+
 void ATWPlayerController::ClientMoveCameraToStartLocation_Implementation(
 	const FVector& InTargetLocation,
 	const FRotator& InTargetRotation
@@ -2696,6 +2961,51 @@ void ATWPlayerController::NotifyAllPlayersHeroSkillFX(
 	}
 }
 
+void ATWPlayerController::NotifyAllPlayersBuffRingVisuals(
+	const TArray<FMassNetworkID>& InTargetUnitNetIds,
+	float InRingRadius,
+	float InDuration,
+	float InHeightOffset
+) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ATWPlayerController* TargetPC = Cast<ATWPlayerController>(It->Get());
+		if (!TargetPC)
+		{
+			continue;
+		}
+
+		TargetPC->ClientApplyBuffRingVisuals(
+			InTargetUnitNetIds,
+			InRingRadius,
+			InDuration,
+			InHeightOffset
+		);
+	}
+}
+
+void ATWPlayerController::ClientApplyBuffRingVisuals_Implementation(
+	const TArray<FMassNetworkID>& InTargetUnitNetIds,
+	float InRingRadius,
+	float InDuration,
+	float InHeightOffset
+)
+{
+	ApplyLocalBuffRingVisuals(
+		InTargetUnitNetIds,
+		InRingRadius,
+		InDuration,
+		InHeightOffset
+	);
+}
+
 void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLocation, FName InHeroUnitId)
 {
 	if (!HasAuthority() || !GetWorld())
@@ -2752,6 +3062,9 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 	
 	if (HeroUnitId == TEXT("DragonKnight"))
 	{
+		const float BuffRadius = ResolveHeroSkillDamageRadius(HeroRow);
+		const FVector BuffCenter = HeroLocation;
+
 		TArray<ETWStatusType> TargetStatuses = {
 			ETWStatusType::Damage,
 			ETWStatusType::Armor,
@@ -2759,16 +3072,39 @@ void ATWPlayerController::ServerUseHeroSkill_Implementation(FVector InTargetLoca
 			ETWStatusType::MoveSpeed
 		};
 
+		TArray<FMassNetworkID> BuffTargetUnitNetIds;
+
 		UnitSubsystem->ApplyTemporaryMultiplierBuffToFriendlyUnits(
-			HeroLocation,
-			ResolveHeroSkillDamageRadius(HeroRow),
+			BuffCenter,
+			BuffRadius,
 			PS->PlayerSlot,
 			HeroRow->StatMultiplier,
 			HeroRow->BuffDuration,
 			TargetStatuses,
-			true
+			true,
+			&BuffTargetUnitNetIds
 		);
 
+		if (BuffTargetUnitNetIds.Num() > 0)
+		{
+			NotifyAllPlayersBuffRingVisuals(
+			BuffTargetUnitNetIds,
+			BuffUnitRingRadius,
+			HeroRow->BuffDuration,
+			BuffRingHeightOffset
+		);
+		}
+		else
+		{
+			UE_LOG(
+				LogTWCommand,
+				Warning,
+				TEXT("[BuffRing][Server] No applied buff target NetIds | Center=%s Radius=%.1f OwnerSlot=%d"),
+				*BuffCenter.ToString(),
+				BuffRadius,
+				PS->PlayerSlot
+			);
+		}
 
 		ServerHeroSkillCooldownEndTime = GetWorld()->GetTimeSeconds() + HeroRow->SkillCooldown;
 		ClientNotifyHeroSkillCooldown(HeroRow->SkillCooldown);
@@ -3252,6 +3588,12 @@ void ATWPlayerController::ClearLocalSelectionCache()
 	if (PlayerSelectionVisualComponent)
 	{
 		PlayerSelectionVisualComponent->ClearSelectionVisuals();
+	}
+
+	ActiveBuffRingVisuals.Empty();
+	if (IsValid(BuffRingVisualActor))
+	{
+		BuffRingVisualActor->ClearBuffRingVisuals();
 	}
 }
 

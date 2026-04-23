@@ -43,6 +43,9 @@ public:
 		const TArray<FTWHPBarVisualData>& InRecentCombatHPBarVisuals
 	);
 
+	void SetBuffRingVisuals(const TArray<FTWUnitRingVisualData>& InBuffRingVisuals);
+	void ClearBuffRingVisuals();
+
 	void ClearVisuals();
 	void SyncVisuals();
 
@@ -54,6 +57,7 @@ protected:
 
 private:
 	void SyncUnitRingISM();
+	void SyncBuffRingISM();
 	void SyncBuildingSelectionBoxISM();
 	void SyncHPBarISM();
 	void UpdateHPBarTickState();
@@ -74,6 +78,9 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> UnitRingISM = nullptr;
 
 	UPROPERTY(VisibleAnywhere, Category="SelectionVisual")
+	TObjectPtr<UInstancedStaticMeshComponent> BuffRingISM = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category="SelectionVisual")
 	TObjectPtr<UInstancedStaticMeshComponent> BuildingSelectionBoxISM = nullptr;
 
 	UPROPERTY(VisibleAnywhere, Category="SelectionVisual")
@@ -81,6 +88,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> UnitRingMID = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> BuffRingMID = nullptr;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> BuildingSelectionBoxMID = nullptr;
@@ -91,6 +101,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FTWUnitRingVisualData> SelectedUnitRingVisuals;
+
+	UPROPERTY(Transient)
+	TArray<FTWUnitRingVisualData> BuffRingVisuals;
 
 	UPROPERTY(Transient)
 	TArray<FTWBuildingSelectionVisualData> SelectedBuildingVisuals;
@@ -122,6 +135,15 @@ private:
 
 	UPROPERTY(Transient)
 	float UnitRingScaleMultiplier = 1.f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> BuffRingMaterial = nullptr;
+
+	UPROPERTY(Transient)
+	float BuffRingZOffset = 70.f;
+
+	UPROPERTY(Transient)
+	float BuffRingScaleMultiplier = 1.f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMesh> BuildingSelectionBoxMesh = nullptr;
@@ -160,4 +182,6 @@ protected:
 	// 체력바 메시 축이 안 맞을 때 에디터에서 미세 조정 가능
 	UPROPERTY(EditAnywhere, Category="SelectionVisual|HPBar")
 	float HPBarYawOffset = 90.f;
+	
+	
 };
