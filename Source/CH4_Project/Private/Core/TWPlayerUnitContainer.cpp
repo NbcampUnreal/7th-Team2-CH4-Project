@@ -74,16 +74,19 @@ void UTWPlayerUnitContainer::ApplyStatus(FName UnitID, const FTWUnitStatus& Unit
 				FTWStatusFragment* StatusFragment = MassEntityManager->GetFragmentDataPtr<FTWStatusFragment>(Unit);
 				if (StatusFragment)
 				{
-					const float CurrentHealth =
-						StatusFragment->GetMutableStatus().GetStatus(ETWStatusType::Health);
+					const FTWUnitStatus OldStatus = StatusFragment->GetStatus();
+					const float OldCurrentHP = OldStatus.GetStatus(ETWStatusType::Health);
+					const float OldMaxHP = OldStatus.GetStatus(ETWStatusType::Health); // 현재 구조상 Health가 current로도 쓰이면 아래 방식보다 분리 필요
+					const float NewMaxHP = UnitStatus.GetStatus(ETWStatusType::Health);
 
 					StatusFragment->SetStatus(UnitStatus);
-					
-					const float NewMaxHP = UnitStatus.GetStatus(ETWStatusType::Health);
+
+					const float DeltaMaxHP = NewMaxHP - OldMaxHP;
+					const float NewCurrentHP = FMath::Clamp(OldCurrentHP + DeltaMaxHP, 0.f, NewMaxHP);
 
 					StatusFragment->GetMutableStatus().SetStatus(
 						ETWStatusType::Health,
-						FMath::Clamp(CurrentHealth, 0.f, NewMaxHP)
+						NewCurrentHP
 					);
 
 					// TODO Apply Move Speed
