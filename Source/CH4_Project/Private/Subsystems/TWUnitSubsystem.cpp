@@ -313,7 +313,8 @@ bool UTWUnitSubsystem::FindNearestEnemyEntity(
 			const FVector EntityPos = TransformFrag->GetTransform().GetLocation();
 			const float DistSq = FVector::DistSquared(Location, EntityPos);
 
-			if (DistSq < MinSquaredDistance)
+			if (DistSq < MinSquaredDistance && 
+				false == EntityManager.GetFragmentDataPtr<FTWStatusFragment>(Entity)->GetIsDeath())
 			{
 				MinSquaredDistance = DistSq;
 				NearestEntity = Entity;

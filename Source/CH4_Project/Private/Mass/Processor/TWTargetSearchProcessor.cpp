@@ -105,8 +105,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 				)
 				{
 					FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-					AttackList[EntityIdx].bIsTargetSet = true;
-					AttackList[EntityIdx].TargetEntity = Target;
+					AttackList[EntityIdx].SetTargetEntity (Target);
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 #pragma region Stand
@@ -129,8 +128,7 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::Range)))
 				{
 					FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-					AttackList[EntityIdx].bIsTargetSet = true;
-					AttackList[EntityIdx].TargetBuilding = TargetBuilding;
+					AttackList[EntityIdx].SetTargetBuilding(TargetBuilding);
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassAttackingTag>(Entity);
 #pragma region Stand
@@ -167,14 +165,14 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 				)
 				{
 					FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-					AttackList[EntityIdx].bIsTargetSet = true;
-					AttackList[EntityIdx].TargetEntity = Target;
+					AttackList[EntityIdx].SetTargetEntity ( Target);
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassChasingTag>(Entity);
 					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
 					CommandList[EntityIdx].SetMoveDestination(
 						EntityManager.GetFragmentDataPtr<FTransformFragment>(Target)->GetTransform().GetLocation());
 
+					AttackList[EntityIdx].LastSearchTime = 0.f;
 
 					EntitiesToSignalPathInit.Add(Entity);
 				}
@@ -185,12 +183,12 @@ void UTWTargetSearchProcessor::Execute(FMassEntityManager& EntityManager, FMassE
 					StatusList[EntityIdx].GetStatus().GetStatus(ETWStatusType::SearchingRange)))
 				{
 					FMassEntityHandle Entity = Context.GetEntity(EntityIdx);
-					AttackList[EntityIdx].bIsTargetSet = true;
-					AttackList[EntityIdx].TargetBuilding = TargetBuilding;
+					AttackList[EntityIdx].SetTargetBuilding (TargetBuilding);
 					Context.Defer().RemoveTag<FTWMassSearchingTag>(Entity);
 					Context.Defer().AddTag<FTWMassChasingTag>(Entity);
 					Context.Defer().AddTag<FTWMassMovingTag>(Entity);
 					CommandList[EntityIdx].SetMoveDestination(TargetBuilding->GetTransform().GetLocation());
+					AttackList[EntityIdx].LastSearchTime = 0.f;
 					EntitiesToSignalPathInit.Add(Entity);
 				}
 				else
