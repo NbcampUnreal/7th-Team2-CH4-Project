@@ -1,5 +1,6 @@
 ﻿#include "Building/GhostBuilding.h"
-
+#include "Building/TWBaseBuilding.h"
+#include "Data/TWBuildingDataAsset.h"
 #include "Misc/MapErrors.h"
 
 
@@ -30,6 +31,34 @@ void AGhostBuilding::OnConstruction(const FTransform& Transform)
 			StaticMesh->SetMaterial(i, BuildingMID);
 		}
 	}
+}
+
+void AGhostBuilding::InitGhsotBuilding(TSubclassOf<ATWBaseBuilding> BuildingClass)
+{
+	if (!BuildingClass)
+	{
+		return;
+	}
+	
+	ATWBaseBuilding* DefaultBuilding = BuildingClass->GetDefaultObject<ATWBaseBuilding>();
+	
+	if (DefaultBuilding && DefaultBuilding->MeshComponent)
+	{
+		UStaticMesh* OriginalMesh = DefaultBuilding->MeshComponent->GetStaticMesh();
+		
+		FIntPoint OriginalSize(1, 1);
+		if (DefaultBuilding->BuildingData)
+		{
+			OriginalSize = DefaultBuilding->BuildingData->GridSize.BuildingSize;
+		}
+	
+		SetBuildingMesh(OriginalMesh, OriginalSize);
+		
+		StaticMesh->SetRelativeRotation(DefaultBuilding->MeshComponent->GetRelativeRotation());
+		StaticMesh->SetRelativeScale3D(DefaultBuilding->MeshComponent->GetRelativeScale3D());
+	}
+	
+
 }
 
 void AGhostBuilding::SetBuildingMesh(UStaticMesh* Mesh, FIntPoint NewBuildingSize)

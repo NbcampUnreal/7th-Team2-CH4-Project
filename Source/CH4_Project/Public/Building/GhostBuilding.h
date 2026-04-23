@@ -4,6 +4,8 @@
 #include "GameFramework/Actor.h"
 #include "GhostBuilding.generated.h"
 
+class ATWBaseBuilding;
+
 UCLASS()
 class CH4_PROJECT_API AGhostBuilding : public AActor
 {
@@ -14,6 +16,9 @@ public:
 	AGhostBuilding();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	
+	UFUNCTION(BlueprintCallable, Category="GhostBuilding")
+	void InitGhsotBuilding(TSubclassOf<ATWBaseBuilding> BuildingClass);
 	
 	void SetBuildingMesh(UStaticMesh* Mesh, FIntPoint NewBuildingSize);
 	void UpdateBuildingVisual(bool bCanBuild);
