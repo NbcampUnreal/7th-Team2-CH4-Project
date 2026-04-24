@@ -27,12 +27,21 @@ public:
 	UAudioComponent* PlaySoundLoopAttached(FGameplayTag SoundTag, USceneComponent* AttachToComponent);
 
 	UFUNCTION(BlueprintCallable, Category = "Sound")
+	void PlayBGMByTag(FGameplayTag SoundTag, float FadeInTime = 1.0f);
+
+	UFUNCTION(BlueprintCallable, Category = "Sound")
+	void StopBGM(float FadeOutTime = 1.0f);
+	
+	UFUNCTION(BlueprintCallable, Category = "Sound")
 	void StopSoundLoop(UAudioComponent* LoopComponent, float FadeOutTime = 0.5f);
 	
 private:
 	
 	UPROPERTY()
 	TObjectPtr<UTWSoundAsset> CachedSoundData;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> CurrentBGMComponent;
 	
 	UTWSoundAsset* GetSoundData();
 

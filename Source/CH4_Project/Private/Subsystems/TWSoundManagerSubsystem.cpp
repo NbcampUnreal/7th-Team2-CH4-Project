@@ -100,6 +100,36 @@ UAudioComponent* UTWSoundManagerSubsystem::PlaySoundLoopAttached(FGameplayTag So
 	return nullptr;
 }
 
+void UTWSoundManagerSubsystem::PlayBGMByTag(FGameplayTag SoundTag, float FadeInTime)
+{
+	if (UTWSoundAsset* Data = GetSoundData())
+	{
+		if (USoundBase* Sound = Data->GetSoundByTag(SoundTag))
+		{
+			StopBGM(0.5f);
+
+			if (UWorld* World = GetWorld())
+			{
+				CurrentBGMComponent = UGameplayStatics::SpawnSound2D(World, Sound);
+                
+				if (CurrentBGMComponent)
+				{
+					CurrentBGMComponent->FadeIn(FadeInTime, 1.0f);
+				}
+			}
+		}
+	}
+}
+
+void UTWSoundManagerSubsystem::StopBGM(float FadeOutTime)
+{
+	if (IsValid(CurrentBGMComponent) && CurrentBGMComponent->IsPlaying())
+	{
+		CurrentBGMComponent->FadeOut(FadeOutTime, 0.0f); 
+		CurrentBGMComponent = nullptr;
+	}
+}
+
 void UTWSoundManagerSubsystem::StopSoundLoop(UAudioComponent* LoopComponent, float FadeOutTime)
 {
 	if (!IsValid(LoopComponent))

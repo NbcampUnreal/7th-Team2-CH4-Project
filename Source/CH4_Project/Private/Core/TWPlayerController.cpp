@@ -355,6 +355,39 @@ void ATWPlayerController::BeginPlay()
 		}
 	}
 
+	if (!IsLocalController())
+	{
+		return;
+	}
+	
+	if (UWorld* World = GetWorld())
+	{
+		if (UTWSoundManagerSubsystem* SoundManager = World->GetGameInstance()->GetSubsystem<UTWSoundManagerSubsystem>())
+		{
+			FString LevelName = World->GetMapName();
+			FGameplayTag BGMTag;
+			
+			if (LevelName.Contains("L_Title"))
+			{
+				BGMTag = FGameplayTag::RequestGameplayTag(FName("BGM.Title"));
+			}
+			else if (LevelName.Contains("L_Lobby"))
+			{
+				BGMTag = FGameplayTag::RequestGameplayTag(FName("BGM.Lobby"));
+			}
+			else 
+			{
+				BGMTag = FGameplayTag::RequestGameplayTag(FName("BGM.InGame"));
+			}
+
+			if (BGMTag.IsValid())
+			{
+				SoundManager->PlayBGMByTag(BGMTag, 2.0f);
+			}
+		}
+	}
+	
+	
 	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 	InputMode.SetHideCursorDuringCapture(false);
