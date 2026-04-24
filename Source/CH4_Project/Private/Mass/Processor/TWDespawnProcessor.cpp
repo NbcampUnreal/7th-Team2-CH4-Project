@@ -17,6 +17,8 @@
 #include "Mass/Fragments/TWUnitFragment.h"
 #include "Mass/Traits/TWCommandTrait.h"
 #include "Subsystems/TWUnitSubsystem.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "Subsystems/TWSoundManagerSubsystem.h"
 
 UTWDespawnProcessor::UTWDespawnProcessor()
 	: EntityQuery(*this)

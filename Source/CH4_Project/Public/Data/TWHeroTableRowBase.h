@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "Materials/MaterialInterface.h"
 #include "TWHeroTableRowBase.generated.h"
 
@@ -69,6 +70,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hero|Skill|Impact")
 	float ImpactDecalLifeTime = 0.75f;
 
+	// 유닛 태그
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hero|Skill|Sound")
+	FGameplayTag SkillSoundTag;
+	
 	// 발동 시 사용할 Niagara FX
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hero|Skill|Impact")
 	TObjectPtr<UNiagaraSystem> ImpactNiagaraFX = nullptr;

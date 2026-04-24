@@ -15,6 +15,7 @@
 #include "Widgets/SWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Widgets/TWAlertWidget.h"
+#include "GameplayTagContainer.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -56,6 +57,7 @@
 #include "FOW/TWFogManager.h"
 #include "Log/TWLogCategory.h"
 #include "Selection/TWSelectionVisualActor.h"
+#include "Subsystems/TWSoundManagerSubsystem.h"
 
 namespace
 {
@@ -934,6 +936,14 @@ void ATWPlayerController::OnStartLeftMouseAction(const FInputActionValue& InputA
 	if (BuildComponent && BuildComponent->GetBuildMode())
 	{
 		BuildComponent->RequestBuild();
+		
+		if (UTWSoundManagerSubsystem* SoundManager = GetWorld()->GetGameInstance()->GetSubsystem<UTWSoundManagerSubsystem>())
+		{
+			FGameplayTag PlaceSoundTag = FGameplayTag::RequestGameplayTag(FName("SFX.Building.Construction"));
+           
+			SoundManager->PlaySoundByTag(PlaceSoundTag, GetMouseWorldLocation(), nullptr);
+		}
+		
 		RefreshDynamicMappingContexts();
 		bConsumeLeftMouseRelease = true;
 		return;
@@ -2842,9 +2852,25 @@ void ATWPlayerController::ClientPlayHeroSkillFX_Implementation(
 	}
 
 	const FTWHeroTableRowBase* HeroSkillRow = FindHeroSkillRow(InHeroUnitId);
+	
+	if (!HeroSkillRow)
+	{
+		return;
+	}
+	
 	const float EffectRadius = InRadius > 0.f ? InRadius : ResolveHeroSkillImpactRadius(HeroSkillRow);
 
-	if (HeroSkillRow && HeroSkillRow->ImpactNiagaraFX)
+	if (UTWSoundManagerSubsystem* SoundManager = World->GetGameInstance()->GetSubsystem<UTWSoundManagerSubsystem>())
+	{
+		if (HeroSkillRow->SkillSoundTag.IsValid())
+		{
+			FVector SoundLocation = (InHeroUnitId == TEXT("Astrologian")) ? InTargetLocation : InStartLocation;
+			
+			SoundManager->PlaySoundByTag(HeroSkillRow->SkillSoundTag, SoundLocation);
+		}
+	}
+	
+	if (HeroSkillRow->ImpactNiagaraFX)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			World,
