@@ -17,6 +17,15 @@ public:
 	
 	void PlaySoundByTag(FGameplayTag SoundTag, FVector Location, AActor* ContextActor = nullptr);
 
+	UFUNCTION(BlueprintCallable, Category = "Sound")
+	void PlaySoundAttached(FGameplayTag SoundTag, USceneComponent* AttachToComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "Sound")
+	UAudioComponent* PlaySoundLoopAttached(FGameplayTag SoundTag, USceneComponent* AttachToComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "Sound")
+	void StopSoundLoop(UAudioComponent* LoopComponent, float FadeOutTime = 0.5f);
+	
 private:
 	
 	UPROPERTY()

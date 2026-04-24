@@ -1,5 +1,6 @@
 ﻿#include "Building/TWBaseBuilding.h"
-
+#include "GameplayTagContainer.h"
+#include "Subsystems/TWSoundManagerSubsystem.h"
 #include "Core/TWPlayerController.h"
 #include "Core/TWPlayerState.h"
 #include "Data/TWBuildingDataAsset.h"
@@ -146,6 +147,14 @@ void ATWBaseBuilding::Destroyed()
 		}
 	}
 
+	if (UTWSoundManagerSubsystem* SoundManager = GetWorld()->GetGameInstance()->GetSubsystem<UTWSoundManagerSubsystem>())
+	{
+
+		FGameplayTag DestroySoundTag = FGameplayTag::RequestGameplayTag(FName("SFX.Building.Destroyed"));
+           
+		SoundManager->PlaySoundByTag(DestroySoundTag, GetActorLocation(), nullptr);
+	}
+	
 	Super::Destroyed();
 }
 

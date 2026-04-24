@@ -1,8 +1,8 @@
 ﻿#include "Subsystems/TWSoundManagerSubsystem.h"
-
 #include "Data/TWSoundAsset.h"
 #include "Engine/AssetManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 
 void UTWSoundManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -38,6 +38,70 @@ void UTWSoundManagerSubsystem::PlaySoundByTag(FGameplayTag SoundTag, FVector Loc
 				0.0f	// 시작 시간
 				);
 		}
+	}
+}
+
+void UTWSoundManagerSubsystem::PlaySoundAttached(FGameplayTag SoundTag, USceneComponent* AttachToComponent)
+{
+	if (!AttachToComponent)
+	{
+		return;
+	}
+	
+	if (UTWSoundAsset* Data = GetSoundData())
+	{
+		if (USoundBase* Sound = Data->GetSoundByTag(SoundTag))
+		{
+			UGameplayStatics::SpawnSoundAttached(
+				Sound, 
+				AttachToComponent, 
+				NAME_None, 
+				FVector::ZeroVector, 
+				EAttachLocation::KeepRelativeOffset, 
+				true
+			);
+		}
+	}
+}
+
+UAudioComponent* UTWSoundManagerSubsystem::PlaySoundLoopAttached(FGameplayTag SoundTag,
+	USceneComponent* AttachToComponent)
+{
+	if (!AttachToComponent)
+	{
+		return nullptr;
+	}
+
+	if (UTWSoundAsset* Data = GetSoundData())
+	{
+		if (USoundBase* Sound = Data->GetSoundByTag(SoundTag))
+		{
+			UAudioComponent* LoopComp = UGameplayStatics::SpawnSoundAttached(
+				Sound, AttachToComponent, NAME_None, FVector::ZeroVector, 
+				EAttachLocation::KeepRelativeOffset, false
+			);
+			return LoopComp;
+		}
+	}
+	return nullptr;
+}
+
+void UTWSoundManagerSubsystem::StopSoundLoop(UAudioComponent* LoopComponent, float FadeOutTime)
+{
+	if (!IsValid(LoopComponent))
+	{
+		return;
+	}
+
+	if (FadeOutTime > 0.f)
+	{
+		LoopComponent->bAutoDestroy = true;
+		LoopComponent->FadeOut(FadeOutTime, 0.f);
+	}
+	else
+	{
+		LoopComponent->Stop();
+		LoopComponent->DestroyComponent();
 	}
 }
 
