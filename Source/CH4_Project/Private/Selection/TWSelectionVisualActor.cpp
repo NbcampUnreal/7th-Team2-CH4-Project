@@ -64,6 +64,16 @@ ATWSelectionVisualActor::ATWSelectionVisualActor()
 	UnitRingISM->SetVisibility(true);
 	UnitRingISM->SetHiddenInGame(false);
 
+	BuffRingISM = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("BuffRingISM"));
+	BuffRingISM->SetupAttachment(SceneRoot);
+	BuffRingISM->SetMobility(EComponentMobility::Movable);
+	BuffRingISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	BuffRingISM->SetGenerateOverlapEvents(false);
+	BuffRingISM->SetCastShadow(false);
+	BuffRingISM->SetReceivesDecals(false);
+	BuffRingISM->SetVisibility(true);
+	BuffRingISM->SetHiddenInGame(false);
+
 	BuildingSelectionBoxISM = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("BuildingSelectionBoxISM"));
 	BuildingSelectionBoxISM->SetupAttachment(SceneRoot);
 	BuildingSelectionBoxISM->SetMobility(EComponentMobility::Movable);
@@ -90,19 +100,13 @@ void ATWSelectionVisualActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!HPBarISM || !HPBarMesh)
+	if (HPBarISM && HPBarMesh && (SelectedHPBarVisuals.Num() > 0 || RecentCombatHPBarVisuals.Num() > 0))
 	{
-		SetActorTickEnabled(false);
+		SyncHPBarISM();
 		return;
 	}
 
-	if (SelectedHPBarVisuals.Num() <= 0 && RecentCombatHPBarVisuals.Num() <= 0)
-	{
-		SetActorTickEnabled(false);
-		return;
-	}
-
-	SyncHPBarISM();
+	SetActorTickEnabled(false);
 }
 
 void ATWSelectionVisualActor::BeginPlay()
@@ -167,6 +171,31 @@ void ATWSelectionVisualActor::ConfigureRenderAssets(
 		}
 	}
 
+	BuffRingMaterial = InUnitRingMaterial;
+	BuffRingZOffset = UnitRingZOffset;
+	BuffRingScaleMultiplier = UnitRingScaleMultiplier;
+
+	if (BuffRingISM)
+	{
+		BuffRingISM->SetStaticMesh(UnitRingMesh);
+
+		if (BuffRingMaterial)
+		{
+			BuffRingISM->SetMaterial(0, BuffRingMaterial);
+			BuffRingMID = UMaterialInstanceDynamic::Create(BuffRingMaterial, this);
+			if (BuffRingMID)
+			{
+				BuffRingISM->SetMaterial(0, BuffRingMID);
+			}
+		}
+	}
+
+	if (BuffRingISM)
+	{
+		BuffRingISM->ClearInstances();
+		BuffRingISM->MarkRenderStateDirty();
+	}
+
 	if (BuildingSelectionBoxISM)
 	{
 		BuildingSelectionBoxISM->SetStaticMesh(BuildingSelectionBoxMesh);
@@ -213,6 +242,24 @@ void ATWSelectionVisualActor::SetVisualData(
 	UpdateHPBarTickState();
 }
 
+void ATWSelectionVisualActor::SetBuffRingVisuals(const TArray<FTWUnitRingVisualData>& InBuffRingVisuals)
+{
+	BuffRingVisuals = InBuffRingVisuals;
+	SyncBuffRingISM();
+}
+
+
+void ATWSelectionVisualActor::ClearBuffRingVisuals()
+{
+	BuffRingVisuals.Empty();
+
+	if (BuffRingISM)
+	{
+		BuffRingISM->ClearInstances();
+		BuffRingISM->MarkRenderStateDirty();
+	}
+}
+
 void ATWSelectionVisualActor::ClearVisuals()
 {
 	PrimarySelectedVisualData.Reset();
@@ -226,6 +273,10 @@ void ATWSelectionVisualActor::ClearVisuals()
 		UnitRingISM->ClearInstances();
 		UnitRingISM->MarkRenderStateDirty();
 	}
+
+	// 중요:
+	// BuffRingVisuals / BuffRingISM은 여기서 지우지 않는다.
+	// 버프링은 ClearBuffRingVisuals() 또는 지속시간 만료에서만 제거한다.
 
 	if (BuildingSelectionBoxISM)
 	{
@@ -245,6 +296,7 @@ void ATWSelectionVisualActor::ClearVisuals()
 void ATWSelectionVisualActor::SyncVisuals()
 {
 	SyncUnitRingISM();
+	SyncBuffRingISM();
 	SyncBuildingSelectionBoxISM();
 	SyncHPBarISM();
 	UpdateHPBarTickState();
@@ -445,6 +497,45 @@ void ATWSelectionVisualActor::SyncUnitRingISM()
 	UnitRingISM->SetHiddenInGame(false);
 	UnitRingISM->SetVisibility(true, true);
 	UnitRingISM->MarkRenderStateDirty();
+}
+
+
+void ATWSelectionVisualActor::SyncBuffRingISM()
+{
+	if (!BuffRingISM || !UnitRingMesh)
+	{
+		return;
+	}
+
+	BuffRingISM->ClearInstances();
+
+	if (BuffRingVisuals.Num() <= 0)
+	{
+		BuffRingISM->MarkRenderStateDirty();
+		return;
+	}
+
+	const float SafeBaseDiameter = FMath::Max(1.f, UnitRingMeshBaseDiameter);
+
+	for (const FTWUnitRingVisualData& RingData : BuffRingVisuals)
+	{
+		const float Diameter = FMath::Max(1.f, RingData.RingRadius * 2.f);
+		const float UniformScale = (Diameter / SafeBaseDiameter) * BuffRingScaleMultiplier;
+
+		const FVector RingLocation = RingData.RingWorldLocation;
+
+		// ★ 강제 90도 회전 (바닥에 눕힘)
+		const FRotator RingRotation = FRotator(0.f, 0.f, 0.f);
+
+		BuffRingISM->AddInstance(
+			FTransform(RingRotation, RingLocation, FVector(UniformScale, UniformScale, UniformScale)),
+			true
+		);
+	}
+
+	BuffRingISM->SetHiddenInGame(false);
+	BuffRingISM->SetVisibility(true, true);
+	BuffRingISM->MarkRenderStateDirty();
 }
 
 void ATWSelectionVisualActor::SyncBuildingSelectionBoxISM()

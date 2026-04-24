@@ -23,7 +23,27 @@ class UTWPlayerSelectionVisualComponent;
 class ATWHeroUnitBase;
 class UUserWidget;
 class UTWAlertWidget;
+class ATWSelectionVisualActor;
+class UStaticMesh;
+class ATWSelectionVisualActor;
 
+USTRUCT()
+struct FActiveBuffRingVisualEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient)
+	FMassNetworkID UnitNetId;
+
+	UPROPERTY(Transient)
+	float ExpireWorldTime = 0.f;
+
+	UPROPERTY(Transient)
+	float RingRadius = 60.f;
+
+	UPROPERTY(Transient)
+	int32 OwnerPlayerSlot = INDEX_NONE;
+};
 UCLASS()
 class CH4_PROJECT_API ATWPlayerController : public APlayerController
 {
@@ -145,6 +165,20 @@ protected:
 	void NotifyAllPlayersUnitDamaged(const FMassEntityHandle& InTargetEntity, float InVisibleTime = 1.25f) const;
 	void NotifyAllPlayersBuildingDamaged(ATWBaseBuilding* InTargetBuilding, float InVisibleTime = 1.25f) const;
 	void NotifyAllPlayersHeroSkillFX(FName InHeroUnitId, const FVector& InStartLocation, const FVector& InTargetLocation, float InRadius) const;
+	void NotifyAllPlayersBuffRingVisuals(
+		const TArray<FMassNetworkID>& InTargetUnitNetIds,
+		float InRingRadius,
+		float InDuration,
+		float InHeightOffset
+	) const;
+
+	UFUNCTION(Client, Reliable)
+	void ClientApplyBuffRingVisuals(
+		const TArray<FMassNetworkID>& InTargetUnitNetIds,
+		float InRingRadius,
+		float InDuration,
+		float InHeightOffset
+	);
 
 	UFUNCTION(Server, Reliable)
 	void ServerHandleHoldCommand();
@@ -159,6 +193,31 @@ protected:
 	void ServerHandleBuildingSelect(ATWBaseBuilding* TargetBuilding);
 
 private:
+	struct FActiveBuffRingVisualEntry
+	{
+		FMassNetworkID UnitNetId;
+		float ExpireTime = 0.f;
+		float RingRadius = 120.f;
+		float HeightOffset = 70.f;
+	};
+
+	void InitializeBuffRingVisualActor();
+	void DestroyBuffRingVisualActor();
+	void TickBuffRingVisuals(float DeltaSeconds);
+	void RefreshBuffRingVisualActor();
+	bool GatherFriendlyUnitsForBuffVisual(
+		const FVector& InCenter,
+		float InRadius,
+		int32 InOwnerPlayerSlot,
+		TArray<FMassNetworkID>& OutTargetUnitNetIds
+	) const;
+	void ApplyLocalBuffRingVisuals(
+		const TArray<FMassNetworkID>& InTargetUnitNetIds,
+		float InRingRadius,
+		float InDuration,
+		float InHeightOffset
+	);
+
 	bool HandleScreenEdgeScrolling(float DeltaSeconds);
 	
 	bool IsLocationHiddenByFog(const FVector& InWorldLocation) const;
@@ -554,13 +613,47 @@ protected:
 	float HeroSkillDefaultImpactDecalLifeTime = 0.75f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|Debug")
-	bool bDrawHeroSkillDebug = true;
+	bool bDrawHeroSkillDebug = false;
+	UPROPERTY(EditDefaultsOnly, Category="HeroSkill|BuffRing")
+	float BuffUnitRingRadius = 100.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category="HeroSkill|BuffRing")
+	float BuffRingVisualScaleMultiplier = 1.0f;
 	UPROPERTY()
 	TObjectPtr<UDecalComponent> HeroSkillTargetDecal = nullptr;
 
 	UPROPERTY(VisibleInstanceOnly, Category="Hero|Skill")
 	float HeroSkillTargetDecalRadius = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	TSubclassOf<ATWSelectionVisualActor> BuffRingVisualActorClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	TObjectPtr<UStaticMesh> BuffRingMesh = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	TObjectPtr<UMaterialInterface> BuffRingMaterial = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	float BuffRingMeshBaseDiameter = 100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	float BuffRingRadiusMultiplier = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	float BuffRingHeightOffset = 70.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	bool bBuffRingRotateToGroundPlane = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hero|Skill|BuffRing")
+	FRotator BuffRingRotationOffset = FRotator(90.f, 0.f, 0.f);
+
+	UPROPERTY(Transient)
+	TObjectPtr<ATWSelectionVisualActor> BuffRingVisualActor = nullptr;
+
+	UPROPERTY(Transient)
+	TArray<FActiveBuffRingVisualEntry> ActiveBuffRingVisuals;
 
 	FName ResolveHeroSkillRowName(FName InHeroUnitId) const;
 	const FTWHeroTableRowBase* FindHeroSkillRow(FName InHeroUnitId) const;

@@ -174,7 +174,8 @@ public:
 		float Multiplier,
 		float Duration,
 		const TArray<ETWStatusType>& TargetStatusTypes,
-		bool bIncludeHeroes
+		bool bIncludeHeroes,
+		TArray<FMassNetworkID>* OutAppliedUnitNetIds = nullptr
 	);
 	bool GetEnemyEntitiesInRadius(
 	const FVector& Center,

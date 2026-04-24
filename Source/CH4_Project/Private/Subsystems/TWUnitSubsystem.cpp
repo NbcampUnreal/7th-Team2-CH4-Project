@@ -709,10 +709,16 @@ void UTWUnitSubsystem::ApplyTemporaryMultiplierBuffToFriendlyUnits(
 	float Multiplier,
 	float Duration,
 	const TArray<ETWStatusType>& TargetStatusTypes,
-	bool bIncludeHeroes
+	bool bIncludeHeroes,
+	TArray<FMassNetworkID>* OutAppliedUnitNetIds
 )
 {
 	checkf(GetWorld()->GetAuthGameMode(), TEXT("Server Logic Called!"));
+
+	if (OutAppliedUnitNetIds)
+	{
+		OutAppliedUnitNetIds->Reset();
+	}
 
 	if (Multiplier <= 1.0f || Duration <= 0.0f || TargetStatusTypes.IsEmpty())
 	{
@@ -730,6 +736,14 @@ void UTWUnitSubsystem::ApplyTemporaryMultiplierBuffToFriendlyUnits(
 	TArray<FMassEntityHandle> TargetEntities;
 	if (!GetFriendlyEntitiesInRadius(Center, Radius, OwnerPlayerSlot, TargetEntities, bIncludeHeroes))
 	{
+		UE_LOG(
+			LogTWCommand,
+			Warning,
+			TEXT("[BuffSkill][Server] No friendly unit in radius | Center=%s Radius=%.1f OwnerSlot=%d"),
+			*Center.ToString(),
+			Radius,
+			OwnerPlayerSlot
+		);
 		return;
 	}
 
@@ -738,6 +752,27 @@ void UTWUnitSubsystem::ApplyTemporaryMultiplierBuffToFriendlyUnits(
 
 	for (const FMassEntityHandle& Entity : TargetEntities)
 	{
+		if (!EntityManager.IsEntityValid(Entity) || !EntityManager.IsEntityActive(Entity))
+		{
+			continue;
+		}
+
+		const FTWUnitFragment* UnitFragment = EntityManager.GetFragmentDataPtr<FTWUnitFragment>(Entity);
+		if (!UnitFragment)
+		{
+			continue;
+		}
+
+		if (UnitFragment->GetOwner() != OwnerPlayerSlot)
+		{
+			continue;
+		}
+
+		if (!bIncludeHeroes && IsHeroUnitId(UnitFragment->GetUnitID()))
+		{
+			continue;
+		}
+
 		FTWStatusFragment* StatusFragment = EntityManager.GetFragmentDataPtr<FTWStatusFragment>(Entity);
 		if (!StatusFragment)
 		{
@@ -747,15 +782,16 @@ void UTWUnitSubsystem::ApplyTemporaryMultiplierBuffToFriendlyUnits(
 		FTWUnitStatus DeltaStatus;
 		bool bHasAnyDelta = false;
 
+		const FTWUnitStatus CurrentStatus = StatusFragment->GetStatus();
+
 		for (const ETWStatusType StatusType : TargetStatusTypes)
 		{
-			// 현재 체력은 건드리지 않는 쪽이 안전
 			if (StatusType == ETWStatusType::Health)
 			{
 				continue;
 			}
 
-			const float CurrentValue = StatusFragment->GetStatus().GetStatus(StatusType);
+			const float CurrentValue = CurrentStatus.GetStatus(StatusType);
 			const float DeltaValue = CurrentValue * (Multiplier - 1.0f);
 
 			if (FMath::IsNearlyZero(DeltaValue))
@@ -772,19 +808,48 @@ void UTWUnitSubsystem::ApplyTemporaryMultiplierBuffToFriendlyUnits(
 			continue;
 		}
 
-		FTWUnitStatus NewStatus = StatusFragment->GetStatus();
+		FTWUnitStatus NewStatus = CurrentStatus;
 		AddStatusDelta(NewStatus, DeltaStatus);
 		StatusFragment->SetStatus(NewStatus);
 
 		FTWTemporaryBuffEntry& NewEntry = AppliedEntries.AddDefaulted_GetRef();
 		NewEntry.Entity = Entity;
 		NewEntry.AppliedDelta = DeltaStatus;
+
+		if (OutAppliedUnitNetIds)
+		{
+			if (const FMassNetworkIDFragment* NetworkIDFragment =
+				EntityManager.GetFragmentDataPtr<FMassNetworkIDFragment>(Entity))
+			{
+				if (NetworkIDFragment->NetID.IsValid())
+				{
+					OutAppliedUnitNetIds->AddUnique(NetworkIDFragment->NetID);
+				}
+			}
+		}
 	}
 
 	if (AppliedEntries.IsEmpty())
 	{
+		UE_LOG(
+			LogTWCommand,
+			Warning,
+			TEXT("[BuffSkill][Server] Friendly units found but no buff delta applied | CandidateCount=%d Multiplier=%.2f"),
+			TargetEntities.Num(),
+			Multiplier
+		);
 		return;
 	}
+
+	UE_LOG(
+		LogTWCommand,
+		Log,
+		TEXT("[BuffSkill][Server] Buff applied | AppliedCount=%d VisualNetIdCount=%d Center=%s Radius=%.1f"),
+		AppliedEntries.Num(),
+		OutAppliedUnitNetIds ? OutAppliedUnitNetIds->Num() : 0,
+		*Center.ToString(),
+		Radius
+	);
 
 	TWeakObjectPtr<UTWUnitSubsystem> WeakThis(this);
 
