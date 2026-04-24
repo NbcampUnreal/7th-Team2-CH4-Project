@@ -41,6 +41,20 @@ void UTWSoundManagerSubsystem::PlaySoundByTag(FGameplayTag SoundTag, FVector Loc
 	}
 }
 
+void UTWSoundManagerSubsystem::PlayUISoundByTag(FGameplayTag SoundTag)
+{
+	if (UTWSoundAsset* Data = GetSoundData())
+	{
+		if (USoundBase* Sound = Data->GetSoundByTag(SoundTag))
+		{
+			if (UWorld* World = GetWorld())
+			{
+				UGameplayStatics::PlaySound2D(World, Sound);
+			}
+		}
+	}
+}
+
 void UTWSoundManagerSubsystem::PlaySoundAttached(FGameplayTag SoundTag, USceneComponent* AttachToComponent)
 {
 	if (!AttachToComponent)

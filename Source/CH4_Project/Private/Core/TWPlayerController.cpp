@@ -15,6 +15,7 @@
 #include "Widgets/SWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Widgets/TWAlertWidget.h"
+#include "GameplayTagContainer.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
